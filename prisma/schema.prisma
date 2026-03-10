@@ -11,3 +11,35 @@ model Request {
   status    String
   createdAt DateTime @default(now())
 }
+
+enum IntegrationType {
+  STASHDB
+  STASH
+  WHISPARR
+}
+
+enum IntegrationStatus {
+  NOT_CONFIGURED
+  CONFIGURED
+  ERROR
+}
+
+model IntegrationConfig {
+  id               String            @id @default(cuid())
+  type             IntegrationType   @unique
+  enabled          Boolean           @default(true)
+  status           IntegrationStatus @default(NOT_CONFIGURED)
+
+  name             String?
+  baseUrl          String?
+  apiKey           String?
+
+  config           Json?
+
+  lastHealthyAt    DateTime?
+  lastErrorAt      DateTime?
+  lastErrorMessage String?
+
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
