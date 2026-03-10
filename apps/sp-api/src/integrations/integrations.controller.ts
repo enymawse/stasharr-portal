@@ -1,4 +1,11 @@
-import { Body, Controller, Get, Param, Put } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Put,
+} from '@nestjs/common';
 import { IntegrationType } from '@prisma/client';
 import { IntegrationResponseDto } from './dto/integration-response.dto';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
@@ -34,7 +41,7 @@ export class IntegrationsController {
     if (
       !Object.values(IntegrationType).includes(normalized as IntegrationType)
     ) {
-      throw new Error(`Unsupported integration type: ${type}`);
+      throw new BadRequestException(`Unsupported integration type: ${type}`);
     }
 
     return normalized as IntegrationType;

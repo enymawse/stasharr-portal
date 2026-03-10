@@ -6,8 +6,8 @@ export interface SetupStatusResponse {
   setupComplete: boolean;
   required: {
     stash: boolean;
-    whisparr: boolean;
     stashdb: boolean;
+    whisparr: boolean;
   };
 }
 
@@ -27,12 +27,12 @@ export class SetupService {
 
     const required = {
       stash: isConfigured(IntegrationType.STASH),
-      whisparr: isConfigured(IntegrationType.WHISPARR),
       stashdb: isConfigured(IntegrationType.STASHDB),
+      whisparr: isConfigured(IntegrationType.WHISPARR),
     };
 
     return {
-      setupComplete: required.stash && required.whisparr,
+      setupComplete: required.stash && required.stashdb && required.whisparr,
       required,
     };
   }
