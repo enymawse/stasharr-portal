@@ -7,7 +7,9 @@
     "dev": "pnpm -r --parallel dev",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
-    "format": "pnpm -r format"
+    "format": "pnpm -r format",
+    "web": "pnpm --filter ./apps/sp-web start",
+    "backend": "pnpm --filter ./apps/sp-api start:dev"
   },
   "devDependencies": {
     "prisma": "^7.4.2"
