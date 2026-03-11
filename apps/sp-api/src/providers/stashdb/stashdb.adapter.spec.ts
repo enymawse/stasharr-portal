@@ -106,4 +106,72 @@ describe('StashdbAdapter', () => {
     expect(requestBody.query).toContain('studio');
     expect(requestBody.query).toContain('images');
   });
+
+  it('returns normalized studioImageUrl for scene details from studio images', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findScene: {
+              id: 'scene-1',
+              title: 'Scene 1',
+              details: 'Details',
+              date: '2026-03-01',
+              release_date: '2026-03-02',
+              production_date: '2026-03-03',
+              duration: 640,
+              images: [
+                {
+                  id: 'img-1',
+                  url: 'https://scene-large.jpg',
+                  width: 1920,
+                  height: 1080,
+                },
+              ],
+              tags: [],
+              urls: [],
+              performers: [],
+              studio: {
+                id: 'studio-1',
+                name: 'Studio Name',
+                is_favorite: false,
+                images: [
+                  {
+                    id: 'studio-img-1',
+                    url: 'https://studio-small.jpg',
+                    width: 180,
+                    height: 120,
+                  },
+                  {
+                    id: 'studio-img-2',
+                    url: 'https://studio-wide.png',
+                    width: 860,
+                    height: 180,
+                  },
+                ],
+              },
+            },
+          },
+        }),
+    } as Response);
+
+    const result = await adapter.getSceneById('scene-1', {
+      baseUrl: 'http://stashdb.local/graphql',
+    });
+
+    expect(result).toMatchObject({
+      id: 'scene-1',
+      studioName: 'Studio Name',
+      studioImageUrl: 'https://studio-wide.png',
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).toContain('findScene');
+    expect(requestBody.query).toContain('studio');
+    expect(requestBody.query).toContain('images');
+  });
 });

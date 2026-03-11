@@ -77,6 +77,40 @@ p {
     );
 }
 
+.studio-logo-overlay {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.95rem;
+  z-index: 2;
+  max-width: min(9.8rem, 28%);
+  height: 2.2rem;
+  border-radius: 0.72rem;
+  padding: 0.22rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 66%, transparent);
+  box-shadow:
+    0 6px 16px rgb(7 12 19 / 34%),
+    inset 0 1px 0 rgb(255 255 255 / 24%);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-elevated) 90%, #fff),
+      color-mix(in srgb, var(--surface-2) 84%, transparent)
+    ),
+    rgb(19 30 44 / 30%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+}
+
+.studio-logo-overlay img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: right center;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 25%));
+}
+
 .hero-layout {
   position: relative;
   z-index: 1;
@@ -316,6 +350,13 @@ button {
     align-items: start;
     padding: 1.2rem 0.9rem 1rem;
     gap: 0.9rem;
+  }
+
+  .studio-logo-overlay {
+    top: 0.68rem;
+    right: 0.68rem;
+    max-width: min(8.2rem, 44%);
+    height: 1.95rem;
   }
 
 }

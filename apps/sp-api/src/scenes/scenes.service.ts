@@ -59,6 +59,7 @@ export class ScenesService {
       imageUrl: scene.imageUrl,
       images: scene.images,
       studio: scene.studioName,
+      studioImageUrl: scene.studioImageUrl,
       releaseDate: scene.releaseDate,
       duration: scene.duration,
       tags: scene.tags,

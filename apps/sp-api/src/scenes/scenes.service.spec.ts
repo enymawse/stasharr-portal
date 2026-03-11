@@ -46,6 +46,7 @@ describe('ScenesService', () => {
     imageUrl: 'http://image',
     images: [],
     studioName: 'Studio',
+    studioImageUrl: 'http://studio-image',
     releaseDate: '2026-01-01',
     duration: 300,
     tags: [],

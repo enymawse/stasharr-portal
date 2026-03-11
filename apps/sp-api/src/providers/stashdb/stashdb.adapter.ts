@@ -65,6 +65,7 @@ export interface StashdbSceneDetails {
   imageUrl: string | null;
   images: StashdbSceneImage[];
   studioName: string | null;
+  studioImageUrl: string | null;
   releaseDate: string | null;
   duration: number | null;
   tags: StashdbSceneTag[];
@@ -125,6 +126,12 @@ interface StashdbGraphqlResponse {
         id?: unknown;
         name?: unknown;
         is_favorite?: unknown;
+        images?: Array<{
+          id?: unknown;
+          url?: unknown;
+          width?: unknown;
+          height?: unknown;
+        }>;
       } | null;
       urls?: Array<{
         url?: unknown;
@@ -278,6 +285,12 @@ export class StashdbAdapter {
             id
             name
             is_favorite
+            images {
+              id
+              url
+              width
+              height
+            }
           }
           urls {
             url
@@ -335,6 +348,9 @@ export class StashdbAdapter {
       .filter((image): image is StashdbSceneImage => image !== null);
 
     const primaryImage = this.selectPrimaryImage(images);
+    const studioImageUrl = this.selectPrimaryImage(
+      this.normalizeImages(scene.studio?.images),
+    )?.url;
 
     const tags = (scene.tags ?? [])
       .map((tag): StashdbSceneTag | null => {
@@ -436,6 +452,7 @@ export class StashdbAdapter {
         typeof scene.studio?.name === 'string' && scene.studio.name.length > 0
           ? scene.studio.name
           : null,
+      studioImageUrl: studioImageUrl ?? null,
       releaseDate,
       duration: typeof scene.duration === 'number' ? scene.duration : null,
       tags,

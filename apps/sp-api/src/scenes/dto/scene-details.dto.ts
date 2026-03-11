@@ -47,6 +47,7 @@ export class SceneDetailsDto {
   imageUrl!: string | null;
   images!: SceneImageDto[];
   studio!: string | null;
+  studioImageUrl!: string | null;
   releaseDate!: string | null;
   duration!: number | null;
   tags!: SceneTagDto[];

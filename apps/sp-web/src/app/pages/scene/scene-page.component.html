@@ -17,6 +17,12 @@
       }
       <div class="hero-shade" aria-hidden="true"></div>
 
+      @if (scene.studioImageUrl) {
+        <div class="studio-logo-overlay" aria-hidden="true">
+          <img [src]="scene.studioImageUrl" alt="" />
+        </div>
+      }
+
       <div class="hero-layout">
         <div class="poster-card">
           @if (scene.imageUrl) {
