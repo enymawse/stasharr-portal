@@ -1,26 +1,12 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { provideRouter, Router } from '@angular/router';
 import { App } from './app';
-import { SetupService } from './core/api/setup.service';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [
-        provideRouter([]),
-        {
-          provide: SetupService,
-          useValue: {
-            getStatus: () =>
-              of({
-                setupComplete: false,
-                required: { stash: false, stashdb: false, whisparr: false },
-              }),
-          },
-        },
-      ],
+      providers: [provideRouter([])],
     }).compileComponents();
   });
 
@@ -28,5 +14,15 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     const app = fixture.componentInstance;
     expect(app).toBeTruthy();
+  });
+
+  it('does not force navigation on app startup', () => {
+    const router = TestBed.inject(Router);
+    const navigateSpy = vi.spyOn(router, 'navigateByUrl');
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    expect(navigateSpy).not.toHaveBeenCalled();
   });
 });
