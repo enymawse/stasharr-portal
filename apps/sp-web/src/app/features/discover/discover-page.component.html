@@ -52,16 +52,6 @@
               </div>
             </div>
           </a>
-
-          <p class="meta">{{ item.type }} | {{ item.source }}</p>
-
-          @if (item.releaseDate) {
-            <p><strong>Release date:</strong> {{ item.releaseDate }}</p>
-          }
-
-          @if (formattedDuration(item.duration); as duration) {
-            <p><strong>Duration:</strong> {{ duration }}</p>
-          }
         </article>
       }
     </section>

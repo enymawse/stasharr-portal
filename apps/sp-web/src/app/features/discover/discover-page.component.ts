@@ -91,20 +91,6 @@ export class DiscoverPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadNextPage();
   }
 
-  protected formattedDuration(durationSeconds: number | null): string | null {
-    if (!durationSeconds || durationSeconds <= 0) {
-      return null;
-    }
-
-    const minutes = Math.floor(durationSeconds / 60)
-      .toString()
-      .padStart(2, '0');
-    const seconds = Math.floor(durationSeconds % 60)
-      .toString()
-      .padStart(2, '0');
-    return `${minutes}:${seconds}`;
-  }
-
   protected truncatedDescription(description: string | null): string | null {
     if (!description) {
       return null;
