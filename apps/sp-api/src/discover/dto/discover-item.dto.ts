@@ -12,5 +12,8 @@ export class DiscoverItemDto {
 
 export class DiscoverResponseDto {
   total!: number;
+  page!: number;
+  perPage!: number;
+  hasMore!: boolean;
   items!: DiscoverItemDto[];
 }

@@ -3,6 +3,8 @@ import { BadGatewayException, Injectable } from '@nestjs/common';
 export interface StashdbAdapterConfig {
   baseUrl: string;
   apiKey?: string | null;
+  page: number;
+  perPage: number;
 }
 
 export interface StashdbScene {
@@ -58,8 +60,8 @@ export class StashdbAdapter {
     const endpoint = this.resolveGraphqlEndpoint(config.baseUrl);
 
     const query = `
-      query QueryScenes {
-        queryScenes(input: { sort: TRENDING }) {
+      query QueryScenes($page: Int!, $perPage: Int!) {
+        queryScenes(input: { sort: TRENDING, page: $page, per_page: $perPage }) {
           count
           scenes {
             id
@@ -99,7 +101,13 @@ export class StashdbAdapter {
       response = await fetch(endpoint, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({
+          query,
+          variables: {
+            page: config.page,
+            perPage: config.perPage,
+          },
+        }),
       });
     } catch {
       throw new BadGatewayException(

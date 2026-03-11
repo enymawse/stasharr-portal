@@ -67,3 +67,20 @@ header p {
   color: #2c3947;
   line-height: 1.35;
 }
+
+.load-sentinel {
+  height: 1px;
+}
+
+button {
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #6e7b8a;
+  background: #eff3f7;
+  cursor: pointer;
+}
+
+.load-more-error {
+  margin-top: 0.5rem;
+}

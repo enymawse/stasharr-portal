@@ -12,5 +12,8 @@ export interface DiscoverItem {
 
 export interface DiscoverResponse {
   total: number;
+  page: number;
+  perPage: number;
+  hasMore: boolean;
   items: DiscoverItem[];
 }

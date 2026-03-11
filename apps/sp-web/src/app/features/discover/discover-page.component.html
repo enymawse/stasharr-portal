@@ -11,6 +11,7 @@
     <p class="state">Loading discover feed...</p>
   } @else if (error()) {
     <p class="state error">{{ error() }}</p>
+    <button type="button" (click)="retryInitialLoad()">Retry</button>
   } @else if (!hasItems()) {
     <p class="state">No trending items are available right now.</p>
   } @else {
@@ -42,5 +43,18 @@
         </article>
       }
     </section>
+
+    <div #loadMoreSentinel class="load-sentinel"></div>
+
+    @if (loadingMore()) {
+      <p class="state">Loading more scenes...</p>
+    }
+
+    @if (loadMoreError()) {
+      <div class="load-more-error">
+        <p class="state error">{{ loadMoreError() }}</p>
+        <button type="button" (click)="retryLoadMore()">Retry</button>
+      </div>
+    }
   }
 </main>

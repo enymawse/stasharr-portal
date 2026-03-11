@@ -11,12 +11,18 @@ import { DiscoverResponseDto } from './dto/discover-item.dto';
 
 @Injectable()
 export class DiscoverService {
+  private static readonly DEFAULT_PAGE = 1;
+  private static readonly DEFAULT_PER_PAGE = 25;
+
   constructor(
     private readonly integrationsService: IntegrationsService,
     private readonly stashdbAdapter: StashdbAdapter,
   ) {}
 
-  async getDiscoverFeed(): Promise<DiscoverResponseDto> {
+  async getDiscoverFeed(
+    page = DiscoverService.DEFAULT_PAGE,
+    perPage = DiscoverService.DEFAULT_PER_PAGE,
+  ): Promise<DiscoverResponseDto> {
     const integration = await this.getStashdbIntegration();
 
     if (!integration.enabled) {
@@ -36,10 +42,17 @@ export class DiscoverService {
     const trending = await this.stashdbAdapter.getTrendingScenes({
       baseUrl: integration.baseUrl,
       apiKey: integration.apiKey,
+      page,
+      perPage,
     });
+
+    const hasMore = page * perPage < trending.total;
 
     return {
       total: trending.total,
+      page,
+      perPage,
+      hasMore,
       items: trending.scenes.map((scene) => ({
         id: scene.id,
         title: scene.title,
