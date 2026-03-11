@@ -8,12 +8,14 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { DiscoverService } from '../../core/api/discover.service';
 import { DiscoverItem } from '../../core/api/discover.types';
 
 @Component({
   selector: 'app-discover-page',
+  imports: [RouterLink],
   templateUrl: './discover-page.component.html',
   styleUrl: './discover-page.component.scss',
 })

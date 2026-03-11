@@ -1,0 +1,101 @@
+<main>
+  <a class="back-link" [routerLink]="['/discover']">Back to Discover</a>
+
+  @if (loading()) {
+    <p class="state">Loading scene details...</p>
+  } @else if (error()) {
+    <p class="state error">{{ error() }}</p>
+    <button type="button" (click)="retry()">Retry</button>
+  } @else if (scene(); as scene) {
+    <section class="hero">
+      @if (scene.imageUrl) {
+        <img class="hero-image" [src]="scene.imageUrl" [alt]="scene.title" />
+      }
+
+      <div class="meta">
+        <h1>{{ scene.title }}</h1>
+
+        @if (scene.studio) {
+          <p><strong>Studio:</strong> {{ scene.studio }}</p>
+        }
+
+        @if (scene.releaseDate) {
+          <p><strong>Release date:</strong> {{ scene.releaseDate }}</p>
+        }
+
+        @if (formattedDuration(scene.duration); as duration) {
+          <p><strong>Duration:</strong> {{ duration }}</p>
+        }
+      </div>
+    </section>
+
+    @if (scene.performers.length > 0) {
+      <section class="section">
+        <h2>Performers</h2>
+        <div class="performer-grid">
+          @for (performer of scene.performers; track performer.id) {
+            <article class="performer-card">
+              @if (performer.imageUrl) {
+                <img
+                  class="performer-avatar"
+                  [src]="performer.imageUrl"
+                  [alt]="performer.name"
+                />
+              } @else {
+                <div class="performer-avatar placeholder">
+                  {{ performerInitial(performer.name) }}
+                </div>
+              }
+
+              <div class="performer-meta">
+                <p class="performer-name">{{ performer.name }}</p>
+                @if (formattedGender(performer.gender); as gender) {
+                  <p class="performer-gender">{{ gender }}</p>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      </section>
+    }
+
+    @if (scene.tags.length > 0) {
+      <section class="section">
+        <h2>Tags</h2>
+        <div class="chips">
+          @for (tag of scene.tags; track tag.id) {
+            <span class="chip">{{ tag.name }}</span>
+          }
+        </div>
+      </section>
+    }
+
+    @if (displayedDescription(scene.description); as description) {
+      <section class="section">
+        <h2>Description</h2>
+        <p>{{ description }}</p>
+
+        @if (hasLongDescription(scene.description)) {
+          <button type="button" (click)="toggleDescription()">
+            {{ descriptionExpanded() ? 'Show less' : 'Show more' }}
+          </button>
+        }
+      </section>
+    }
+
+    @if (scene.sourceUrls.length > 0) {
+      <section class="section">
+        <h2>External Links</h2>
+        <ul>
+          @for (sourceUrl of scene.sourceUrls; track sourceUrl.url) {
+            <li>
+              <a [href]="sourceUrl.url" target="_blank" rel="noopener noreferrer">
+                {{ sourceUrl.type ?? 'External link' }}
+              </a>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  }
+</main>

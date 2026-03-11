@@ -22,7 +22,9 @@
             <img class="thumbnail" [src]="item.imageUrl" [alt]="item.title" loading="lazy" />
           }
 
-          <h2>{{ item.title }}</h2>
+          <h2>
+            <a class="scene-link" [routerLink]="['/scene', item.id]">{{ item.title }}</a>
+          </h2>
           <p class="meta">{{ item.type }} | {{ item.source }}</p>
 
           @if (item.studio) {

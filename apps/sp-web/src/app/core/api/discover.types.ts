@@ -17,3 +17,44 @@ export interface DiscoverResponse {
   hasMore: boolean;
   items: DiscoverItem[];
 }
+
+export interface SceneImage {
+  id: string;
+  url: string;
+  width: number | null;
+  height: number | null;
+}
+
+export interface SceneTag {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+export interface ScenePerformer {
+  id: string;
+  name: string;
+  gender: string | null;
+  isFavorite: boolean;
+  imageUrl: string | null;
+}
+
+export interface SceneUrl {
+  url: string;
+  type: string | null;
+}
+
+export interface SceneDetails {
+  id: string;
+  title: string;
+  description: string | null;
+  imageUrl: string | null;
+  images: SceneImage[];
+  studio: string | null;
+  releaseDate: string | null;
+  duration: number | null;
+  tags: SceneTag[];
+  performers: ScenePerformer[];
+  sourceUrls: SceneUrl[];
+  source: 'STASHDB';
+}

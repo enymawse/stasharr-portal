@@ -63,6 +63,15 @@ header p {
   font-size: 0.95rem;
 }
 
+.scene-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.scene-link:hover {
+  text-decoration: underline;
+}
+
 .details {
   color: #2c3947;
   line-height: 1.35;

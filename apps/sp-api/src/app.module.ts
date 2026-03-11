@@ -4,6 +4,7 @@ import { DiscoverModule } from './discover/discover.module';
 import { HealthModule } from './health/health.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ScenesModule } from './scenes/scenes.module';
 import { SetupModule } from './setup/setup.module';
 
 @Module({
@@ -17,6 +18,7 @@ import { SetupModule } from './setup/setup.module';
     IntegrationsModule,
     SetupModule,
     DiscoverModule,
+    ScenesModule,
   ],
 })
 export class AppModule {}
