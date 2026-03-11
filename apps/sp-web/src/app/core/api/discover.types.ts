@@ -79,6 +79,7 @@ export interface SceneDetails {
   images: SceneImage[];
   studio: string | null;
   studioImageUrl: string | null;
+  studioUrl: string | null;
   releaseDate: string | null;
   duration: number | null;
   tags: SceneTag[];

@@ -60,6 +60,7 @@ export class ScenesService {
       images: scene.images,
       studio: scene.studioName,
       studioImageUrl: scene.studioImageUrl,
+      studioUrl: this.resolveStudioUrl(scene.sourceUrls),
       releaseDate: scene.releaseDate,
       duration: scene.duration,
       tags: scene.tags,
@@ -118,5 +119,16 @@ export class ScenesService {
 
       throw error;
     }
+  }
+
+  private resolveStudioUrl(
+    sourceUrls: Array<{ url: string; type: string | null }>,
+  ): string | null {
+    const studioEntry = sourceUrls.find((entry) => {
+      const normalizedType = entry.type?.trim().toLowerCase() ?? '';
+      return normalizedType.includes('studio');
+    });
+
+    return studioEntry?.url ?? null;
   }
 }

@@ -18,9 +18,21 @@
       <div class="hero-shade" aria-hidden="true"></div>
 
       @if (scene.studioImageUrl) {
-        <div class="studio-logo-overlay" aria-hidden="true">
-          <img [src]="scene.studioImageUrl" alt="" />
-        </div>
+        @if (scene.studioUrl) {
+          <a
+            class="studio-logo-overlay"
+            [href]="scene.studioUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            [attr.aria-label]="studioLogoAriaLabel(scene)"
+          >
+            <img [src]="scene.studioImageUrl" alt="" />
+          </a>
+        } @else {
+          <div class="studio-logo-overlay" aria-hidden="true">
+            <img [src]="scene.studioImageUrl" alt="" />
+          </div>
+        }
       }
 
       <div class="hero-layout">
@@ -61,7 +73,7 @@
             </div>
           }
 
-          @if (scene.sourceUrls.length > 0) {
+          @if (nonStudioSourceUrls(scene).length > 0) {
             <div class="hero-actions">
               @if (hasStashCopy(scene)) {
                 @if (hasMultipleStashCopies(scene)) {
@@ -89,7 +101,11 @@
                 }
               }
 
-              @for (sourceUrl of scene.sourceUrls; track sourceUrl.url; let idx = $index) {
+              @for (
+                sourceUrl of nonStudioSourceUrls(scene);
+                track sourceUrl.url;
+                let idx = $index
+              ) {
                 @if (idx < 2) {
                   <a
                     class="secondary-link"
@@ -184,11 +200,11 @@
         </section>
       }
 
-      @if (scene.sourceUrls.length > 0) {
+      @if (nonStudioSourceUrls(scene).length > 0) {
         <section class="section">
           <h2>External Links</h2>
           <ul class="links">
-            @for (sourceUrl of scene.sourceUrls; track sourceUrl.url) {
+            @for (sourceUrl of nonStudioSourceUrls(scene); track sourceUrl.url) {
               <li>
                 <a [href]="sourceUrl.url" target="_blank" rel="noopener noreferrer">
                   {{ sourceUrl.type ?? 'External link' }}

@@ -101,6 +101,12 @@ p {
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(8px);
+  text-decoration: none;
+}
+
+a.studio-logo-overlay:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .studio-logo-overlay img {
