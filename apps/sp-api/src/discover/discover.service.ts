@@ -7,7 +7,7 @@ import {
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
-import { DiscoverItemDto } from './dto/discover-item.dto';
+import { DiscoverResponseDto } from './dto/discover-item.dto';
 
 @Injectable()
 export class DiscoverService {
@@ -16,7 +16,7 @@ export class DiscoverService {
     private readonly stashdbAdapter: StashdbAdapter,
   ) {}
 
-  async getDiscoverFeed(): Promise<DiscoverItemDto[]> {
+  async getDiscoverFeed(): Promise<DiscoverResponseDto> {
     const integration = await this.getStashdbIntegration();
 
     if (!integration.enabled) {
@@ -33,25 +33,25 @@ export class DiscoverService {
       );
     }
 
-    const trendingScenes = await this.stashdbAdapter.getTrendingScenes({
+    const trending = await this.stashdbAdapter.getTrendingScenes({
       baseUrl: integration.baseUrl,
       apiKey: integration.apiKey,
     });
 
-    return trendingScenes.map((scene) => ({
-      id: scene.id,
-      title: scene.title,
-      type: 'SCENE',
-      details: scene.details,
-      imageUrl: scene.imageUrl,
-      imageCount: scene.imageCount,
-      studioName: scene.studioName,
-      releaseDate: scene.releaseDate,
-      productionDate: scene.productionDate,
-      duration: scene.duration,
-      source: 'STASHDB',
-      sourceUrl: scene.sourceUrl,
-    }));
+    return {
+      total: trending.total,
+      items: trending.scenes.map((scene) => ({
+        id: scene.id,
+        title: scene.title,
+        description: scene.details,
+        imageUrl: scene.imageUrl,
+        studio: scene.studioName,
+        releaseDate: scene.releaseDate ?? scene.productionDate ?? scene.date,
+        duration: scene.duration,
+        type: 'SCENE',
+        source: 'STASHDB',
+      })),
+    };
   }
 
   private async getStashdbIntegration() {

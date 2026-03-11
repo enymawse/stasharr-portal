@@ -2,6 +2,9 @@
   <header>
     <h1>Discover</h1>
     <p>Trending scenes from your configured StashDB integration.</p>
+    @if (!loading() && !error()) {
+      <p class="state">Total trending scenes: {{ total() }}</p>
+    }
   </header>
 
   @if (loading()) {
@@ -21,30 +24,20 @@
           <h2>{{ item.title }}</h2>
           <p class="meta">{{ item.type }} | {{ item.source }}</p>
 
-          @if (item.studioName) {
-            <p><strong>Studio:</strong> {{ item.studioName }}</p>
+          @if (item.studio) {
+            <p><strong>Studio:</strong> {{ item.studio }}</p>
           }
 
-          @if (displayDate(item); as date) {
-            <p><strong>Date:</strong> {{ date }}</p>
+          @if (item.releaseDate) {
+            <p><strong>Release date:</strong> {{ item.releaseDate }}</p>
           }
 
           @if (formattedDuration(item.duration); as duration) {
             <p><strong>Duration:</strong> {{ duration }}</p>
           }
 
-          @if (item.imageCount > 0) {
-            <p><strong>Images:</strong> {{ item.imageCount }}</p>
-          }
-
-          @if (truncatedDetails(item.details); as details) {
-            <p class="details">{{ details }}</p>
-          }
-
-          @if (item.sourceUrl) {
-            <p>
-              <a [href]="item.sourceUrl" target="_blank" rel="noopener noreferrer">View source</a>
-            </p>
+          @if (truncatedDescription(item.description); as description) {
+            <p class="details">{{ description }}</p>
           }
         </article>
       }

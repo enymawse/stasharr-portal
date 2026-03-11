@@ -1,14 +1,16 @@
 export interface DiscoverItem {
   id: string;
   title: string;
-  type: 'SCENE';
-  details: string | null;
+  description: string | null;
   imageUrl: string | null;
-  imageCount: number;
-  studioName: string | null;
+  studio: string | null;
   releaseDate: string | null;
-  productionDate: string | null;
   duration: number | null;
+  type: 'SCENE';
   source: 'STASHDB';
-  sourceUrl: string | null;
+}
+
+export interface DiscoverResponse {
+  total: number;
+  items: DiscoverItem[];
 }

@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { DiscoverItemDto } from './dto/discover-item.dto';
+import { DiscoverResponseDto } from './dto/discover-item.dto';
 import { DiscoverService } from './discover.service';
 
 @Controller('api/discover')
@@ -7,7 +7,7 @@ export class DiscoverController {
   constructor(private readonly discoverService: DiscoverService) {}
 
   @Get()
-  getDiscoverFeed(): Promise<DiscoverItemDto[]> {
+  getDiscoverFeed(): Promise<DiscoverResponseDto> {
     return this.discoverService.getDiscoverFeed();
   }
 }

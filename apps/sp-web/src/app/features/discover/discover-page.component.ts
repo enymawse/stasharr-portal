@@ -13,6 +13,7 @@ export class DiscoverPageComponent implements OnInit {
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+  protected readonly total = signal(0);
   protected readonly items = signal<DiscoverItem[]>([]);
 
   ngOnInit(): void {
@@ -23,32 +24,26 @@ export class DiscoverPageComponent implements OnInit {
     return this.items().length > 0;
   }
 
-  protected displayDate(item: DiscoverItem): string | null {
-    return item.releaseDate ?? item.productionDate;
-  }
-
   protected formattedDuration(durationSeconds: number | null): string | null {
     if (!durationSeconds || durationSeconds <= 0) {
       return null;
     }
 
-    const totalMinutes = Math.floor(durationSeconds / 60);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-
-    if (hours === 0) {
-      return `${minutes}m`;
-    }
-
-    return `${hours}h ${minutes}m`;
+    const minutes = Math.floor(durationSeconds / 60)
+      .toString()
+      .padStart(2, '0');
+    const seconds = Math.floor(durationSeconds % 60)
+      .toString()
+      .padStart(2, '0');
+    return `${minutes}:${seconds}`;
   }
 
-  protected truncatedDetails(details: string | null): string | null {
-    if (!details) {
+  protected truncatedDescription(description: string | null): string | null {
+    if (!description) {
       return null;
     }
 
-    const singleLine = details.replaceAll(/\s+/g, ' ').trim();
+    const singleLine = description.replaceAll(/\s+/g, ' ').trim();
     if (singleLine.length <= 180) {
       return singleLine;
     }
@@ -68,8 +63,9 @@ export class DiscoverPageComponent implements OnInit {
         }),
       )
       .subscribe({
-        next: (items) => {
-          this.items.set(items);
+        next: (response) => {
+          this.total.set(response.total);
+          this.items.set(response.items);
         },
         error: () => {
           this.error.set('Failed to load discover feed from the API.');
