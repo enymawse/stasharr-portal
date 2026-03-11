@@ -38,7 +38,7 @@ header p {
   margin-top: 1rem;
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 .card {
@@ -64,7 +64,7 @@ header p {
 
 .media {
   position: relative;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 10 / 7;
   border-radius: 8px;
   overflow: hidden;
   background: #e7edf5;
@@ -104,11 +104,11 @@ header p {
 }
 
 .logo-plaque {
-  max-width: min(10.25rem, 65%);
-  min-width: 3.15rem;
-  height: 2rem;
+  max-width: min(5.8rem, 37%);
+  min-width: 1.75rem;
+  height: 1.15rem;
   border-radius: 0.55rem;
-  padding: 0.22rem 0.5rem;
+  padding: 0.12rem 0.28rem;
   background:
     linear-gradient(180deg, rgb(251 254 255 / 88%), rgb(233 241 250 / 82%)),
     rgb(21 34 48 / 24%);
@@ -126,16 +126,16 @@ header p {
 }
 
 .text-badge {
-  max-width: min(10.25rem, 65%);
-  min-width: 3.15rem;
-  height: 2rem;
-  padding: 0.2rem 0.56rem;
+  max-width: min(5.8rem, 37%);
+  min-width: 1.75rem;
+  height: 1.15rem;
+  padding: 0.1rem 0.3rem;
   border-radius: 0.55rem;
   background:
     linear-gradient(180deg, rgb(252 255 255 / 84%), rgb(231 239 247 / 76%)),
     rgb(17 27 38 / 52%);
   color: #182a3d;
-  font-size: 0.72rem;
+  font-size: 0.56rem;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -237,9 +237,17 @@ button {
 }
 
 @media (max-width: 560px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .media {
+    aspect-ratio: 16 / 10;
+  }
+
   .logo-plaque,
   .text-badge {
-    max-width: 70%;
-    height: 1.85rem;
+    max-width: 40%;
+    height: 1.05rem;
   }
 }
