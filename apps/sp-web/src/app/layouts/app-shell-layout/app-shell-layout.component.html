@@ -1,0 +1,63 @@
+<div class="layout" [class.collapsed]="collapsed()">
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      @if (!collapsed()) {
+        <p class="brand">Stasharr Portal</p>
+      } @else {
+        <p class="brand compact">SP</p>
+      }
+
+      <button
+        type="button"
+        class="collapse-btn"
+        (click)="toggleCollapsed()"
+        [attr.aria-label]="collapsed() ? 'Expand navigation' : 'Collapse navigation'"
+        [attr.aria-expanded]="!collapsed()"
+      >
+        <span aria-hidden="true">{{ collapsed() ? '»' : '«' }}</span>
+      </button>
+    </div>
+
+    <nav class="nav" aria-label="Primary navigation">
+      <a
+        routerLink="/discover"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        class="nav-item"
+      >
+        <span class="icon" aria-hidden="true">D</span>
+        @if (!collapsed()) {
+          <span>Discover</span>
+        }
+      </a>
+
+      <a
+        routerLink="/scenes"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        class="nav-item"
+      >
+        <span class="icon" aria-hidden="true">S</span>
+        @if (!collapsed()) {
+          <span>Scenes</span>
+        }
+      </a>
+
+      <a
+        routerLink="/settings"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        class="nav-item"
+      >
+        <span class="icon" aria-hidden="true">⚙</span>
+        @if (!collapsed()) {
+          <span>Settings</span>
+        }
+      </a>
+    </nav>
+  </aside>
+
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>

@@ -3,9 +3,12 @@ import {
   requireSetupCompleteGuard,
   setupOnlyWhenIncompleteGuard,
 } from './core/guards/setup-route.guard';
+import { AppShellLayoutComponent } from './layouts/app-shell-layout/app-shell-layout.component';
 import { DiscoverPageComponent } from './features/discover/discover-page.component';
 import { SetupPageComponent } from './features/setup/setup-page.component';
+import { ScenesPageComponent } from './pages/scenes/scenes-page.component';
 import { ScenePageComponent } from './pages/scene/scene-page.component';
+import { SettingsPageComponent } from './pages/settings/settings-page.component';
 
 export const routes: Routes = [
   {
@@ -14,22 +17,35 @@ export const routes: Routes = [
     canActivate: [setupOnlyWhenIncompleteGuard],
   },
   {
-    path: 'discover',
-    component: DiscoverPageComponent,
-    canActivate: [requireSetupCompleteGuard],
-  },
-  {
-    path: 'scene/:stashId',
-    component: ScenePageComponent,
-    canActivate: [requireSetupCompleteGuard],
-  },
-  {
     path: '',
-    pathMatch: 'full',
-    redirectTo: 'discover',
+    component: AppShellLayoutComponent,
+    canActivate: [requireSetupCompleteGuard],
+    children: [
+      {
+        path: 'discover',
+        component: DiscoverPageComponent,
+      },
+      {
+        path: 'scene/:stashId',
+        component: ScenePageComponent,
+      },
+      {
+        path: 'scenes',
+        component: ScenesPageComponent,
+      },
+      {
+        path: 'settings',
+        component: SettingsPageComponent,
+      },
+      {
+        path: '',
+        pathMatch: 'full',
+        redirectTo: 'discover',
+      },
+    ],
   },
   {
     path: '**',
-    redirectTo: 'setup',
+    redirectTo: '',
   },
 ];

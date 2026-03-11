@@ -1,0 +1,123 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+}
+
+.layout {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  background: var(--app-bg);
+  transition: grid-template-columns 180ms ease;
+}
+
+.layout.collapsed {
+  grid-template-columns: 74px 1fr;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  padding: 0.8rem 0.65rem;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0.9rem;
+}
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.brand {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+
+.brand.compact {
+  font-size: 0.88rem;
+}
+
+.collapse-btn {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.nav {
+  display: grid;
+  gap: 0.3rem;
+  align-content: start;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.52rem;
+  border-radius: 9px;
+  color: var(--text-primary);
+  text-decoration: none;
+  padding: 0.48rem 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: background-color 140ms ease;
+}
+
+.icon {
+  width: 1.3rem;
+  height: 1.3rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.nav-item.active {
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.nav-item.active .icon {
+  color: var(--focus-ring);
+}
+
+.nav-item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.content {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 74px 1fr;
+  }
+
+  .brand {
+    display: none;
+  }
+
+  .nav-item {
+    justify-content: center;
+  }
+
+  .nav-item span:not(.icon) {
+    display: none;
+  }
+}
