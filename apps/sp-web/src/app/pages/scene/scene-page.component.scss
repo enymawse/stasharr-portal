@@ -1,7 +1,8 @@
 :host {
   display: block;
   min-height: 100dvh;
-  color: #17212b;
+  color: #e4edf7;
+  background: linear-gradient(180deg, #0f1823 0%, #121d2b 22%, #eef2f7 55%);
   font-family:
     'Segoe UI',
     Tahoma,
@@ -11,9 +12,9 @@
 }
 
 main {
-  max-width: 1024px;
+  max-width: min(1220px, 96vw);
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 1.2rem 1rem 2.2rem;
 }
 
 h1,
@@ -24,119 +25,302 @@ p {
 
 .back-link {
   display: inline-block;
-  margin-bottom: 1rem;
-  color: #145a8d;
+  margin-bottom: 0.95rem;
+  color: #cce2f7;
   text-decoration: none;
 }
 
-.back-link:hover {
-  text-decoration: underline;
-}
-
-.state {
-  margin-top: 1rem;
-}
-
 .error {
-  color: #a82222;
+  color: #f97f7f;
 }
 
-.hero {
+.hero-shell {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  min-height: 500px;
+  border: 1px solid rgb(84 107 128 / 45%);
+  box-shadow: 0 18px 38px rgb(5 9 14 / 38%);
+  background: #152331;
+}
+
+.hero-backdrop {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 20%;
+  transform: scale(1.06);
+  opacity: 0.74;
+}
+
+.hero-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      110deg,
+      rgb(7 13 20 / 86%) 0%,
+      rgb(7 13 20 / 58%) 42%,
+      rgb(7 13 20 / 84%) 100%
+    ),
+    linear-gradient(
+      to bottom,
+      rgb(8 14 23 / 10%) 0%,
+      rgb(8 14 23 / 52%) 66%,
+      rgb(18 28 39 / 92%) 100%
+    );
+}
+
+.hero-layout {
+  position: relative;
+  z-index: 1;
+  min-height: 500px;
+  padding: 2rem 1.3rem 1.2rem;
   display: grid;
-  grid-template-columns: minmax(220px, 360px) 1fr;
-  gap: 1rem;
-  align-items: start;
+  grid-template-columns: minmax(210px, 280px) 1fr;
+  align-items: end;
+  gap: 1.2rem;
 }
 
-.hero-image {
+.poster-card {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgb(193 216 238 / 35%);
+  box-shadow: 0 18px 28px rgb(6 11 18 / 50%);
+  background: rgb(16 26 38 / 72%);
+}
+
+.poster-image {
   width: 100%;
-  border-radius: 10px;
+  aspect-ratio: 3 / 4;
   object-fit: cover;
-  background: #eef2f6;
+  display: block;
+  background: #22374d;
 }
 
-.meta {
+.poster-image.placeholder {
+  background: rgb(29 46 64 / 88%);
+}
+
+.hero-info {
+  max-width: 760px;
   display: grid;
-  gap: 0.5rem;
+  gap: 0.78rem;
+}
+
+.title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.62rem;
+}
+
+.title-row h1 {
+  font-size: clamp(1.7rem, 5.3vw, 3rem);
+  line-height: 1.05;
+  text-wrap: balance;
+  text-shadow: 0 8px 22px rgb(0 0 0 / 45%);
+}
+
+.release-subheading {
+  width: fit-content;
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #d8ebff;
+  background: rgb(21 43 64 / 72%);
+  border: 1px solid rgb(165 197 227 / 45%);
+  border-radius: 999px;
+  padding: 0.2rem 0.64rem;
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meta-chip {
+  border-radius: 999px;
+  border: 1px solid rgb(189 216 241 / 40%);
+  background: rgb(15 34 52 / 66%);
+  color: #e2effc;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.18rem 0.56rem;
+}
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.hero-tag {
+  border-radius: 999px;
+  border: 1px solid rgb(190 217 241 / 30%);
+  background: rgb(12 29 45 / 62%);
+  color: #d8e8f8;
+  font-size: 0.74rem;
+  padding: 0.16rem 0.52rem;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.48rem;
+  margin-top: 0.2rem;
+}
+
+.hero-actions a {
+  text-decoration: none;
+  border-radius: 8px;
+  border: 1px solid rgb(173 202 230 / 52%);
+  background: linear-gradient(180deg, rgb(240 248 255 / 95%), rgb(206 225 241 / 94%));
+  color: #123453;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.34rem 0.62rem;
+}
+
+.content-shell {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.9rem;
 }
 
 .section {
-  margin-top: 1.25rem;
   display: grid;
-  gap: 0.65rem;
+  gap: 0.75rem;
+  background: #f7fbff;
+  border: 1px solid #d6dfe9;
+  border-radius: 12px;
+  padding: 0.95rem;
+  color: #132030;
+}
+
+.overview-text {
+  color: #2a3a4a;
+  line-height: 1.58;
 }
 
 .performer-grid {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
 }
 
 .performer-card {
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  align-items: center;
-  gap: 0.65rem;
-  border: 1px solid #d4dde7;
-  border-radius: 8px;
-  padding: 0.55rem;
+  border: 1px solid #d3dce7;
+  border-radius: 10px;
+  overflow: hidden;
   background: #fbfdff;
+  display: grid;
 }
 
-.performer-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
+.performer-image {
+  width: 100%;
+  aspect-ratio: 3 / 4;
   object-fit: cover;
-  background: #e9eef5;
+  background: #e7edf5;
 }
 
-.performer-avatar.placeholder {
+.performer-image.placeholder {
   display: grid;
   place-items: center;
-  font-weight: 600;
-  color: #344554;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #324455;
 }
 
 .performer-meta {
+  padding: 0.55rem 0.6rem 0.62rem;
   display: grid;
-  gap: 0.2rem;
+  gap: 0.22rem;
 }
 
 .performer-name {
   font-weight: 600;
+  line-height: 1.25;
 }
 
 .performer-gender {
-  font-size: 0.85rem;
-  color: #5c6977;
+  font-size: 0.82rem;
+  color: #5a6878;
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.46rem;
 }
 
 .chip {
   border: 1px solid #c5d0dc;
   background: #f6f9fc;
   border-radius: 999px;
-  padding: 0.2rem 0.55rem;
-  font-size: 0.9rem;
+  padding: 0.18rem 0.56rem;
+  font-size: 0.88rem;
+}
+
+.links {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.32rem;
+}
+
+.links a {
+  color: #1a5f93;
+  text-decoration: none;
+}
+
+.links a:hover {
+  text-decoration: underline;
 }
 
 button {
   width: fit-content;
-  padding: 0.45rem 0.75rem;
+  padding: 0.42rem 0.72rem;
   border-radius: 6px;
   border: 1px solid #6e7b8a;
   background: #eff3f7;
   cursor: pointer;
 }
 
-@media (max-width: 760px) {
-  .hero {
+@media (max-width: 880px) {
+  .hero-shell {
+    min-height: 620px;
+  }
+
+  .hero-layout {
     grid-template-columns: 1fr;
+    align-items: start;
+    padding: 1.2rem 0.9rem 1rem;
+    gap: 0.9rem;
+  }
+
+  .poster-card {
+    width: min(240px, 60vw);
+  }
+}
+
+@media (max-width: 560px) {
+  main {
+    padding: 1rem 0.72rem 1.8rem;
+  }
+
+  .hero-shell {
+    min-height: 560px;
+  }
+
+  .content-shell {
+    margin-top: 0.72rem;
+    gap: 0.76rem;
+  }
+
+  .section {
+    padding: 0.78rem;
   }
 }

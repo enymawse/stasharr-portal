@@ -7,96 +7,134 @@
     <p class="state error">{{ error() }}</p>
     <button type="button" (click)="retry()">Retry</button>
   } @else if (scene(); as scene) {
-    <section class="hero">
+    <section class="hero-shell">
       @if (scene.imageUrl) {
-        <img class="hero-image" [src]="scene.imageUrl" [alt]="scene.title" />
+        <div
+          class="hero-backdrop"
+          [style.background-image]="'url(' + scene.imageUrl + ')'"
+          aria-hidden="true"
+        ></div>
       }
+      <div class="hero-shade" aria-hidden="true"></div>
 
-      <div class="meta">
-        <h1>{{ scene.title }}</h1>
-        <app-scene-status-badge [status]="scene.status" />
+      <div class="hero-layout">
+        <div class="poster-card">
+          @if (scene.imageUrl) {
+            <img class="poster-image" [src]="scene.imageUrl" [alt]="scene.title" />
+          } @else {
+            <div class="poster-image placeholder" aria-hidden="true"></div>
+          }
+        </div>
 
-        @if (scene.studio) {
-          <p><strong>Studio:</strong> {{ scene.studio }}</p>
-        }
+        <div class="hero-info">
+          <div class="title-row">
+            <h1>{{ scene.title }}</h1>
+            <app-scene-status-badge [status]="scene.status" />
+          </div>
 
-        @if (scene.releaseDate) {
-          <p><strong>Release date:</strong> {{ scene.releaseDate }}</p>
-        }
+          @if (scene.releaseDate) {
+            <p class="release-subheading">{{ scene.releaseDate }}</p>
+          }
 
-        @if (formattedDuration(scene.duration); as duration) {
-          <p><strong>Duration:</strong> {{ duration }}</p>
-        }
+          <div class="meta-row">
+            @if (scene.studio) {
+              <span class="meta-chip">{{ scene.studio }}</span>
+            }
+            @if (formattedDuration(scene.duration); as duration) {
+              <span class="meta-chip">{{ duration }}</span>
+            }
+          </div>
+
+          @if (scene.tags.length > 0) {
+            <div class="hero-tags">
+              @for (tag of scene.tags; track tag.id; let idx = $index) {
+                @if (idx < 4) {
+                  <span class="hero-tag">{{ tag.name }}</span>
+                }
+              }
+            </div>
+          }
+
+          @if (scene.sourceUrls.length > 0) {
+            <div class="hero-actions">
+              @for (sourceUrl of scene.sourceUrls; track sourceUrl.url; let idx = $index) {
+                @if (idx < 2) {
+                  <a [href]="sourceUrl.url" target="_blank" rel="noopener noreferrer">
+                    {{ sourceUrl.type ?? 'Open source link' }}
+                  </a>
+                }
+              }
+            </div>
+          }
+        </div>
       </div>
     </section>
 
-    @if (scene.performers.length > 0) {
-      <section class="section">
-        <h2>Performers</h2>
-        <div class="performer-grid">
-          @for (performer of scene.performers; track performer.id) {
-            <article class="performer-card">
-              @if (performer.imageUrl) {
-                <img
-                  class="performer-avatar"
-                  [src]="performer.imageUrl"
-                  [alt]="performer.name"
-                />
-              } @else {
-                <div class="performer-avatar placeholder">
-                  {{ performerInitial(performer.name) }}
-                </div>
-              }
+    <div class="content-shell">
+      @if (displayedDescription(scene.description); as description) {
+        <section class="section overview-section">
+          <h2>Overview</h2>
+          <p class="overview-text">{{ description }}</p>
 
-              <div class="performer-meta">
-                <p class="performer-name">{{ performer.name }}</p>
-                @if (formattedGender(performer.gender); as gender) {
-                  <p class="performer-gender">{{ gender }}</p>
+          @if (hasLongDescription(scene.description)) {
+            <button type="button" (click)="toggleDescription()">
+              {{ descriptionExpanded() ? 'Show less' : 'Show more' }}
+            </button>
+          }
+        </section>
+      }
+
+      @if (scene.performers.length > 0) {
+        <section class="section">
+          <h2>Performers</h2>
+          <div class="performer-grid">
+            @for (performer of scene.performers; track performer.id) {
+              <article class="performer-card">
+                @if (performer.imageUrl) {
+                  <img class="performer-image" [src]="performer.imageUrl" [alt]="performer.name" />
+                } @else {
+                  <div class="performer-image placeholder">
+                    {{ performerInitial(performer.name) }}
+                  </div>
                 }
-              </div>
-            </article>
-          }
-        </div>
-      </section>
-    }
 
-    @if (scene.tags.length > 0) {
-      <section class="section">
-        <h2>Tags</h2>
-        <div class="chips">
-          @for (tag of scene.tags; track tag.id) {
-            <span class="chip">{{ tag.name }}</span>
-          }
-        </div>
-      </section>
-    }
+                <div class="performer-meta">
+                  <p class="performer-name">{{ performer.name }}</p>
+                  @if (formattedGender(performer.gender); as gender) {
+                    <p class="performer-gender">{{ gender }}</p>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+        </section>
+      }
 
-    @if (displayedDescription(scene.description); as description) {
-      <section class="section">
-        <h2>Description</h2>
-        <p>{{ description }}</p>
+      @if (scene.tags.length > 0) {
+        <section class="section">
+          <h2>Tags</h2>
+          <div class="chips">
+            @for (tag of scene.tags; track tag.id) {
+              <span class="chip">{{ tag.name }}</span>
+            }
+          </div>
+        </section>
+      }
 
-        @if (hasLongDescription(scene.description)) {
-          <button type="button" (click)="toggleDescription()">
-            {{ descriptionExpanded() ? 'Show less' : 'Show more' }}
-          </button>
-        }
-      </section>
-    }
-
-    @if (scene.sourceUrls.length > 0) {
-      <section class="section">
-        <h2>External Links</h2>
-        <ul>
-          @for (sourceUrl of scene.sourceUrls; track sourceUrl.url) {
-            <li>
-              <a [href]="sourceUrl.url" target="_blank" rel="noopener noreferrer">
-                {{ sourceUrl.type ?? 'External link' }}
-              </a>
-            </li>
-          }
-        </ul>
-      </section>
-    }
+      @if (scene.sourceUrls.length > 0) {
+        <section class="section">
+          <h2>External Links</h2>
+          <ul class="links">
+            @for (sourceUrl of scene.sourceUrls; track sourceUrl.url) {
+              <li>
+                <a [href]="sourceUrl.url" target="_blank" rel="noopener noreferrer">
+                  {{ sourceUrl.type ?? 'External link' }}
+                </a>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    </div>
   }
 </main>
