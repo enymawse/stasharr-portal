@@ -8,6 +8,7 @@
   font-size: 0.78rem;
   font-weight: 600;
   line-height: 1.3;
+  box-shadow: var(--shadow-sm);
 }
 
 .icon {
@@ -28,31 +29,31 @@
 }
 
 .unrequested {
-  background: #f2f4f7;
-  border-color: #d4dae2;
-  color: #445364;
+  background: var(--badge-unrequested-bg);
+  border-color: var(--badge-unrequested-border);
+  color: var(--badge-unrequested-text);
 }
 
 .requested {
-  background: #e8f1ff;
-  border-color: #b8ccf3;
-  color: #1f4f8c;
+  background: var(--badge-requested-bg);
+  border-color: var(--badge-requested-border);
+  color: var(--badge-requested-text);
 }
 
 .processing {
-  background: #fff4df;
-  border-color: #efd2a0;
-  color: #8b5a07;
+  background: var(--badge-processing-bg);
+  border-color: var(--badge-processing-border);
+  color: var(--badge-processing-text);
 }
 
 .available {
-  background: #e6f6e9;
-  border-color: #b7dfc0;
-  color: #1e6b35;
+  background: var(--badge-available-bg);
+  border-color: var(--badge-available-border);
+  color: var(--badge-available-text);
 }
 
 .failed {
-  background: #fdeaea;
-  border-color: #efb9b9;
-  color: #8d2222;
+  background: var(--badge-failed-bg);
+  border-color: var(--badge-failed-border);
+  color: var(--badge-failed-text);
 }

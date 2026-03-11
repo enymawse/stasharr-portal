@@ -49,7 +49,7 @@
             <div class="hero-tags">
               @for (tag of scene.tags; track tag.id; let idx = $index) {
                 @if (idx < 4) {
-                  <span class="hero-tag">{{ tag.name }}</span>
+                  <span class="meta-chip">{{ tag.name }}</span>
                 }
               }
             </div>

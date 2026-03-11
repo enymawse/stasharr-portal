@@ -1,1 +1,93 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  --app-bg: #eef3f8;
+  --surface-1: #ffffff;
+  --surface-2: #f6f9fc;
+  --surface-elevated: #f8fbff;
+  --surface-raised: #edf4fb;
+  --text-primary: #152233;
+  --text-muted: #556578;
+  --text-on-media: #f4f8fd;
+  --border-subtle: #d7e0ea;
+  --border-strong: #aebdcc;
+  --focus-ring: #2d7fc0;
+  --button-bg: #ecf3fa;
+  --button-border: #6f8194;
+  --button-text: #17314a;
+  --danger: #a82222;
+  --warning-bg: #fff4dc;
+  --warning-border: #e9c88f;
+  --success-bg: #e8f7ea;
+  --success-border: #9ecfa9;
+  --chip-bg: #f2f7fd;
+  --chip-border: #c6d4e2;
+  --chip-text: #23425f;
+  --badge-unrequested-bg: #eef2f6;
+  --badge-unrequested-border: #d1dae4;
+  --badge-unrequested-text: #43576b;
+  --badge-requested-bg: #e5f0ff;
+  --badge-requested-border: #b6cbf3;
+  --badge-requested-text: #1e4c88;
+  --badge-processing-bg: #fff2d8;
+  --badge-processing-border: #ebcf98;
+  --badge-processing-text: #7f5607;
+  --badge-available-bg: #e2f4e6;
+  --badge-available-border: #add8b8;
+  --badge-available-text: #1b6231;
+  --badge-failed-bg: #fbe8e8;
+  --badge-failed-border: #ebb4b4;
+  --badge-failed-text: #842121;
+  --shadow-sm: 0 6px 16px rgb(8 16 27 / 12%);
+}
+
+:root[data-theme='dark'] {
+  --app-bg: #0f1722;
+  --surface-1: #162232;
+  --surface-2: #1a2a3d;
+  --surface-elevated: #1c2f44;
+  --surface-raised: #213750;
+  --text-primary: #e5edf6;
+  --text-muted: #9db0c6;
+  --text-on-media: #f7fbff;
+  --border-subtle: #2f4258;
+  --border-strong: #496384;
+  --focus-ring: #74b8ed;
+  --button-bg: #233a53;
+  --button-border: #5d7b9d;
+  --button-text: #e3edf8;
+  --danger: #f38f8f;
+  --warning-bg: #53401f;
+  --warning-border: #9a7440;
+  --success-bg: #1f4630;
+  --success-border: #4f9b68;
+  --chip-bg: #24384d;
+  --chip-border: #3f5873;
+  --chip-text: #d7e5f4;
+  --badge-unrequested-bg: #273647;
+  --badge-unrequested-border: #3e5269;
+  --badge-unrequested-text: #c0d0e3;
+  --badge-requested-bg: #213d61;
+  --badge-requested-border: #41658f;
+  --badge-requested-text: #cee0fb;
+  --badge-processing-bg: #524427;
+  --badge-processing-border: #8b7442;
+  --badge-processing-text: #f8dc99;
+  --badge-available-bg: #1f4d33;
+  --badge-available-border: #4c8d62;
+  --badge-available-text: #ccefd4;
+  --badge-failed-bg: #522a2a;
+  --badge-failed-border: #8f4949;
+  --badge-failed-text: #f8c5c5;
+  --shadow-sm: 0 10px 22px rgb(0 0 0 / 40%);
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--app-bg);
+  color: var(--text-primary);
+}
+
+* {
+  scrollbar-color: var(--border-strong) transparent;
+}

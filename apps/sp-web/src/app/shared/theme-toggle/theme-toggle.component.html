@@ -1,0 +1,16 @@
+<button
+  type="button"
+  class="theme-toggle"
+  [attr.aria-label]="label()"
+  [attr.aria-pressed]="isDark()"
+  [title]="label()"
+  (click)="toggle()"
+>
+  @if (isDark()) {
+    <span aria-hidden="true">☀</span>
+    <span class="text">Light</span>
+  } @else {
+    <span aria-hidden="true">☾</span>
+    <span class="text">Dark</span>
+  }
+</button>

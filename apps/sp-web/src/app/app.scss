@@ -1,5 +1,17 @@
 :host {
   display: block;
   min-height: 100dvh;
-  background: #f6f8fb;
+  background: var(--app-bg);
+  color: var(--text-primary);
+}
+
+.app-shell {
+  min-height: 100dvh;
+}
+
+.global-theme-toggle {
+  position: fixed;
+  top: 0.7rem;
+  right: 0.8rem;
+  z-index: 1000;
 }

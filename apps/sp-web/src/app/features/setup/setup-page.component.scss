@@ -8,7 +8,7 @@
     Geneva,
     Verdana,
     sans-serif;
-  color: #17212b;
+  color: var(--text-primary);
 }
 
 *,
@@ -41,15 +41,15 @@ p {
 }
 
 .card {
-  border: 1px solid #d0d7de;
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
   padding: 1rem;
-  background: #fff;
+  background: var(--surface-1);
 }
 
 .meta {
   margin-top: 0.4rem;
-  color: #55606d;
+  color: var(--text-muted);
   font-size: 0.95rem;
 }
 
@@ -69,8 +69,10 @@ input[type='text'],
 input[type='password'] {
   width: 100%;
   padding: 0.5rem 0.65rem;
-  border: 1px solid #bdc7d2;
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-primary);
 }
 
 .checkbox-row {
@@ -86,8 +88,9 @@ input[type='password'] {
 button {
   padding: 0.45rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid #6e7b8a;
-  background: #eff3f7;
+  border: 1px solid var(--button-border);
+  background: var(--button-bg);
+  color: var(--button-text);
   cursor: pointer;
 }
 
@@ -104,13 +107,13 @@ button:disabled {
 }
 
 .warning {
-  background: #fff5dd;
-  border: 1px solid #f5d79b;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
 }
 
 .success {
-  background: #e9f8ec;
-  border: 1px solid #a8d9b0;
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
 }
 
 .state {
@@ -118,10 +121,10 @@ button:disabled {
 }
 
 .error {
-  color: #a82222;
+  color: var(--danger);
 }
 
 .hint {
-  color: #5e6670;
+  color: var(--text-muted);
   font-size: 0.9rem;
 }

@@ -1,7 +1,7 @@
 :host {
   display: block;
   min-height: 100dvh;
-  color: #17212b;
+  color: var(--text-primary);
   font-family:
     'Segoe UI',
     Tahoma,
@@ -31,7 +31,7 @@ header p {
 }
 
 .error {
-  color: #a82222;
+  color: var(--danger);
 }
 
 .grid {
@@ -59,7 +59,7 @@ header p {
 }
 
 .media-link:focus-visible {
-  outline: 2px solid #2365a2;
+  outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
 
@@ -68,7 +68,7 @@ header p {
   aspect-ratio: 10 / 7;
   border-radius: 7px;
   overflow: hidden;
-  background: #e7edf5;
+  background: var(--surface-2);
 }
 
 .thumbnail {
@@ -79,7 +79,7 @@ header p {
 
 .thumbnail.placeholder {
   background:
-    linear-gradient(130deg, rgb(220 229 238 / 95%), rgb(198 212 226 / 95%)),
+    linear-gradient(130deg, color-mix(in srgb, var(--surface-2) 88%, #fff), color-mix(in srgb, var(--surface-2) 78%, #9fb3c8)),
     radial-gradient(circle at 18% 25%, rgb(255 255 255 / 45%), transparent 55%);
 }
 
@@ -97,7 +97,7 @@ header p {
 }
 
 .studio-badge {
-  border: 1px solid rgb(255 255 255 / 38%);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 65%, transparent);
   box-shadow:
     0 4px 12px rgb(12 22 33 / 26%),
     inset 0 1px 0 rgb(255 255 255 / 25%);
@@ -111,7 +111,7 @@ header p {
   border-radius: 0.55rem;
   padding: 0.12rem 0.28rem;
   background:
-    linear-gradient(180deg, rgb(251 254 255 / 88%), rgb(233 241 250 / 82%)),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-elevated) 92%, #fff), color-mix(in srgb, var(--surface-2) 88%, transparent)),
     rgb(21 34 48 / 24%);
   display: flex;
   align-items: center;
@@ -133,9 +133,9 @@ header p {
   padding: 0.1rem 0.3rem;
   border-radius: 0.55rem;
   background:
-    linear-gradient(180deg, rgb(252 255 255 / 84%), rgb(231 239 247 / 76%)),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-elevated) 92%, #fff), color-mix(in srgb, var(--surface-2) 85%, transparent)),
     rgb(17 27 38 / 52%);
-  color: #182a3d;
+  color: var(--text-primary);
   font-size: 0.56rem;
   font-weight: 600;
   display: inline-flex;
@@ -211,8 +211,9 @@ button {
   margin-top: 0.5rem;
   padding: 0.45rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid #6e7b8a;
-  background: #eff3f7;
+  border: 1px solid var(--button-border);
+  background: var(--button-bg);
+  color: var(--button-text);
   cursor: pointer;
 }
 
