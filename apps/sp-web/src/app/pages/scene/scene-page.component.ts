@@ -3,10 +3,11 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { DiscoverService } from '../../core/api/discover.service';
 import { SceneDetails } from '../../core/api/discover.types';
+import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
 @Component({
   selector: 'app-scene-page',
-  imports: [RouterLink],
+  imports: [RouterLink, SceneStatusBadgeComponent],
   templateUrl: './scene-page.component.html',
   styleUrl: './scene-page.component.scss',
 })

@@ -12,10 +12,11 @@ import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { DiscoverService } from '../../core/api/discover.service';
 import { DiscoverItem } from '../../core/api/discover.types';
+import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
 @Component({
   selector: 'app-discover-page',
-  imports: [RouterLink],
+  imports: [RouterLink, SceneStatusBadgeComponent],
   templateUrl: './discover-page.component.html',
   styleUrl: './discover-page.component.scss',
 })

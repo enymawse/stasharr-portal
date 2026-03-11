@@ -7,6 +7,7 @@ import {
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
+import { SceneStatusService } from '../scene-status/scene-status.service';
 import { SceneDetailsDto } from './dto/scene-details.dto';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class ScenesService {
   constructor(
     private readonly integrationsService: IntegrationsService,
     private readonly stashdbAdapter: StashdbAdapter,
+    private readonly sceneStatusService: SceneStatusService,
   ) {}
 
   async getSceneById(stashId: string): Promise<SceneDetailsDto> {
@@ -42,6 +44,7 @@ export class ScenesService {
       baseUrl: integration.baseUrl,
       apiKey: integration.apiKey,
     });
+    const status = await this.sceneStatusService.resolveForScene(scene.id);
 
     return {
       id: scene.id,
@@ -56,6 +59,7 @@ export class ScenesService {
       performers: scene.performers,
       sourceUrls: scene.sourceUrls,
       source: 'STASHDB',
+      status,
     };
   }
 

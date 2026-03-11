@@ -1,3 +1,5 @@
+import { SceneStatusDto } from '../../scene-status/dto/scene-status.dto';
+
 export class SceneImageDto {
   id!: string;
   url!: string;
@@ -37,4 +39,5 @@ export class SceneDetailsDto {
   performers!: ScenePerformerDto[];
   sourceUrls!: SceneUrlDto[];
   source!: 'STASHDB';
+  status!: SceneStatusDto;
 }

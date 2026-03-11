@@ -7,6 +7,7 @@ import {
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
+import { SceneStatusService } from '../scene-status/scene-status.service';
 import { DiscoverResponseDto } from './dto/discover-item.dto';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class DiscoverService {
   constructor(
     private readonly integrationsService: IntegrationsService,
     private readonly stashdbAdapter: StashdbAdapter,
+    private readonly sceneStatusService: SceneStatusService,
   ) {}
 
   async getDiscoverFeed(
@@ -47,6 +49,9 @@ export class DiscoverService {
     });
 
     const hasMore = page * perPage < trending.total;
+    const statuses = await this.sceneStatusService.resolveForScenes(
+      trending.scenes.map((scene) => scene.id),
+    );
 
     return {
       total: trending.total,
@@ -63,6 +68,7 @@ export class DiscoverService {
         duration: scene.duration,
         type: 'SCENE',
         source: 'STASHDB',
+        status: statuses.get(scene.id) ?? { state: 'UNREQUESTED' },
       })),
     };
   }

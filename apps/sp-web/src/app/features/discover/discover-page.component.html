@@ -25,6 +25,7 @@
           <h2>
             <a class="scene-link" [routerLink]="['/scene', item.id]">{{ item.title }}</a>
           </h2>
+          <app-scene-status-badge [status]="item.status" />
           <p class="meta">{{ item.type }} | {{ item.source }}</p>
 
           @if (item.studio) {

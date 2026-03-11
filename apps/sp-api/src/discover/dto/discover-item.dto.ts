@@ -1,3 +1,5 @@
+import { SceneStatusDto } from '../../scene-status/dto/scene-status.dto';
+
 export class DiscoverItemDto {
   id!: string;
   title!: string;
@@ -8,6 +10,7 @@ export class DiscoverItemDto {
   duration!: number | null;
   type!: 'SCENE';
   source!: 'STASHDB';
+  status!: SceneStatusDto;
 }
 
 export class DiscoverResponseDto {

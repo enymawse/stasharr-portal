@@ -1,3 +1,14 @@
+export type SceneStatusState =
+  | 'UNREQUESTED'
+  | 'REQUESTED'
+  | 'PROCESSING'
+  | 'AVAILABLE'
+  | 'FAILED';
+
+export interface SceneStatus {
+  state: SceneStatusState;
+}
+
 export interface DiscoverItem {
   id: string;
   title: string;
@@ -8,6 +19,7 @@ export interface DiscoverItem {
   duration: number | null;
   type: 'SCENE';
   source: 'STASHDB';
+  status: SceneStatus;
 }
 
 export interface DiscoverResponse {
@@ -57,4 +69,5 @@ export interface SceneDetails {
   performers: ScenePerformer[];
   sourceUrls: SceneUrl[];
   source: 'STASHDB';
+  status: SceneStatus;
 }
