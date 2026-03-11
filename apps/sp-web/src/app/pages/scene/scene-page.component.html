@@ -57,12 +57,69 @@
 
           @if (scene.sourceUrls.length > 0) {
             <div class="hero-actions">
+              @if (hasStashCopy(scene)) {
+                @if (hasMultipleStashCopies(scene)) {
+                  <label class="stash-copy-selector">
+                    <span>Stash Copies</span>
+                    <select
+                      [value]="selectedStashViewUrl(scene)"
+                      (change)="onStashCopySelected($any($event.target).value)"
+                    >
+                      @for (copy of scene.stash!.copies; track copy.id) {
+                        <option [value]="copy.viewUrl">{{ copy.label }}</option>
+                      }
+                    </select>
+                  </label>
+
+                  @if (selectedStashViewUrl(scene); as selectedViewUrl) {
+                    <a [href]="selectedViewUrl" target="_blank" rel="noopener noreferrer">
+                      View in Stash ({{ selectedStashLabel(scene) }})
+                    </a>
+                  }
+                } @else if (scene.stash!.copies[0]; as singleCopy) {
+                  <a [href]="singleCopy.viewUrl" target="_blank" rel="noopener noreferrer">
+                    View in Stash
+                  </a>
+                }
+              }
+
               @for (sourceUrl of scene.sourceUrls; track sourceUrl.url; let idx = $index) {
                 @if (idx < 2) {
-                  <a [href]="sourceUrl.url" target="_blank" rel="noopener noreferrer">
+                  <a
+                    class="secondary-link"
+                    [href]="sourceUrl.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     {{ sourceUrl.type ?? 'Open source link' }}
                   </a>
                 }
+              }
+            </div>
+          } @else if (hasStashCopy(scene)) {
+            <div class="hero-actions">
+              @if (hasMultipleStashCopies(scene)) {
+                <label class="stash-copy-selector">
+                  <span>Stash Copies</span>
+                  <select
+                    [value]="selectedStashViewUrl(scene)"
+                    (change)="onStashCopySelected($any($event.target).value)"
+                  >
+                    @for (copy of scene.stash!.copies; track copy.id) {
+                      <option [value]="copy.viewUrl">{{ copy.label }}</option>
+                    }
+                  </select>
+                </label>
+
+                @if (selectedStashViewUrl(scene); as selectedViewUrl) {
+                  <a [href]="selectedViewUrl" target="_blank" rel="noopener noreferrer">
+                    View in Stash ({{ selectedStashLabel(scene) }})
+                  </a>
+                }
+              } @else if (scene.stash!.copies[0]; as singleCopy) {
+                <a [href]="singleCopy.viewUrl" target="_blank" rel="noopener noreferrer">
+                  View in Stash
+                </a>
               }
             </div>
           }

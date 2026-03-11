@@ -6,9 +6,13 @@ import {
 } from '@nestjs/common';
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
+import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { SceneStatusService } from '../scene-status/scene-status.service';
-import { SceneDetailsDto } from './dto/scene-details.dto';
+import {
+  SceneDetailsDto,
+  SceneStashAvailabilityDto,
+} from './dto/scene-details.dto';
 
 @Injectable()
 export class ScenesService {
@@ -16,6 +20,7 @@ export class ScenesService {
     private readonly integrationsService: IntegrationsService,
     private readonly stashdbAdapter: StashdbAdapter,
     private readonly sceneStatusService: SceneStatusService,
+    private readonly stashAdapter: StashAdapter,
   ) {}
 
   async getSceneById(stashId: string): Promise<SceneDetailsDto> {
@@ -45,6 +50,7 @@ export class ScenesService {
       apiKey: integration.apiKey,
     });
     const status = await this.sceneStatusService.resolveForScene(scene.id);
+    const stash = await this.resolveStashAvailability(scene.id);
 
     return {
       id: scene.id,
@@ -60,7 +66,43 @@ export class ScenesService {
       sourceUrls: scene.sourceUrls,
       source: 'STASHDB',
       status,
+      stash,
     };
+  }
+
+  private async resolveStashAvailability(
+    stashId: string,
+  ): Promise<SceneStashAvailabilityDto | null> {
+    try {
+      const integration = await this.integrationsService.findOne(
+        IntegrationType.STASH,
+      );
+
+      if (
+        !integration.enabled ||
+        integration.status !== IntegrationStatus.CONFIGURED
+      ) {
+        return null;
+      }
+
+      const baseUrl = integration.baseUrl?.trim();
+      if (!baseUrl) {
+        return null;
+      }
+
+      const copies = await this.stashAdapter.findScenesByStashId(stashId, {
+        baseUrl,
+        apiKey: integration.apiKey,
+      });
+
+      return {
+        exists: copies.length > 0,
+        hasMultipleCopies: copies.length > 1,
+        copies,
+      };
+    } catch {
+      return null;
+    }
   }
 
   private async getStashdbIntegration() {

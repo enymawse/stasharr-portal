@@ -26,6 +26,20 @@ export class SceneUrlDto {
   type!: string | null;
 }
 
+export class SceneStashCopyDto {
+  id!: string;
+  viewUrl!: string;
+  width!: number | null;
+  height!: number | null;
+  label!: string;
+}
+
+export class SceneStashAvailabilityDto {
+  exists!: boolean;
+  hasMultipleCopies!: boolean;
+  copies!: SceneStashCopyDto[];
+}
+
 export class SceneDetailsDto {
   id!: string;
   title!: string;
@@ -40,4 +54,5 @@ export class SceneDetailsDto {
   sourceUrls!: SceneUrlDto[];
   source!: 'STASHDB';
   status!: SceneStatusDto;
+  stash!: SceneStashAvailabilityDto | null;
 }

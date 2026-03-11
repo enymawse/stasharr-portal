@@ -19,6 +19,7 @@ export class ScenePageComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly scene = signal<SceneDetails | null>(null);
   protected readonly descriptionExpanded = signal(false);
+  protected readonly selectedStashCopyUrl = signal<string | null>(null);
 
   ngOnInit(): void {
     this.loadScene();
@@ -30,6 +31,39 @@ export class ScenePageComponent implements OnInit {
 
   protected toggleDescription(): void {
     this.descriptionExpanded.update((value) => !value);
+  }
+
+  protected hasStashCopy(scene: SceneDetails): boolean {
+    return scene.stash?.exists === true && scene.stash.copies.length > 0;
+  }
+
+  protected hasMultipleStashCopies(scene: SceneDetails): boolean {
+    return scene.stash?.hasMultipleCopies === true;
+  }
+
+  protected selectedStashViewUrl(scene: SceneDetails): string | null {
+    const selected = this.selectedStashCopyUrl();
+    if (selected) {
+      return selected;
+    }
+
+    return scene.stash?.copies[0]?.viewUrl ?? null;
+  }
+
+  protected selectedStashLabel(scene: SceneDetails): string {
+    const selected = this.selectedStashViewUrl(scene);
+    if (!selected) {
+      return 'View in Stash';
+    }
+
+    return (
+      scene.stash?.copies.find((copy) => copy.viewUrl === selected)?.label ??
+      'View in Stash'
+    );
+  }
+
+  protected onStashCopySelected(viewUrl: string): void {
+    this.selectedStashCopyUrl.set(viewUrl);
   }
 
   protected formattedDuration(durationSeconds: number | null): string | null {
@@ -91,6 +125,7 @@ export class ScenePageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     this.descriptionExpanded.set(false);
+    this.selectedStashCopyUrl.set(null);
 
     this.discoverService
       .getSceneDetails(stashIdParam)
@@ -102,6 +137,7 @@ export class ScenePageComponent implements OnInit {
       .subscribe({
         next: (scene) => {
           this.scene.set(scene);
+          this.selectedStashCopyUrl.set(scene.stash?.copies[0]?.viewUrl ?? null);
         },
         error: () => {
           this.error.set('Failed to load scene details from the API.');

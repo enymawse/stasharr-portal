@@ -180,6 +180,29 @@ p {
   padding: 0.34rem 0.62rem;
 }
 
+.hero-actions .secondary-link {
+  background: color-mix(in srgb, var(--surface-1) 86%, transparent);
+  font-weight: 600;
+}
+
+.stash-copy-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-on-media);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.stash-copy-selector select {
+  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-size: 0.76rem;
+  padding: 0.25rem 0.36rem;
+}
+
 .content-shell {
   margin-top: 0.9rem;
   display: grid;

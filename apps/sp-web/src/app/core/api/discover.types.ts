@@ -57,6 +57,20 @@ export interface SceneUrl {
   type: string | null;
 }
 
+export interface SceneStashCopy {
+  id: string;
+  viewUrl: string;
+  width: number | null;
+  height: number | null;
+  label: string;
+}
+
+export interface SceneStashAvailability {
+  exists: boolean;
+  hasMultipleCopies: boolean;
+  copies: SceneStashCopy[];
+}
+
 export interface SceneDetails {
   id: string;
   title: string;
@@ -71,4 +85,5 @@ export interface SceneDetails {
   sourceUrls: SceneUrl[];
   source: 'STASHDB';
   status: SceneStatus;
+  stash: SceneStashAvailability | null;
 }
