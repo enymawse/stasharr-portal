@@ -60,12 +60,20 @@
 
                 <label>
                   Base URL
-                  <input type="text" formControlName="baseUrl" placeholder="http://localhost:9999" />
+                  <input
+                    type="text"
+                    formControlName="baseUrl"
+                    placeholder="http://localhost:9999"
+                  />
                 </label>
 
                 <label>
                   API Key
-                  <input type="password" formControlName="apiKey" placeholder="Enter to update key" />
+                  <input
+                    type="password"
+                    formControlName="apiKey"
+                    placeholder="Enter to update key"
+                  />
                 </label>
 
                 @if (hasStoredApiKey(type)) {
@@ -81,7 +89,11 @@
                   <button type="submit" [disabled]="isSaving(type)">
                     {{ isSaving(type) ? 'Saving...' : 'Save changes' }}
                   </button>
-                  <button type="button" [disabled]="isTesting(type)" (click)="testIntegration(type)">
+                  <button
+                    type="button"
+                    [disabled]="isTesting(type)"
+                    (click)="testIntegration(type)"
+                  >
                     {{ isTesting(type) ? 'Testing...' : 'Test' }}
                   </button>
                 </div>
@@ -110,7 +122,7 @@
               </div>
 
               <div class="danger-card">
-                <h3>Reset {{ labelFor(type) }}</h3>
+                <h3>Reset {{ labelFor(type) }} Integration</h3>
 
                 @if (!shouldConfirmReset(type)) {
                   <button
@@ -119,7 +131,7 @@
                     [disabled]="isResetting(type)"
                     (click)="requestIntegrationReset(type)"
                   >
-                    Reset {{ labelFor(type) }}
+                    Reset {{ labelFor(type) }} Integration
                   </button>
                 } @else {
                   <p>Reset this integration and clear saved configuration?</p>
@@ -132,7 +144,11 @@
                     >
                       {{ isResetting(type) ? 'Resetting...' : 'Confirm reset' }}
                     </button>
-                    <button type="button" [disabled]="isResetting(type)" (click)="cancelIntegrationReset(type)">
+                    <button
+                      type="button"
+                      [disabled]="isResetting(type)"
+                      (click)="cancelIntegrationReset(type)"
+                    >
                       Cancel
                     </button>
                   </div>
@@ -155,7 +171,9 @@
             <p class="meta">Stasharr Portal settings and metadata.</p>
 
             <div class="about-list">
-              <p>Version: <strong>{{ health()?.version ?? 'Unknown' }}</strong></p>
+              <p>
+                Version: <strong>{{ health()?.version ?? 'Unknown' }}</strong>
+              </p>
               <p>
                 Documentation:
                 <a href="#" target="_blank" rel="noopener noreferrer">Documentation (stub)</a>
@@ -191,9 +209,15 @@
 
       @if (health(); as health) {
         <div class="health-grid">
-          <p>Service: <strong>{{ health.service }}</strong></p>
-          <p>API: <strong>{{ health.status }}</strong></p>
-          <p>Database: <strong>{{ health.database }}</strong></p>
+          <p>
+            Service: <strong>{{ health.service }}</strong>
+          </p>
+          <p>
+            API: <strong>{{ health.status }}</strong>
+          </p>
+          <p>
+            Database: <strong>{{ health.database }}</strong>
+          </p>
         </div>
       }
 
@@ -212,10 +236,17 @@
         </button>
       } @else {
         <div class="actions">
-          <button type="button" class="danger" [disabled]="resettingAll()" (click)="resetAllIntegrations()">
+          <button
+            type="button"
+            class="danger"
+            [disabled]="resettingAll()"
+            (click)="resetAllIntegrations()"
+          >
             {{ resettingAll() ? 'Resetting...' : 'Confirm reset all' }}
           </button>
-          <button type="button" [disabled]="resettingAll()" (click)="cancelResetAll()">Cancel</button>
+          <button type="button" [disabled]="resettingAll()" (click)="cancelResetAll()">
+            Cancel
+          </button>
         </div>
       }
     </section>
