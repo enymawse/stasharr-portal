@@ -28,8 +28,8 @@
 
               <div class="media-top">
                 @if (item.studioImageUrl) {
-                  <div class="studio-badge image-badge" [title]="item.studio ?? 'Studio'">
-                    <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio badge'" loading="lazy" />
+                  <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                    <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
                   </div>
                 } @else if (item.studio) {
                   <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
