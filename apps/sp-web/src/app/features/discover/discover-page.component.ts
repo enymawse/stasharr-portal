@@ -111,11 +111,11 @@ export class DiscoverPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     const singleLine = description.replaceAll(/\s+/g, ' ').trim();
-    if (singleLine.length <= 180) {
+    if (singleLine.length <= 220) {
       return singleLine;
     }
 
-    return `${singleLine.slice(0, 177)}...`;
+    return `${singleLine.slice(0, 217)}...`;
   }
 
   private loadNextPage(): void {

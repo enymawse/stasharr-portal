@@ -20,6 +20,7 @@ export interface StashdbScene {
   details: string | null;
   imageUrl: string | null;
   studioName: string | null;
+  studioImageUrl: string | null;
   date: string | null;
   releaseDate: string | null;
   productionDate: string | null;
@@ -91,6 +92,12 @@ interface StashdbGraphqlResponse {
         studio?: {
           id?: unknown;
           name?: unknown;
+          images?: Array<{
+            id?: unknown;
+            url?: unknown;
+            width?: unknown;
+            height?: unknown;
+          }>;
         } | null;
         duration?: unknown;
       }>;
@@ -169,6 +176,12 @@ export class StashdbAdapter {
             studio {
               id
               name
+              images {
+                id
+                url
+                width
+                height
+              }
             }
             duration
           }
@@ -191,26 +204,12 @@ export class StashdbAdapter {
           return null;
         }
 
-        const validImages = (scene.images ?? [])
-          .filter(
-            (image): image is { url: string; width: number | null } =>
-              typeof image.url === 'string' && image.url.length > 0,
-          )
-          .map((image) => ({
-            url: image.url,
-            width: typeof image.width === 'number' ? image.width : null,
-          }));
-
-        const widestImage = validImages.reduce<{
-          url: string;
-          width: number;
-        } | null>((best, image) => {
-          const width = image.width ?? 0;
-          if (!best || width > best.width) {
-            return { url: image.url, width };
-          }
-          return best;
-        }, null);
+        const sceneImageUrl = this.selectPrimaryImage(
+          this.normalizeImages(scene.images),
+        )?.url;
+        const studioImageUrl = this.selectPrimaryImage(
+          this.normalizeImages(scene.studio?.images),
+        )?.url;
 
         return {
           id: scene.id,
@@ -219,12 +218,13 @@ export class StashdbAdapter {
             typeof scene.details === 'string' && scene.details.trim().length > 0
               ? scene.details
               : null,
-          imageUrl: widestImage?.url ?? validImages[0]?.url ?? null,
+          imageUrl: sceneImageUrl ?? null,
           studioName:
             typeof scene.studio?.name === 'string' &&
             scene.studio.name.length > 0
               ? scene.studio.name
               : null,
+          studioImageUrl: studioImageUrl ?? null,
           date:
             typeof scene.date === 'string' && scene.date.length > 0
               ? scene.date
@@ -316,12 +316,17 @@ export class StashdbAdapter {
 
     const images = (scene.images ?? [])
       .map((image): StashdbSceneImage | null => {
-        if (typeof image.id !== 'string' || typeof image.url !== 'string') {
+        if (typeof image.url !== 'string') {
           return null;
         }
 
+        const id =
+          typeof image.id === 'string' && image.id.length > 0
+            ? image.id
+            : image.url;
+
         return {
-          id: image.id,
+          id,
           url: image.url,
           width: typeof image.width === 'number' ? image.width : null,
           height: typeof image.height === 'number' ? image.height : null,
@@ -451,6 +456,33 @@ export class StashdbAdapter {
       const currentWidth = current.width ?? 0;
       return currentWidth > bestWidth ? current : best;
     }, images[0]);
+  }
+
+  private normalizeImages(
+    images:
+      | Array<{
+          id?: unknown;
+          url?: unknown;
+          width?: unknown;
+          height?: unknown;
+        }>
+      | null
+      | undefined,
+  ): StashdbSceneImage[] {
+    return (images ?? [])
+      .map((image): StashdbSceneImage | null => {
+        if (typeof image.id !== 'string' || typeof image.url !== 'string') {
+          return null;
+        }
+
+        return {
+          id: image.id,
+          url: image.url,
+          width: typeof image.width === 'number' ? image.width : null,
+          height: typeof image.height === 'number' ? image.height : null,
+        };
+      })
+      .filter((image): image is StashdbSceneImage => image !== null);
   }
 
   private async executeQuery(

@@ -64,6 +64,7 @@ export class DiscoverService {
         description: scene.details,
         imageUrl: scene.imageUrl,
         studio: scene.studioName,
+        studioImageUrl: scene.studioImageUrl,
         releaseDate: scene.releaseDate ?? scene.productionDate ?? scene.date,
         duration: scene.duration,
         type: 'SCENE',

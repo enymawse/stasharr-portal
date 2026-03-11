@@ -18,19 +18,42 @@
     <section class="grid">
       @for (item of items(); track item.id) {
         <article class="card">
-          @if (item.imageUrl) {
-            <img class="thumbnail" [src]="item.imageUrl" [alt]="item.title" loading="lazy" />
-          }
+          <a class="media-link" [routerLink]="['/scene', item.id]" [attr.aria-label]="item.title">
+            <div class="media">
+              @if (item.imageUrl) {
+                <img class="thumbnail" [src]="item.imageUrl" [alt]="item.title" loading="lazy" />
+              } @else {
+                <div class="thumbnail placeholder" aria-hidden="true"></div>
+              }
 
-          <h2>
-            <a class="scene-link" [routerLink]="['/scene', item.id]">{{ item.title }}</a>
-          </h2>
-          <app-scene-status-badge [status]="item.status" />
+              <div class="media-top">
+                @if (item.studioImageUrl) {
+                  <div class="studio-badge image-badge" [title]="item.studio ?? 'Studio'">
+                    <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio badge'" loading="lazy" />
+                  </div>
+                } @else if (item.studio) {
+                  <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                }
+
+                @if (item.status.state !== 'UNREQUESTED') {
+                  <app-scene-status-badge
+                    class="status-icon"
+                    [status]="item.status"
+                    mode="icon"
+                  />
+                }
+              </div>
+
+              <div class="media-bottom">
+                <h2 class="media-title">{{ item.title }}</h2>
+                @if (truncatedDescription(item.description); as description) {
+                  <p class="media-description">{{ description }}</p>
+                }
+              </div>
+            </div>
+          </a>
+
           <p class="meta">{{ item.type }} | {{ item.source }}</p>
-
-          @if (item.studio) {
-            <p><strong>Studio:</strong> {{ item.studio }}</p>
-          }
 
           @if (item.releaseDate) {
             <p><strong>Release date:</strong> {{ item.releaseDate }}</p>
@@ -38,10 +61,6 @@
 
           @if (formattedDuration(item.duration); as duration) {
             <p><strong>Duration:</strong> {{ duration }}</p>
-          }
-
-          @if (truncatedDescription(item.description); as description) {
-            <p class="details">{{ description }}</p>
           }
         </article>
       }

@@ -6,6 +6,7 @@ export class DiscoverItemDto {
   description!: string | null;
   imageUrl!: string | null;
   studio!: string | null;
+  studioImageUrl!: string | null;
   releaseDate!: string | null;
   duration!: number | null;
   type!: 'SCENE';
