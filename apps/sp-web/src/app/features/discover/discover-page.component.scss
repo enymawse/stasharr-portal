@@ -1,0 +1,65 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+  color: #17212b;
+  font-family:
+    'Segoe UI',
+    Tahoma,
+    Geneva,
+    Verdana,
+    sans-serif;
+}
+
+main {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+header p {
+  margin-top: 0.5rem;
+}
+
+.state {
+  margin-top: 1rem;
+}
+
+.error {
+  color: #a82222;
+}
+
+.grid {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.card {
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  padding: 1rem;
+  background: #fff;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.meta {
+  color: #55606d;
+  font-size: 0.95rem;
+}
+
+a {
+  color: #145a8d;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}

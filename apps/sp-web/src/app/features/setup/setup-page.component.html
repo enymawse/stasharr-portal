@@ -1,0 +1,76 @@
+<main>
+  <header>
+    <h1>Stasharr Portal Setup</h1>
+    <p>Configure required integrations before using the app.</p>
+  </header>
+
+  @if (loading()) {
+    <p class="state">Loading setup status...</p>
+  } @else if (loadError()) {
+    <p class="state error">{{ loadError() }}</p>
+  } @else {
+    @if (isSetupComplete()) {
+      <p class="banner success">
+        Setup complete: Stash, Whisparr, and StashDB are configured.
+      </p>
+    } @else {
+      <p class="banner warning">
+        Setup incomplete: configure Stash, Whisparr, and StashDB to continue.
+      </p>
+    }
+
+    @if (setupMessage()) {
+      <p class="state">{{ setupMessage() }}</p>
+    }
+
+    <section class="cards">
+      @for (type of integrationTypes; track type) {
+        <article class="card">
+          <h2>{{ labelFor(type) }}</h2>
+          <p class="meta">
+            {{ isRequired(type) ? 'Required' : 'Optional' }} | Status: {{ statusText(type) }}
+          </p>
+
+          <form [formGroup]="formFor(type)" (ngSubmit)="saveIntegration(type)">
+            <label>
+              Name
+              <input type="text" formControlName="name" />
+            </label>
+
+            <label>
+              Base URL
+              <input type="text" formControlName="baseUrl" placeholder="http://localhost:9999" />
+            </label>
+
+            <label>
+              API Key
+              <input type="password" formControlName="apiKey" placeholder="Enter to update key" />
+            </label>
+
+            @if (hasStoredApiKey(type)) {
+              <p class="hint">An API key is already stored. Leave blank to keep current key.</p>
+            }
+
+            <label class="checkbox-row">
+              <input type="checkbox" formControlName="enabled" />
+              Enabled
+            </label>
+
+            <div class="actions">
+              <button type="submit" [disabled]="isSaving(type)">
+                {{ isSaving(type) ? 'Saving...' : 'Save' }}
+              </button>
+            </div>
+
+            @if (saveSuccess(type)) {
+              <p class="state success">{{ saveSuccess(type) }}</p>
+            }
+            @if (saveError(type)) {
+              <p class="state error">{{ saveError(type) }}</p>
+            }
+          </form>
+        </article>
+      }
+    </section>
+  }
+</main>

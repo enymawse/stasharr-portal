@@ -1,0 +1,37 @@
+<main>
+  <header>
+    <h1>Discover</h1>
+    <p>Trending scenes from your configured StashDB integration.</p>
+  </header>
+
+  @if (loading()) {
+    <p class="state">Loading discover feed...</p>
+  } @else if (error()) {
+    <p class="state error">{{ error() }}</p>
+  } @else if (!hasItems()) {
+    <p class="state">No trending items are available right now.</p>
+  } @else {
+    <section class="grid">
+      @for (item of items(); track item.id) {
+        <article class="card">
+          <h2>{{ item.title }}</h2>
+          <p class="meta">{{ item.type }} | {{ item.source }}</p>
+
+          @if (item.releaseDate) {
+            <p>Release date: {{ item.releaseDate }}</p>
+          }
+
+          @if (item.studio) {
+            <p>Studio: {{ item.studio }}</p>
+          }
+
+          @if (item.sourceUrl) {
+            <p>
+              <a [href]="item.sourceUrl" target="_blank" rel="noopener noreferrer">View source</a>
+            </p>
+          }
+        </article>
+      }
+    </section>
+  }
+</main>
