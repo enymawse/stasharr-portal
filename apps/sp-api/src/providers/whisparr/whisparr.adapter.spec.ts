@@ -134,4 +134,15 @@ describe('WhisparrAdapter', () => {
       }),
     ).rejects.toBeInstanceOf(BadGatewayException);
   });
+
+  it('builds scene view URL for deep-linking', () => {
+    expect(
+      adapter.buildSceneViewUrl(
+        'http://whisparr.local/base/',
+        '019cd3c7-089f-7b87-b064-db980b95df0f',
+      ),
+    ).toBe(
+      'http://whisparr.local/base/movie/019cd3c7-089f-7b87-b064-db980b95df0f',
+    );
+  });
 });

@@ -40,6 +40,11 @@ export class SceneStashAvailabilityDto {
   copies!: SceneStashCopyDto[];
 }
 
+export class SceneWhisparrAvailabilityDto {
+  exists!: boolean;
+  viewUrl!: string;
+}
+
 export class SceneDetailsDto {
   id!: string;
   title!: string;
@@ -57,4 +62,5 @@ export class SceneDetailsDto {
   source!: 'STASHDB';
   status!: SceneStatusDto;
   stash!: SceneStashAvailabilityDto | null;
+  whisparr!: SceneWhisparrAvailabilityDto | null;
 }

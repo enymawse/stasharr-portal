@@ -41,6 +41,10 @@ export class ScenePageComponent implements OnInit {
     return scene.stash?.hasMultipleCopies === true;
   }
 
+  protected hasWhisparrLink(scene: SceneDetails): boolean {
+    return scene.whisparr?.exists === true && scene.whisparr.viewUrl.length > 0;
+  }
+
   protected selectedStashViewUrl(scene: SceneDetails): string | null {
     const selected = this.selectedStashCopyUrl();
     if (selected) {

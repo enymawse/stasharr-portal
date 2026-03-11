@@ -73,7 +73,11 @@
             </div>
           }
 
-          @if (nonStudioSourceUrls(scene).length > 0) {
+          @if (
+            nonStudioSourceUrls(scene).length > 0 ||
+            hasStashCopy(scene) ||
+            hasWhisparrLink(scene)
+          ) {
             <div class="hero-actions">
               @if (hasStashCopy(scene)) {
                 @if (hasMultipleStashCopies(scene)) {
@@ -101,6 +105,16 @@
                 }
               }
 
+              @if (hasWhisparrLink(scene)) {
+                <a
+                  [href]="scene.whisparr!.viewUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View in Whisparr
+                </a>
+              }
+
               @for (
                 sourceUrl of nonStudioSourceUrls(scene);
                 track sourceUrl.url;
@@ -118,7 +132,7 @@
                 }
               }
             </div>
-          } @else if (hasStashCopy(scene)) {
+          } @else if (hasStashCopy(scene) || hasWhisparrLink(scene)) {
             <div class="hero-actions">
               @if (hasMultipleStashCopies(scene)) {
                 <label class="stash-copy-selector">
@@ -141,6 +155,16 @@
               } @else if (scene.stash!.copies[0]; as singleCopy) {
                 <a [href]="singleCopy.viewUrl" target="_blank" rel="noopener noreferrer">
                   View in Stash
+                </a>
+              }
+
+              @if (hasWhisparrLink(scene)) {
+                <a
+                  [href]="scene.whisparr!.viewUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View in Whisparr
                 </a>
               }
             </div>

@@ -122,6 +122,14 @@ export class WhisparrAdapter {
     };
   }
 
+  buildSceneViewUrl(baseUrl: string, stashId: string): string {
+    const parsed = new URL(baseUrl);
+    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+    parsed.pathname = `${cleanPath}/movie/${encodeURIComponent(stashId)}`;
+    parsed.search = '';
+    return parsed.toString();
+  }
+
   private parseMovieLookupEntry(
     entry: unknown,
   ): WhisparrSceneLookupResult | null {

@@ -71,6 +71,11 @@ export interface SceneStashAvailability {
   copies: SceneStashCopy[];
 }
 
+export interface SceneWhisparrAvailability {
+  exists: boolean;
+  viewUrl: string;
+}
+
 export interface SceneDetails {
   id: string;
   title: string;
@@ -88,4 +93,5 @@ export interface SceneDetails {
   source: 'STASHDB';
   status: SceneStatus;
   stash: SceneStashAvailability | null;
+  whisparr: SceneWhisparrAvailability | null;
 }

@@ -8,10 +8,12 @@ import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
+import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
 import { SceneStatusService } from '../scene-status/scene-status.service';
 import {
   SceneDetailsDto,
   SceneStashAvailabilityDto,
+  SceneWhisparrAvailabilityDto,
 } from './dto/scene-details.dto';
 
 @Injectable()
@@ -21,6 +23,7 @@ export class ScenesService {
     private readonly stashdbAdapter: StashdbAdapter,
     private readonly sceneStatusService: SceneStatusService,
     private readonly stashAdapter: StashAdapter,
+    private readonly whisparrAdapter: WhisparrAdapter,
   ) {}
 
   async getSceneById(stashId: string): Promise<SceneDetailsDto> {
@@ -51,6 +54,7 @@ export class ScenesService {
     });
     const status = await this.sceneStatusService.resolveForScene(scene.id);
     const stash = await this.resolveStashAvailability(scene.id);
+    const whisparr = await this.resolveWhisparrAvailability(scene.id);
 
     return {
       id: scene.id,
@@ -69,6 +73,7 @@ export class ScenesService {
       source: 'STASHDB',
       status,
       stash,
+      whisparr,
     };
   }
 
@@ -130,5 +135,43 @@ export class ScenesService {
     });
 
     return studioEntry?.url ?? null;
+  }
+
+  private async resolveWhisparrAvailability(
+    stashId: string,
+  ): Promise<SceneWhisparrAvailabilityDto | null> {
+    try {
+      const integration = await this.integrationsService.findOne(
+        IntegrationType.WHISPARR,
+      );
+
+      if (
+        !integration.enabled ||
+        integration.status !== IntegrationStatus.CONFIGURED
+      ) {
+        return null;
+      }
+
+      const baseUrl = integration.baseUrl?.trim();
+      if (!baseUrl) {
+        return null;
+      }
+
+      const match = await this.whisparrAdapter.findSceneByStashId(stashId, {
+        baseUrl,
+        apiKey: integration.apiKey,
+      });
+
+      if (!match) {
+        return null;
+      }
+
+      return {
+        exists: true,
+        viewUrl: this.whisparrAdapter.buildSceneViewUrl(baseUrl, stashId),
+      };
+    } catch {
+      return null;
+    }
   }
 }
