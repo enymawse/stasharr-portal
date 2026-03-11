@@ -24,6 +24,16 @@ export class IntegrationsService {
     return this.http.put<IntegrationResponse>(`/api/integrations/${type}`, payload);
   }
 
+  testIntegration(
+    type: IntegrationType,
+    payload: UpdateIntegrationPayload,
+  ): Observable<IntegrationResponse> {
+    return this.http.post<IntegrationResponse>(
+      `/api/integrations/${type}/test`,
+      payload,
+    );
+  }
+
   resetIntegration(type: IntegrationType): Observable<IntegrationResponse> {
     return this.http.delete<IntegrationResponse>(`/api/integrations/${type}`);
   }

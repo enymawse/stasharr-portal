@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   Param,
+  Post,
   Put,
 } from '@nestjs/common';
 import { IntegrationType } from '@prisma/client';
@@ -29,6 +30,20 @@ export class IntegrationsController {
   ): Promise<IntegrationResponseDto> {
     const normalizedType = this.parseIntegrationType(type);
     const integration = await this.integrationsService.upsert(
+      normalizedType,
+      dto,
+    );
+
+    return this.toResponseDto(integration);
+  }
+
+  @Post(':type/test')
+  async test(
+    @Param('type') type: string,
+    @Body() dto: UpdateIntegrationDto,
+  ): Promise<IntegrationResponseDto> {
+    const normalizedType = this.parseIntegrationType(type);
+    const integration = await this.integrationsService.testIntegration(
       normalizedType,
       dto,
     );

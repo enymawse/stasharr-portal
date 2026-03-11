@@ -158,6 +158,16 @@ interface StashdbGraphqlResponse {
 
 @Injectable()
 export class StashdbAdapter {
+  async testConnection(config: StashdbAdapterBaseConfig): Promise<void> {
+    const query = `
+      query ConnectivityCheck {
+        __typename
+      }
+    `;
+
+    await this.executeQuery(config, query);
+  }
+
   async getTrendingScenes(
     config: StashdbAdapterTrendingConfig,
   ): Promise<StashdbTrendingScenesResult> {

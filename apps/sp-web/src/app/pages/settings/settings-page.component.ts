@@ -10,6 +10,9 @@ import {
   UpdateIntegrationPayload,
 } from '../../core/api/integrations.types';
 
+type ServiceTab = IntegrationType;
+type SettingsTab = ServiceTab | 'ABOUT';
+
 @Component({
   selector: 'app-settings-page',
   imports: [ReactiveFormsModule],
@@ -22,19 +25,16 @@ export class SettingsPageComponent implements OnInit {
 
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
+  protected readonly globalMessage = signal<string | null>(null);
   protected readonly health = signal<HealthStatusResponse | null>(null);
-  protected readonly refreshingHealth = signal(false);
   protected readonly healthError = signal<string | null>(null);
-  protected readonly feedback = signal<string | null>(null);
+  protected readonly refreshingHealth = signal(false);
+  protected readonly activeTab = signal<SettingsTab>('STASH');
   protected readonly confirmResetType = signal<IntegrationType | null>(null);
   protected readonly confirmResetAll = signal(false);
   protected readonly resettingAll = signal(false);
 
-  protected readonly integrationTypes: IntegrationType[] = [
-    'STASH',
-    'WHISPARR',
-    'STASHDB',
-  ];
+  protected readonly serviceTabs: ServiceTab[] = ['STASH', 'WHISPARR', 'STASHDB'];
 
   protected readonly forms: Record<IntegrationType, IntegrationForm> = {
     STASH: this.createIntegrationForm(),
@@ -50,24 +50,42 @@ export class SettingsPageComponent implements OnInit {
     STASHDB: null,
   });
 
-  protected readonly saveState = signal<Record<IntegrationType, SaveState>>({
-    STASH: this.defaultSaveState(),
-    WHISPARR: this.defaultSaveState(),
-    STASHDB: this.defaultSaveState(),
+  protected readonly saveState = signal<Record<IntegrationType, ActionState>>({
+    STASH: this.defaultActionState(),
+    WHISPARR: this.defaultActionState(),
+    STASHDB: this.defaultActionState(),
   });
 
-  protected readonly resetState = signal<Record<IntegrationType, ResetState>>({
-    STASH: this.defaultResetState(),
-    WHISPARR: this.defaultResetState(),
-    STASHDB: this.defaultResetState(),
+  protected readonly testState = signal<Record<IntegrationType, ActionState>>({
+    STASH: this.defaultActionState(),
+    WHISPARR: this.defaultActionState(),
+    STASHDB: this.defaultActionState(),
+  });
+
+  protected readonly resetState = signal<Record<IntegrationType, ActionState>>({
+    STASH: this.defaultActionState(),
+    WHISPARR: this.defaultActionState(),
+    STASHDB: this.defaultActionState(),
   });
 
   ngOnInit(): void {
     this.loadSettingsData();
   }
 
-  protected formFor(type: IntegrationType): IntegrationForm {
-    return this.forms[type];
+  protected setActiveTab(tab: SettingsTab): void {
+    this.activeTab.set(tab);
+  }
+
+  protected isActiveTab(tab: SettingsTab): boolean {
+    return this.activeTab() === tab;
+  }
+
+  protected isServiceTabActive(type: IntegrationType): boolean {
+    return this.activeTab() === type;
+  }
+
+  protected configured(type: IntegrationType): boolean {
+    return this.integrations()[type]?.status === 'CONFIGURED';
   }
 
   protected labelFor(type: IntegrationType): string {
@@ -81,10 +99,14 @@ export class SettingsPageComponent implements OnInit {
     }
   }
 
+  protected formFor(type: IntegrationType): IntegrationForm {
+    return this.forms[type];
+  }
+
   protected statusText(type: IntegrationType): string {
     const integration = this.integrations()[type];
     if (!integration) {
-      return 'Not configured';
+      return 'NOT CONFIGURED';
     }
 
     return integration.status.replaceAll('_', ' ');
@@ -95,7 +117,7 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected isSaving(type: IntegrationType): boolean {
-    return this.saveState()[type].saving;
+    return this.saveState()[type].running;
   }
 
   protected saveSuccess(type: IntegrationType): string | null {
@@ -106,8 +128,20 @@ export class SettingsPageComponent implements OnInit {
     return this.saveState()[type].error;
   }
 
+  protected isTesting(type: IntegrationType): boolean {
+    return this.testState()[type].running;
+  }
+
+  protected testSuccess(type: IntegrationType): string | null {
+    return this.testState()[type].success;
+  }
+
+  protected testError(type: IntegrationType): string | null {
+    return this.testState()[type].error;
+  }
+
   protected isResetting(type: IntegrationType): boolean {
-    return this.resetState()[type].resetting;
+    return this.resetState()[type].running;
   }
 
   protected resetSuccess(type: IntegrationType): string | null {
@@ -118,62 +152,12 @@ export class SettingsPageComponent implements OnInit {
     return this.resetState()[type].error;
   }
 
-  protected lastHealthyAt(type: IntegrationType): string | null {
-    const value = this.integrations()[type]?.lastHealthyAt;
-    return value ? this.formatDateTime(value) : null;
-  }
-
-  protected lastErrorAt(type: IntegrationType): string | null {
-    const value = this.integrations()[type]?.lastErrorAt;
-    return value ? this.formatDateTime(value) : null;
-  }
-
-  protected saveIntegration(type: IntegrationType): void {
-    const formValue = this.forms[type].getRawValue();
-    const payload: UpdateIntegrationPayload = {
-      enabled: formValue.enabled,
-      name: this.normalizeInput(formValue.name),
-      baseUrl: this.normalizeInput(formValue.baseUrl),
-    };
-
-    const apiKey = this.normalizeInput(formValue.apiKey);
-    if (apiKey) {
-      payload.apiKey = apiKey;
-    }
-
-    this.patchSaveState(type, { saving: true, success: null, error: null });
-    this.feedback.set(null);
-
-    this.integrationsService
-      .updateIntegration(type, payload)
-      .pipe(
-        finalize(() => {
-          this.patchSaveState(type, { saving: false });
-        }),
-      )
-      .subscribe({
-        next: (integration) => {
-          this.integrations.update((current) => ({
-            ...current,
-            [type]: integration,
-          }));
-          this.forms[type].patchValue({ apiKey: '' });
-          this.patchSaveState(type, {
-            success: `${this.labelFor(type)} settings saved.`,
-            error: null,
-          });
-        },
-        error: () => {
-          this.patchSaveState(type, {
-            success: null,
-            error: `Failed to save ${this.labelFor(type)} settings.`,
-          });
-        },
-      });
+  protected shouldConfirmReset(type: IntegrationType): boolean {
+    return this.confirmResetType() === type;
   }
 
   protected requestIntegrationReset(type: IntegrationType): void {
-    this.feedback.set(null);
+    this.globalMessage.set(null);
     this.confirmResetType.set(type);
   }
 
@@ -183,27 +167,98 @@ export class SettingsPageComponent implements OnInit {
     }
   }
 
-  protected shouldConfirmReset(type: IntegrationType): boolean {
-    return this.confirmResetType() === type;
+  protected requestResetAll(): void {
+    this.globalMessage.set(null);
+    this.confirmResetAll.set(true);
+  }
+
+  protected cancelResetAll(): void {
+    this.confirmResetAll.set(false);
+  }
+
+  protected saveIntegration(type: IntegrationType): void {
+    const payload = this.payloadFromForm(type);
+    this.patchActionState(this.saveState, type, {
+      running: true,
+      success: null,
+      error: null,
+    });
+    this.patchActionState(this.testState, type, { success: null, error: null });
+
+    this.integrationsService
+      .updateIntegration(type, payload)
+      .pipe(
+        finalize(() => {
+          this.patchActionState(this.saveState, type, { running: false });
+        }),
+      )
+      .subscribe({
+        next: (integration) => {
+          this.updateIntegration(type, integration);
+          this.forms[type].patchValue({ apiKey: '' });
+          this.patchActionState(this.saveState, type, {
+            success: `${this.labelFor(type)} settings saved.`,
+            error: null,
+          });
+        },
+        error: () => {
+          this.patchActionState(this.saveState, type, {
+            success: null,
+            error: `Failed to save ${this.labelFor(type)} settings.`,
+          });
+        },
+      });
+  }
+
+  protected testIntegration(type: IntegrationType): void {
+    const payload = this.payloadFromForm(type);
+    this.patchActionState(this.testState, type, {
+      running: true,
+      success: null,
+      error: null,
+    });
+
+    this.integrationsService
+      .testIntegration(type, payload)
+      .pipe(
+        finalize(() => {
+          this.patchActionState(this.testState, type, { running: false });
+        }),
+      )
+      .subscribe({
+        next: (integration) => {
+          this.updateIntegration(type, integration);
+          this.patchActionState(this.testState, type, {
+            success: `${this.labelFor(type)} test passed.`,
+            error: null,
+          });
+        },
+        error: () => {
+          this.patchActionState(this.testState, type, {
+            success: null,
+            error: `${this.labelFor(type)} test failed.`,
+          });
+        },
+      });
   }
 
   protected resetIntegration(type: IntegrationType): void {
-    this.patchResetState(type, { resetting: true, success: null, error: null });
-    this.feedback.set(null);
+    this.patchActionState(this.resetState, type, {
+      running: true,
+      success: null,
+      error: null,
+    });
 
     this.integrationsService
       .resetIntegration(type)
       .pipe(
         finalize(() => {
-          this.patchResetState(type, { resetting: false });
+          this.patchActionState(this.resetState, type, { running: false });
         }),
       )
       .subscribe({
         next: (integration) => {
-          this.integrations.update((current) => ({
-            ...current,
-            [type]: integration,
-          }));
+          this.updateIntegration(type, integration);
           this.forms[type].setValue({
             name: '',
             baseUrl: '',
@@ -211,13 +266,13 @@ export class SettingsPageComponent implements OnInit {
             enabled: integration.enabled,
           });
           this.confirmResetType.set(null);
-          this.patchResetState(type, {
+          this.patchActionState(this.resetState, type, {
             success: `${this.labelFor(type)} has been reset.`,
             error: null,
           });
         },
         error: () => {
-          this.patchResetState(type, {
+          this.patchActionState(this.resetState, type, {
             success: null,
             error: `Failed to reset ${this.labelFor(type)}.`,
           });
@@ -225,19 +280,9 @@ export class SettingsPageComponent implements OnInit {
       });
   }
 
-  protected requestResetAll(): void {
-    this.confirmResetAll.set(true);
-    this.feedback.set(null);
-  }
-
-  protected cancelResetAll(): void {
-    this.confirmResetAll.set(false);
-  }
-
   protected resetAllIntegrations(): void {
     this.resettingAll.set(true);
-    this.feedback.set(null);
-    this.healthError.set(null);
+    this.globalMessage.set(null);
 
     this.integrationsService
       .resetAllIntegrations()
@@ -248,12 +293,13 @@ export class SettingsPageComponent implements OnInit {
       )
       .subscribe({
         next: (integrations) => {
-          this.confirmResetAll.set(false);
           this.applyIntegrations(integrations);
-          this.feedback.set('All integrations were reset to not configured.');
+          this.confirmResetAll.set(false);
+          this.confirmResetType.set(null);
+          this.globalMessage.set('All integrations were reset to not configured.');
         },
         error: () => {
-          this.feedback.set('Failed to reset all integrations.');
+          this.globalMessage.set('Failed to reset all integrations.');
         },
       });
   }
@@ -277,9 +323,19 @@ export class SettingsPageComponent implements OnInit {
           this.health.set(health);
         },
         error: () => {
-          this.healthError.set('Failed to refresh service health.');
+          this.healthError.set('Failed to refresh health data.');
         },
       });
+  }
+
+  protected lastHealthyAt(type: IntegrationType): string | null {
+    const value = this.integrations()[type]?.lastHealthyAt;
+    return value ? this.formatDateTime(value) : null;
+  }
+
+  protected lastErrorAt(type: IntegrationType): string | null {
+    const value = this.integrations()[type]?.lastErrorAt;
+    return value ? this.formatDateTime(value) : null;
   }
 
   private loadSettingsData(): void {
@@ -306,6 +362,22 @@ export class SettingsPageComponent implements OnInit {
       });
   }
 
+  private payloadFromForm(type: IntegrationType): UpdateIntegrationPayload {
+    const formValue = this.forms[type].getRawValue();
+    const payload: UpdateIntegrationPayload = {
+      enabled: formValue.enabled,
+      name: this.normalizeInput(formValue.name),
+      baseUrl: this.normalizeInput(formValue.baseUrl),
+    };
+
+    const apiKey = this.normalizeInput(formValue.apiKey);
+    if (apiKey) {
+      payload.apiKey = apiKey;
+    }
+
+    return payload;
+  }
+
   private applyIntegrations(integrations: IntegrationResponse[]): void {
     const byType: Record<IntegrationType, IntegrationResponse | null> = {
       STASH: null,
@@ -319,7 +391,7 @@ export class SettingsPageComponent implements OnInit {
 
     this.integrations.set(byType);
 
-    for (const type of this.integrationTypes) {
+    for (const type of this.serviceTabs) {
       const integration = byType[type];
       this.forms[type].setValue({
         name: integration?.name ?? '',
@@ -328,6 +400,13 @@ export class SettingsPageComponent implements OnInit {
         enabled: integration?.enabled ?? true,
       });
     }
+  }
+
+  private updateIntegration(type: IntegrationType, integration: IntegrationResponse): void {
+    this.integrations.update((current) => ({
+      ...current,
+      [type]: integration,
+    }));
   }
 
   private createIntegrationForm(): IntegrationForm {
@@ -341,7 +420,7 @@ export class SettingsPageComponent implements OnInit {
 
   private normalizeInput(value: string): string | undefined {
     const trimmed = value.trim();
-    return trimmed.length === 0 ? undefined : trimmed;
+    return trimmed.length > 0 ? trimmed : undefined;
   }
 
   private formatDateTime(value: string): string {
@@ -353,34 +432,26 @@ export class SettingsPageComponent implements OnInit {
     return date.toLocaleString();
   }
 
-  private defaultSaveState(): SaveState {
+  private defaultActionState(): ActionState {
     return {
-      saving: false,
+      running: false,
       success: null,
       error: null,
     };
   }
 
-  private defaultResetState(): ResetState {
-    return {
-      resetting: false,
-      success: null,
-      error: null,
-    };
-  }
-
-  private patchSaveState(type: IntegrationType, patch: Partial<SaveState>): void {
-    this.saveState.update((current) => ({
-      ...current,
-      [type]: {
-        ...current[type],
-        ...patch,
-      },
-    }));
-  }
-
-  private patchResetState(type: IntegrationType, patch: Partial<ResetState>): void {
-    this.resetState.update((current) => ({
+  private patchActionState(
+    store: {
+      update: (
+        updater: (
+          state: Record<IntegrationType, ActionState>,
+        ) => Record<IntegrationType, ActionState>,
+      ) => void;
+    },
+    type: IntegrationType,
+    patch: Partial<ActionState>,
+  ): void {
+    store.update((current) => ({
       ...current,
       [type]: {
         ...current[type],
@@ -390,14 +461,8 @@ export class SettingsPageComponent implements OnInit {
   }
 }
 
-interface SaveState {
-  saving: boolean;
-  success: string | null;
-  error: string | null;
-}
-
-interface ResetState {
-  resetting: boolean;
+interface ActionState {
+  running: boolean;
   success: string | null;
   error: string | null;
 }

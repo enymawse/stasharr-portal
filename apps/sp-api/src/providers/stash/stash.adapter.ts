@@ -31,6 +31,16 @@ interface StashGraphqlResponse {
 
 @Injectable()
 export class StashAdapter {
+  async testConnection(config: StashAdapterBaseConfig): Promise<void> {
+    const query = `
+      query ConnectivityCheck {
+        __typename
+      }
+    `;
+
+    await this.executeQuery(config, query);
+  }
+
   async findScenesByStashId(
     stashId: string,
     config: StashAdapterBaseConfig,
@@ -198,7 +208,7 @@ export class StashAdapter {
   private resolveSceneViewUrl(baseUrl: string, sceneId: string): string {
     const parsed = new URL(baseUrl);
     const cleanPath = parsed.pathname.replace(/\/+$/, '');
-    parsed.pathname = `${cleanPath}/scenes/${encodeURIComponent(sceneId)}`;
+    parsed.pathname = `${cleanPath}/scene/${encodeURIComponent(sceneId)}`;
     parsed.search = '';
     return parsed.toString();
   }

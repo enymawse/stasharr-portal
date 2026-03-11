@@ -12,6 +12,44 @@ export interface WhisparrSceneLookupResult {
 
 @Injectable()
 export class WhisparrAdapter {
+  async testConnection(config: WhisparrAdapterBaseConfig): Promise<void> {
+    const endpoint = this.resolveSystemStatusEndpoint(config.baseUrl);
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+    };
+
+    if (config.apiKey?.trim()) {
+      headers['X-Api-Key'] = config.apiKey.trim();
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'GET',
+        headers,
+      });
+    } catch {
+      throw new BadGatewayException(
+        'Failed to reach Whisparr provider endpoint.',
+      );
+    }
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new BadGatewayException(
+        `Whisparr provider returned ${response.status}: ${errorBody}`,
+      );
+    }
+
+    try {
+      await response.json();
+    } catch {
+      throw new BadGatewayException(
+        'Whisparr provider returned an invalid JSON response.',
+      );
+    }
+  }
+
   async findSceneByStashId(
     stashId: string,
     config: WhisparrAdapterBaseConfig,
@@ -120,6 +158,16 @@ export class WhisparrAdapter {
 
     parsed.pathname = `${cleanPath}/api/v3/movie`;
     parsed.searchParams.set('stashId', stashId);
+
+    return parsed.toString();
+  }
+
+  private resolveSystemStatusEndpoint(baseUrl: string): string {
+    const parsed = new URL(baseUrl);
+    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+
+    parsed.pathname = `${cleanPath}/api/v3/system/status`;
+    parsed.search = '';
 
     return parsed.toString();
   }
