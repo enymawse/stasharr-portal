@@ -23,6 +23,39 @@ export class DiscoverPageComponent implements OnInit {
     return this.items().length > 0;
   }
 
+  protected displayDate(item: DiscoverItem): string | null {
+    return item.releaseDate ?? item.productionDate;
+  }
+
+  protected formattedDuration(durationSeconds: number | null): string | null {
+    if (!durationSeconds || durationSeconds <= 0) {
+      return null;
+    }
+
+    const totalMinutes = Math.floor(durationSeconds / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours === 0) {
+      return `${minutes}m`;
+    }
+
+    return `${hours}h ${minutes}m`;
+  }
+
+  protected truncatedDetails(details: string | null): string | null {
+    if (!details) {
+      return null;
+    }
+
+    const singleLine = details.replaceAll(/\s+/g, ' ').trim();
+    if (singleLine.length <= 180) {
+      return singleLine;
+    }
+
+    return `${singleLine.slice(0, 177)}...`;
+  }
+
   private loadDiscoverFeed(): void {
     this.loading.set(true);
     this.error.set(null);

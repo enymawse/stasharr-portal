@@ -44,15 +44,28 @@ header p {
 .card {
   border: 1px solid #d0d7de;
   border-radius: 8px;
-  padding: 1rem;
+  padding: 0.85rem;
   background: #fff;
   display: grid;
   gap: 0.5rem;
 }
 
+.thumbnail {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #eef2f6;
+}
+
 .meta {
   color: #55606d;
   font-size: 0.95rem;
+}
+
+.details {
+  color: #2c3947;
+  line-height: 1.35;
 }
 
 a {

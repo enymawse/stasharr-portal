@@ -14,15 +14,31 @@
     <section class="grid">
       @for (item of items(); track item.id) {
         <article class="card">
+          @if (item.imageUrl) {
+            <img class="thumbnail" [src]="item.imageUrl" [alt]="item.title" loading="lazy" />
+          }
+
           <h2>{{ item.title }}</h2>
           <p class="meta">{{ item.type }} | {{ item.source }}</p>
 
-          @if (item.releaseDate) {
-            <p>Release date: {{ item.releaseDate }}</p>
+          @if (item.studioName) {
+            <p><strong>Studio:</strong> {{ item.studioName }}</p>
           }
 
-          @if (item.studio) {
-            <p>Studio: {{ item.studio }}</p>
+          @if (displayDate(item); as date) {
+            <p><strong>Date:</strong> {{ date }}</p>
+          }
+
+          @if (formattedDuration(item.duration); as duration) {
+            <p><strong>Duration:</strong> {{ duration }}</p>
+          }
+
+          @if (item.imageCount > 0) {
+            <p><strong>Images:</strong> {{ item.imageCount }}</p>
+          }
+
+          @if (truncatedDetails(item.details); as details) {
+            <p class="details">{{ details }}</p>
           }
 
           @if (item.sourceUrl) {
