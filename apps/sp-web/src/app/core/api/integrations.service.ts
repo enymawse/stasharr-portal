@@ -23,4 +23,12 @@ export class IntegrationsService {
   ): Observable<IntegrationResponse> {
     return this.http.put<IntegrationResponse>(`/api/integrations/${type}`, payload);
   }
+
+  resetIntegration(type: IntegrationType): Observable<IntegrationResponse> {
+    return this.http.delete<IntegrationResponse>(`/api/integrations/${type}`);
+  }
+
+  resetAllIntegrations(): Observable<IntegrationResponse[]> {
+    return this.http.delete<IntegrationResponse[]>('/api/integrations');
+  }
 }

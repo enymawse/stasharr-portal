@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Put,
@@ -33,6 +34,19 @@ export class IntegrationsController {
     );
 
     return this.toResponseDto(integration);
+  }
+
+  @Delete(':type')
+  async reset(@Param('type') type: string): Promise<IntegrationResponseDto> {
+    const normalizedType = this.parseIntegrationType(type);
+    const integration = await this.integrationsService.reset(normalizedType);
+    return this.toResponseDto(integration);
+  }
+
+  @Delete()
+  async resetAll(): Promise<IntegrationResponseDto[]> {
+    const integrations = await this.integrationsService.resetAll();
+    return integrations.map((integration) => this.toResponseDto(integration));
   }
 
   private parseIntegrationType(type: string): IntegrationType {

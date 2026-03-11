@@ -1,0 +1,156 @@
+<main>
+  <header>
+    <h1>Settings</h1>
+    <p>Manage integrations, reset configuration, and review service health.</p>
+  </header>
+
+  @if (loading()) {
+    <p class="state">Loading settings...</p>
+  } @else if (loadError()) {
+    <p class="state error">{{ loadError() }}</p>
+  } @else {
+    @if (feedback()) {
+      <p class="state info">{{ feedback() }}</p>
+    }
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Integrations</h2>
+      </div>
+
+      <div class="cards">
+        @for (type of integrationTypes; track type) {
+          <article class="card">
+            <h3>{{ labelFor(type) }}</h3>
+            <p class="meta">Status: {{ statusText(type) }}</p>
+
+            <form [formGroup]="formFor(type)" (ngSubmit)="saveIntegration(type)">
+              <label>
+                Name
+                <input type="text" formControlName="name" />
+              </label>
+
+              <label>
+                Base URL
+                <input type="text" formControlName="baseUrl" placeholder="http://localhost:9999" />
+              </label>
+
+              <label>
+                API Key
+                <input type="password" formControlName="apiKey" placeholder="Enter to update key" />
+              </label>
+
+              @if (hasStoredApiKey(type)) {
+                <p class="hint">API key is stored. Leave blank to keep current key.</p>
+              }
+
+              <label class="checkbox-row">
+                <input type="checkbox" formControlName="enabled" />
+                Enabled
+              </label>
+
+              <div class="actions">
+                <button type="submit" [disabled]="isSaving(type)">
+                  {{ isSaving(type) ? 'Saving...' : 'Save changes' }}
+                </button>
+              </div>
+
+              @if (saveSuccess(type)) {
+                <p class="state success">{{ saveSuccess(type) }}</p>
+              }
+              @if (saveError(type)) {
+                <p class="state error">{{ saveError(type) }}</p>
+              }
+            </form>
+
+            <div class="health-meta">
+              <p>Last healthy: {{ lastHealthyAt(type) ?? 'Never' }}</p>
+              <p>Last error: {{ lastErrorAt(type) ?? 'None' }}</p>
+              @if (integrations()[type]?.lastErrorMessage; as lastErrorMessage) {
+                <p class="error-message">{{ lastErrorMessage }}</p>
+              }
+            </div>
+
+            <div class="reset-row">
+              @if (!shouldConfirmReset(type)) {
+                <button
+                  type="button"
+                  class="danger"
+                  [disabled]="isResetting(type)"
+                  (click)="requestIntegrationReset(type)"
+                >
+                  Reset {{ labelFor(type) }}
+                </button>
+              } @else {
+                <p>Reset {{ labelFor(type) }}?</p>
+                <div class="confirm-actions">
+                  <button
+                    type="button"
+                    class="danger"
+                    [disabled]="isResetting(type)"
+                    (click)="resetIntegration(type)"
+                  >
+                    {{ isResetting(type) ? 'Resetting...' : 'Confirm reset' }}
+                  </button>
+                  <button type="button" (click)="cancelIntegrationReset(type)">Cancel</button>
+                </div>
+              }
+
+              @if (resetSuccess(type)) {
+                <p class="state success">{{ resetSuccess(type) }}</p>
+              }
+              @if (resetError(type)) {
+                <p class="state error">{{ resetError(type) }}</p>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Reset actions</h2>
+      </div>
+
+      <p class="meta">Use with care. These actions clear stored integration configuration.</p>
+
+      @if (!confirmResetAll()) {
+        <button type="button" class="danger" (click)="requestResetAll()">
+          Reset all integrations
+        </button>
+      } @else {
+        <p>Reset all integrations?</p>
+        <div class="confirm-actions">
+          <button type="button" class="danger" [disabled]="resettingAll()" (click)="resetAllIntegrations()">
+            {{ resettingAll() ? 'Resetting...' : 'Confirm reset all' }}
+          </button>
+          <button type="button" [disabled]="resettingAll()" (click)="cancelResetAll()">Cancel</button>
+        </div>
+      }
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Service health</h2>
+        <button type="button" [disabled]="refreshingHealth()" (click)="refreshHealth()">
+          {{ refreshingHealth() ? 'Refreshing...' : 'Refresh health' }}
+        </button>
+      </div>
+
+      @if (health(); as health) {
+        <div class="health-grid">
+          <p>Service: <strong>{{ health.service }}</strong></p>
+          <p>API status: <strong>{{ health.status }}</strong></p>
+          <p>Database: <strong>{{ health.database }}</strong></p>
+        </div>
+      } @else {
+        <p class="meta">Health data unavailable.</p>
+      }
+
+      @if (healthError()) {
+        <p class="state error">{{ healthError() }}</p>
+      }
+    </section>
+  }
+</main>
