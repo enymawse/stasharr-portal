@@ -1,4 +1,18 @@
 :root {
+  --app-font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    'Noto Sans',
+    'Liberation Sans',
+    Arial,
+    sans-serif,
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Segoe UI Symbol',
+    'Noto Color Emoji';
   --app-bg: #eef3f8;
   --surface-1: #ffffff;
   --surface-2: #f6f9fc;
@@ -86,6 +100,7 @@ body {
   min-height: 100%;
   background: var(--app-bg);
   color: var(--text-primary);
+  font-family: var(--app-font-family);
 }
 
 * {

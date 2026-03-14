@@ -2,12 +2,7 @@
   box-sizing: border-box;
   display: block;
   min-height: 100dvh;
-  font-family:
-    'Segoe UI',
-    Tahoma,
-    Geneva,
-    Verdana,
-    sans-serif;
+  font-family: var(--app-font-family);
   color: var(--text-primary);
 }
 

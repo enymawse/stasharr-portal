@@ -9,12 +9,7 @@
       color-mix(in srgb, var(--app-bg) 25%, #101a27) 22%,
       var(--app-bg) 55%
     );
-  font-family:
-    'Segoe UI',
-    Tahoma,
-    Geneva,
-    Verdana,
-    sans-serif;
+  font-family: var(--app-font-family);
 }
 
 main {
