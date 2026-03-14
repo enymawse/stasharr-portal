@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { DiscoverService } from '../../core/api/discover.service';
-import { SceneDetails, SceneUrl } from '../../core/api/discover.types';
+import { SceneDetails } from '../../core/api/discover.types';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
 @Component({
@@ -68,15 +68,6 @@ export class ScenePageComponent implements OnInit {
 
   protected onStashCopySelected(viewUrl: string): void {
     this.selectedStashCopyUrl.set(viewUrl);
-  }
-
-  protected nonStudioSourceUrls(scene: SceneDetails): SceneUrl[] {
-    const studioUrl = scene.studioUrl;
-    if (!studioUrl) {
-      return scene.sourceUrls;
-    }
-
-    return scene.sourceUrls.filter((sourceUrl) => sourceUrl.url !== studioUrl);
   }
 
   protected studioLogoAriaLabel(scene: SceneDetails): string {

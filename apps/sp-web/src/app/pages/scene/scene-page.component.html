@@ -55,9 +55,6 @@
           }
 
           <div class="meta-row">
-            @if (scene.studio) {
-              <span class="meta-chip">{{ scene.studio }}</span>
-            }
             @if (formattedDuration(scene.duration); as duration) {
               <span class="meta-chip">{{ duration }}</span>
             }
@@ -73,11 +70,7 @@
             </div>
           }
 
-          @if (
-            nonStudioSourceUrls(scene).length > 0 ||
-            hasStashCopy(scene) ||
-            hasWhisparrLink(scene)
-          ) {
+          @if (hasStashCopy(scene) || hasWhisparrLink(scene)) {
             <div class="hero-actions">
               @if (hasStashCopy(scene)) {
                 @if (hasMultipleStashCopies(scene)) {
@@ -103,59 +96,6 @@
                     View in Stash
                   </a>
                 }
-              }
-
-              @if (hasWhisparrLink(scene)) {
-                <a
-                  [href]="scene.whisparr!.viewUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  View in Whisparr
-                </a>
-              }
-
-              @for (
-                sourceUrl of nonStudioSourceUrls(scene);
-                track sourceUrl.url;
-                let idx = $index
-              ) {
-                @if (idx < 2) {
-                  <a
-                    class="secondary-link"
-                    [href]="sourceUrl.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {{ sourceUrl.type ?? 'Open source link' }}
-                  </a>
-                }
-              }
-            </div>
-          } @else if (hasStashCopy(scene) || hasWhisparrLink(scene)) {
-            <div class="hero-actions">
-              @if (hasMultipleStashCopies(scene)) {
-                <label class="stash-copy-selector">
-                  <span>Stash Copies</span>
-                  <select
-                    [value]="selectedStashViewUrl(scene)"
-                    (change)="onStashCopySelected($any($event.target).value)"
-                  >
-                    @for (copy of scene.stash!.copies; track copy.id) {
-                      <option [value]="copy.viewUrl">{{ copy.label }}</option>
-                    }
-                  </select>
-                </label>
-
-                @if (selectedStashViewUrl(scene); as selectedViewUrl) {
-                  <a [href]="selectedViewUrl" target="_blank" rel="noopener noreferrer">
-                    View in Stash ({{ selectedStashLabel(scene) }})
-                  </a>
-                }
-              } @else if (scene.stash!.copies[0]; as singleCopy) {
-                <a [href]="singleCopy.viewUrl" target="_blank" rel="noopener noreferrer">
-                  View in Stash
-                </a>
               }
 
               @if (hasWhisparrLink(scene)) {
@@ -224,20 +164,6 @@
         </section>
       }
 
-      @if (nonStudioSourceUrls(scene).length > 0) {
-        <section class="section">
-          <h2>External Links</h2>
-          <ul class="links">
-            @for (sourceUrl of nonStudioSourceUrls(scene); track sourceUrl.url) {
-              <li>
-                <a [href]="sourceUrl.url" target="_blank" rel="noopener noreferrer">
-                  {{ sourceUrl.type ?? 'External link' }}
-                </a>
-              </li>
-            }
-          </ul>
-        </section>
-      }
     </div>
   }
 </main>

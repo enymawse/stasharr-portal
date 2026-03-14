@@ -220,11 +220,6 @@ a.studio-logo-overlay:focus-visible {
   padding: 0.34rem 0.62rem;
 }
 
-.hero-actions .secondary-link {
-  background: color-mix(in srgb, var(--surface-1) 86%, transparent);
-  font-weight: 600;
-}
-
 .stash-copy-selector {
   display: inline-flex;
   align-items: center;
@@ -322,18 +317,6 @@ a.studio-logo-overlay:focus-visible {
   padding: 0.18rem 0.56rem;
   font-size: 0.88rem;
   color: var(--chip-text);
-}
-
-.links {
-  margin: 0;
-  padding-left: 1rem;
-  display: grid;
-  gap: 0.32rem;
-}
-
-.links a {
-  color: var(--focus-ring);
-  text-decoration: none;
 }
 
 button {
