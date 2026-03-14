@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
+import { DiscoverResponseDto } from '../discover/dto/discover-item.dto';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
@@ -18,6 +19,9 @@ import {
 
 @Injectable()
 export class ScenesService {
+  private static readonly DEFAULT_PAGE = 1;
+  private static readonly DEFAULT_PER_PAGE = 25;
+
   constructor(
     private readonly integrationsService: IntegrationsService,
     private readonly stashdbAdapter: StashdbAdapter,
@@ -25,6 +29,59 @@ export class ScenesService {
     private readonly stashAdapter: StashAdapter,
     private readonly whisparrAdapter: WhisparrAdapter,
   ) {}
+
+  async getScenesFeed(
+    page = ScenesService.DEFAULT_PAGE,
+    perPage = ScenesService.DEFAULT_PER_PAGE,
+  ): Promise<DiscoverResponseDto> {
+    const integration = await this.getStashdbIntegration();
+
+    if (!integration.enabled) {
+      throw new ConflictException('STASHDB integration is disabled.');
+    }
+
+    if (integration.status !== IntegrationStatus.CONFIGURED) {
+      throw new ConflictException('STASHDB integration is not configured.');
+    }
+
+    if (!integration.baseUrl) {
+      throw new BadRequestException(
+        'STASHDB integration is missing a base URL.',
+      );
+    }
+
+    const scenes = await this.stashdbAdapter.getScenesSortedByDate({
+      baseUrl: integration.baseUrl,
+      apiKey: integration.apiKey,
+      page,
+      perPage,
+    });
+
+    const hasMore = page * perPage < scenes.total;
+    const statuses = await this.sceneStatusService.resolveForScenes(
+      scenes.scenes.map((scene) => scene.id),
+    );
+
+    return {
+      total: scenes.total,
+      page,
+      perPage,
+      hasMore,
+      items: scenes.scenes.map((scene) => ({
+        id: scene.id,
+        title: scene.title,
+        description: scene.details,
+        imageUrl: scene.imageUrl,
+        studio: scene.studioName,
+        studioImageUrl: scene.studioImageUrl,
+        releaseDate: scene.releaseDate ?? scene.productionDate ?? scene.date,
+        duration: scene.duration,
+        type: 'SCENE',
+        source: 'STASHDB',
+        status: statuses.get(scene.id) ?? { state: 'UNREQUESTED' },
+      })),
+    };
+  }
 
   async getSceneById(stashId: string): Promise<SceneDetailsDto> {
     const sceneId = stashId.trim();

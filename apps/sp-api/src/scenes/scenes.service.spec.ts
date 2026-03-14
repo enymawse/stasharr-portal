@@ -16,6 +16,7 @@ describe('ScenesService', () => {
 
   const stashdbAdapter = {
     getSceneById: jest.fn(),
+    getScenesSortedByDate: jest.fn(),
   } as unknown as StashdbAdapter;
 
   const sceneStatusService = {
@@ -98,9 +99,31 @@ describe('ScenesService', () => {
       });
 
     stashdbAdapter.getSceneById = jest.fn().mockResolvedValue(sceneDetails);
+    stashdbAdapter.getScenesSortedByDate = jest.fn().mockResolvedValue({
+      total: 1,
+      scenes: [
+        {
+          id: 'stashdb-scene-1',
+          title: 'Scene',
+          details: 'Description',
+          imageUrl: 'http://image',
+          studioName: 'Studio',
+          studioImageUrl: 'http://studio-image',
+          date: '2026-01-01',
+          releaseDate: '2026-01-02',
+          productionDate: '2026-01-03',
+          duration: 300,
+        },
+      ],
+    });
     sceneStatusService.resolveForScene = jest
       .fn()
       .mockResolvedValue({ state: 'AVAILABLE' });
+    sceneStatusService.resolveForScenes = jest
+      .fn()
+      .mockResolvedValue(
+        new Map([['stashdb-scene-1', { state: 'AVAILABLE' }]]),
+      );
     stashAdapter.findScenesByStashId = jest.fn().mockResolvedValue([]);
     whisparrAdapter.findSceneByStashId = jest.fn().mockResolvedValue(null);
     whisparrAdapter.buildSceneViewUrl = jest
@@ -139,6 +162,30 @@ describe('ScenesService', () => {
         ],
       },
       whisparr: null,
+    });
+  });
+
+  it('returns a date-sorted scenes feed with scene statuses', async () => {
+    await expect(service.getScenesFeed(1, 25)).resolves.toEqual({
+      total: 1,
+      page: 1,
+      perPage: 25,
+      hasMore: false,
+      items: [
+        {
+          id: 'stashdb-scene-1',
+          title: 'Scene',
+          description: 'Description',
+          imageUrl: 'http://image',
+          studio: 'Studio',
+          studioImageUrl: 'http://studio-image',
+          releaseDate: '2026-01-02',
+          duration: 300,
+          type: 'SCENE',
+          source: 'STASHDB',
+          status: { state: 'AVAILABLE' },
+        },
+      ],
     });
   });
 

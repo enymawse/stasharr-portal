@@ -174,4 +174,36 @@ describe('StashdbAdapter', () => {
     expect(requestBody.query).toContain('studio');
     expect(requestBody.query).toContain('images');
   });
+
+  it('requests date-sorted scenes for the scenes feed', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.getScenesSortedByDate({
+        baseUrl: 'http://stashdb.local/graphql',
+        page: 1,
+        perPage: 25,
+      }),
+    ).resolves.toEqual({
+      total: 0,
+      scenes: [],
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).toContain('sort: DATE');
+  });
 });
