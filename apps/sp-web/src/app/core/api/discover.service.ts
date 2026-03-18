@@ -23,6 +23,13 @@ export class DiscoverService {
     return this.http.get<DiscoverResponse>('/api/scenes', { params });
   }
 
+  getRequestsFeed(page: number, perPage: number): Observable<DiscoverResponse> {
+    const params = new HttpParams()
+      .set('page', page.toString())
+      .set('perPage', perPage.toString());
+    return this.http.get<DiscoverResponse>('/api/requests', { params });
+  }
+
   getSceneDetails(stashId: string): Observable<SceneDetails> {
     return this.http.get<SceneDetails>(
       `/api/scenes/${encodeURIComponent(stashId)}`,

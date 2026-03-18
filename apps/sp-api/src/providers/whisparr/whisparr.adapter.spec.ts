@@ -140,6 +140,72 @@ describe('WhisparrAdapter', () => {
     });
   });
 
+  describe('findMovieById', () => {
+    it('normalizes movie-by-id payload', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            id: 42,
+            stashId: 'scene-1',
+            hasFile: true,
+          }),
+      } as Response);
+
+      await expect(
+        adapter.findMovieById(42, {
+          baseUrl: 'http://whisparr.local/base',
+          apiKey: 'secret',
+        }),
+      ).resolves.toEqual({
+        movieId: 42,
+        stashId: 'scene-1',
+        hasFile: true,
+      });
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://whisparr.local/base/api/v3/movie/42',
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            'X-Api-Key': 'secret',
+          },
+        },
+      );
+    });
+
+    it('returns null when movie-by-id payload cannot be normalized', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            id: 42,
+            hasFile: true,
+          }),
+      } as Response);
+
+      await expect(
+        adapter.findMovieById(42, {
+          baseUrl: 'http://whisparr.local',
+        }),
+      ).resolves.toBeNull();
+    });
+
+    it('throws for unexpected movie-by-id payload shape', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(['not-an-object']),
+      } as Response);
+
+      await expect(
+        adapter.findMovieById(42, {
+          baseUrl: 'http://whisparr.local',
+        }),
+      ).rejects.toBeInstanceOf(BadGatewayException);
+    });
+  });
+
   describe('getQueueSnapshot', () => {
     it('normalizes queue payload with records wrapper and filters malformed entries', async () => {
       fetchMock.mockResolvedValue({

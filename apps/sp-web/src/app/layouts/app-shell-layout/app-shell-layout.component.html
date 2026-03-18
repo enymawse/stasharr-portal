@@ -56,6 +56,24 @@
       </a>
 
       <a
+        routerLink="/requests"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        class="nav-item"
+      >
+        <span class="icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path
+              d="M5 4h14a2 2 0 0 1 2 2v5.2a6 6 0 0 0-2-.95V6H5v12h4.25c.16.72.45 1.4.84 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm8 5h4v2h-4V9Zm0 3h4v2h-4v-2Zm-6 0h4v2H7v-2Zm0-3h4v2H7V9Zm9.5 5.5a4.5 4.5 0 1 1-3.66 7.12l-1.96 1.96-1.41-1.41 1.96-1.96A4.5 4.5 0 0 1 16.5 14.5Zm0 2a2.5 2.5 0 1 0 0 5a2.5 2.5 0 0 0 0-5Z"
+            />
+          </svg>
+        </span>
+        @if (!collapsed()) {
+          <span>Requests</span>
+        }
+      </a>
+
+      <a
         routerLink="/settings"
         routerLinkActive="active"
         [routerLinkActiveOptions]="{ exact: true }"

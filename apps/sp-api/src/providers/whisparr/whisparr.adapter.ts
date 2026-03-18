@@ -89,6 +89,77 @@ export class WhisparrAdapter {
     return matches[0];
   }
 
+  async findMovieById(
+    movieId: number,
+    config: WhisparrAdapterBaseConfig,
+  ): Promise<WhisparrMovieLookupResult | null> {
+    if (!Number.isInteger(movieId) || movieId <= 0) {
+      this.logger.debug(
+        `findMovieById called with invalid movieId: ${this.safeJson({
+          movieId,
+        })}`,
+      );
+      return null;
+    }
+
+    this.logger.debug(
+      `Looking up Whisparr movie by movieId: ${this.safeJson({
+        movieId,
+        baseUrl: config.baseUrl,
+        hasApiKey: Boolean(config.apiKey?.trim()),
+      })}`,
+    );
+
+    const payload = await this.fetchJsonPayload(
+      this.resolveMovieByIdEndpoint(config.baseUrl, movieId),
+      config,
+    );
+
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      this.logger.error(
+        `Whisparr movie-by-id payload has unexpected shape: ${this.safeJson({
+          movieId,
+          payloadShape: this.describePayloadShape(payload),
+          payloadPreview: this.previewPayload(payload),
+        })}`,
+      );
+      throw new BadGatewayException(
+        'Whisparr provider returned an unexpected movie-by-id response shape.',
+      );
+    }
+
+    this.logger.debug(
+      `Whisparr movie-by-id raw payload: ${this.safeJson(payload)}`,
+    );
+
+    const movie = this.parseMovieLookupEntry(payload);
+    if (!movie) {
+      this.logger.warn(
+        `Whisparr movie-by-id payload could not be normalized: ${this.safeJson({
+          movieId,
+          payloadPreview: this.previewPayload(payload),
+        })}`,
+      );
+      return null;
+    }
+
+    if (movie.movieId !== movieId) {
+      this.logger.warn(
+        `Whisparr movie-by-id response mismatch: ${this.safeJson({
+          requestedMovieId: movieId,
+          responseMovieId: movie.movieId,
+        })}`,
+      );
+      return null;
+    }
+
+    this.logger.debug(
+      `Whisparr movie-by-id normalized result: ${this.safeJson(movie)}`,
+    );
+
+    return movie;
+  }
+
   async getQueueSnapshot(
     config: WhisparrAdapterBaseConfig,
   ): Promise<WhisparrQueueSnapshotItem[]> {
@@ -352,6 +423,16 @@ export class WhisparrAdapter {
 
     parsed.pathname = `${cleanPath}/api/v3/movie`;
     parsed.searchParams.set('stashId', stashId);
+
+    return parsed.toString();
+  }
+
+  private resolveMovieByIdEndpoint(baseUrl: string, movieId: number): string {
+    const parsed = new URL(baseUrl);
+    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+
+    parsed.pathname = `${cleanPath}/api/v3/movie/${encodeURIComponent(String(movieId))}`;
+    parsed.search = '';
 
     return parsed.toString();
   }
