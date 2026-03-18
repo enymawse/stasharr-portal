@@ -45,15 +45,14 @@ header p {
   gap: 0;
 }
 
-.media-link {
-  display: block;
-  text-decoration: none;
-  color: inherit;
+.media-link-stretch {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
   border-radius: 8px;
-  overflow: clip;
 }
 
-.media-link:focus-visible {
+.media-link-stretch:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
@@ -161,6 +160,7 @@ header p {
     );
   display: grid;
   gap: 0.4rem;
+  z-index: 3;
 }
 
 .media-title {
@@ -185,11 +185,43 @@ header p {
     max-height 220ms ease;
 }
 
+.media-description.requestable {
+  max-height: 3.1rem;
+}
+
+.request-cta {
+  opacity: 0;
+  transform: translateY(10px);
+  max-height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0.3rem 0.55rem;
+  border-radius: 7px;
+  border: 1px solid rgb(180 209 234 / 52%);
+  background: rgb(15 34 52 / 76%);
+  color: #ecf6ff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  width: fit-content;
+  cursor: pointer;
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease,
+    max-height 220ms ease;
+}
+
 .card:hover .media-description,
 .card:focus-within .media-description {
   opacity: 1;
   transform: translateY(0);
   max-height: 9.5rem;
+}
+
+.card.requestable:hover .request-cta,
+.card.requestable:focus-within .request-cta {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 2.4rem;
 }
 
 .card:hover .media-title,
@@ -221,6 +253,12 @@ button {
     opacity: 1;
     transform: none;
     max-height: 9.5rem;
+  }
+
+  .card.requestable .request-cta {
+    opacity: 1;
+    transform: none;
+    max-height: 2.4rem;
   }
 
   .media-title {

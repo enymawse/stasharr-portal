@@ -17,41 +17,56 @@
   } @else {
     <section class="grid">
       @for (item of items(); track item.id) {
-        <article class="card">
-          <a class="media-link" [routerLink]="['/scene', item.id]" [attr.aria-label]="item.title">
-            <div class="media">
-              @if (item.imageUrl) {
-                <img class="thumbnail" [src]="item.imageUrl" [alt]="item.title" loading="lazy" />
-              } @else {
-                <div class="thumbnail placeholder" aria-hidden="true"></div>
+        <article class="card" [class.requestable]="isRequestable(item)">
+          <div class="media">
+            <a
+              class="media-link-stretch"
+              [routerLink]="['/scene', item.id]"
+              [attr.aria-label]="item.title"
+            ></a>
+
+            @if (item.imageUrl) {
+              <img class="thumbnail" [src]="item.imageUrl" [alt]="item.title" loading="lazy" />
+            } @else {
+              <div class="thumbnail placeholder" aria-hidden="true"></div>
+            }
+
+            <div class="media-top">
+              @if (item.studioImageUrl) {
+                <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                  <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
+                </div>
+              } @else if (item.studio) {
+                <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
               }
 
-              <div class="media-top">
-                @if (item.studioImageUrl) {
-                  <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
-                    <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
-                  </div>
-                } @else if (item.studio) {
-                  <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
-                }
-
-                @if (item.status.state !== 'NOT_REQUESTED') {
-                  <app-scene-status-badge
-                    class="status-icon"
-                    [status]="item.status"
-                    mode="icon"
-                  />
-                }
-              </div>
-
-              <div class="media-bottom">
-                <h2 class="media-title">{{ item.title }}</h2>
-                @if (truncatedDescription(item.description); as description) {
-                  <p class="media-description">{{ description }}</p>
-                }
-              </div>
+              @if (item.status.state !== 'NOT_REQUESTED') {
+                <app-scene-status-badge
+                  class="status-icon"
+                  [status]="item.status"
+                  mode="icon"
+                />
+              }
             </div>
-          </a>
+
+            <div class="media-bottom">
+              <h2 class="media-title">{{ item.title }}</h2>
+              @if (truncatedDescription(item.description, isRequestable(item)); as description) {
+                <p class="media-description" [class.requestable]="isRequestable(item)">
+                  {{ description }}
+                </p>
+              }
+              @if (isRequestable(item)) {
+                <button
+                  type="button"
+                  class="request-cta"
+                  (click)="openRequestModal(item)"
+                >
+                  Request
+                </button>
+              }
+            </div>
+          </div>
         </article>
       }
     </section>
@@ -69,4 +84,13 @@
       </div>
     }
   }
+
+  <app-scene-request-modal
+    [open]="requestModalOpen()"
+    [sceneId]="requestContext()?.id ?? null"
+    [sceneTitle]="requestContext()?.title ?? null"
+    [sceneImageUrl]="requestContext()?.imageUrl ?? null"
+    (closed)="onRequestModalClosed()"
+    (submitted)="onRequestSubmitted($event)"
+  />
 </main>

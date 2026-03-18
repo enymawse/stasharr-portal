@@ -1,0 +1,118 @@
+@if (open) {
+  <div class="request-modal-overlay" (click)="onBackdropClick($event)">
+    <section
+      class="request-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="request-dialog-title"
+      (click)="$event.stopPropagation()"
+    >
+      @if (sceneImageUrl) {
+        <div
+          class="request-modal-art"
+          [style.background-image]="'url(' + sceneImageUrl + ')'"
+          aria-hidden="true"
+        ></div>
+      }
+      <div class="request-modal-shade" aria-hidden="true"></div>
+
+      <div class="request-modal-content">
+        <header class="request-modal-header">
+          <div>
+            <h2 id="request-dialog-title">Request in Whisparr</h2>
+            @if (sceneTitle) {
+              <p>{{ sceneTitle }}</p>
+            }
+          </div>
+          <button
+            #requestCloseButton
+            type="button"
+            class="close-modal"
+            aria-label="Close request dialog"
+            [disabled]="requestSubmitLoading()"
+            (click)="closeModal()"
+          >
+            Close
+          </button>
+        </header>
+
+        <div class="request-modal-body">
+          @if (requestOptionsLoading()) {
+            <p class="state">Loading request options...</p>
+          } @else if (requestOptionsError()) {
+            <p class="state error">{{ requestOptionsError() }}</p>
+          } @else if (requestOptions(); as options) {
+            <form [formGroup]="requestForm" (ngSubmit)="submitRequest()">
+              <label class="field">
+                <span>Root Folder</span>
+                <select formControlName="rootFolderPath">
+                  @for (folder of options.rootFolders; track folder.id) {
+                    <option [value]="folder.path" [disabled]="!folder.accessible">
+                      {{ folder.path }}{{ folder.accessible ? '' : ' (Unavailable)' }}
+                    </option>
+                  }
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Quality Profile</span>
+                <select formControlName="qualityProfileId">
+                  @for (profile of options.qualityProfiles; track profile.id) {
+                    <option [ngValue]="profile.id">{{ profile.name }}</option>
+                  }
+                </select>
+              </label>
+
+              <div class="checks">
+                <label>
+                  <input type="checkbox" formControlName="monitored" />
+                  <span>Monitored</span>
+                </label>
+                <label>
+                  <input type="checkbox" formControlName="searchForMovie" />
+                  <span>Search Immediately</span>
+                </label>
+              </div>
+
+              @if (options.tags.length > 0) {
+                <fieldset class="tags-field">
+                  <legend>Tags</legend>
+                  <div class="tags-grid">
+                    @for (tag of options.tags; track tag.id) {
+                      <label>
+                        <input
+                          type="checkbox"
+                          [checked]="tagChecked(tag.id)"
+                          (change)="toggleTagSelection(tag.id, $any($event.target).checked)"
+                        />
+                        <span>{{ tag.label }}</span>
+                      </label>
+                    }
+                  </div>
+                </fieldset>
+              }
+
+              @if (requestSubmitError()) {
+                <p class="state error">{{ requestSubmitError() }}</p>
+              }
+
+              <div class="request-actions">
+                <button type="submit" [disabled]="requestSubmitLoading()">
+                  {{ requestSubmitLoading() ? 'Submitting...' : 'Submit Request' }}
+                </button>
+                <button
+                  type="button"
+                  class="secondary"
+                  [disabled]="requestSubmitLoading()"
+                  (click)="closeModal()"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          }
+        </div>
+      </div>
+    </section>
+  </div>
+}

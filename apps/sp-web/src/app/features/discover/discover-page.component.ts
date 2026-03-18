@@ -11,12 +11,13 @@ import {
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { DiscoverService } from '../../core/api/discover.service';
-import { DiscoverItem } from '../../core/api/discover.types';
+import { DiscoverItem, SceneRequestContext } from '../../core/api/discover.types';
+import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
 @Component({
   selector: 'app-discover-page',
-  imports: [RouterLink, SceneStatusBadgeComponent],
+  imports: [RouterLink, SceneStatusBadgeComponent, SceneRequestModalComponent],
   templateUrl: './discover-page.component.html',
   styleUrl: './discover-page.component.scss',
 })
@@ -55,6 +56,8 @@ export class DiscoverPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly hasMore = signal(true);
   protected readonly inFlight = signal(false);
   protected readonly items = signal<DiscoverItem[]>([]);
+  protected readonly requestModalOpen = signal(false);
+  protected readonly requestContext = signal<SceneRequestContext | null>(null);
 
   ngOnInit(): void {
     this.loadNextPage();
@@ -91,17 +94,52 @@ export class DiscoverPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadNextPage();
   }
 
-  protected truncatedDescription(description: string | null): string | null {
+  protected isRequestable(item: DiscoverItem): boolean {
+    return item.status.state === 'NOT_REQUESTED';
+  }
+
+  protected openRequestModal(item: DiscoverItem): void {    if (!this.isRequestable(item)) {      return;
+    }
+
+    this.requestContext.set({
+      id: item.id,
+      title: item.title,
+      imageUrl: item.imageUrl,
+    });
+    this.requestModalOpen.set(true);  }
+
+  protected onRequestModalClosed(): void {
+    this.requestModalOpen.set(false);
+  }
+
+  protected onRequestSubmitted(stashId: string): void {
+    this.items.update((current) =>
+      current.map((item) =>
+        item.id === stashId
+          ? {
+              ...item,
+              status: { state: 'DOWNLOADING' },
+            }
+          : item,
+      ),
+    );
+  }
+
+  protected truncatedDescription(
+    description: string | null,
+    requestable = false,
+  ): string | null {
     if (!description) {
       return null;
     }
 
     const singleLine = description.replaceAll(/\s+/g, ' ').trim();
-    if (singleLine.length <= 220) {
+    const limit = requestable ? 138 : 220;
+    if (singleLine.length <= limit) {
       return singleLine;
     }
 
-    return `${singleLine.slice(0, 217)}...`;
+    return `${singleLine.slice(0, limit - 3)}...`;
   }
 
   private loadNextPage(): void {

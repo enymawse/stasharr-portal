@@ -140,3 +140,9 @@ export interface SubmitSceneRequestResponse {
   stashId: string;
   whisparrMovieId: number | null;
 }
+
+export interface SceneRequestContext {
+  id: string;
+  title: string;
+  imageUrl: string | null;
+}
