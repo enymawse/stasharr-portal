@@ -17,6 +17,39 @@ export interface WhisparrQueueSnapshotItem {
   trackedDownloadStatus: string | null;
 }
 
+export interface WhisparrRootFolderOption {
+  id: number;
+  path: string;
+  accessible: boolean;
+}
+
+export interface WhisparrQualityProfileOption {
+  id: number;
+  name: string;
+}
+
+export interface WhisparrTagOption {
+  id: number;
+  label: string;
+}
+
+export interface WhisparrCreateMovieInput {
+  title: string;
+  studio: string;
+  foreignId: string;
+  monitored: boolean;
+  rootFolderPath: string;
+  addOptions: {
+    searchForMovie: boolean;
+  };
+  qualityProfileId: number;
+  tags: number[];
+}
+
+export interface WhisparrCreateMovieResult {
+  movieId: number | null;
+}
+
 @Injectable()
 export class WhisparrAdapter {
   private static readonly DEFAULT_QUEUE_PAGE_SIZE = 50;
@@ -186,6 +219,72 @@ export class WhisparrAdapter {
     return normalized;
   }
 
+  async getRootFolders(
+    config: WhisparrAdapterBaseConfig,
+  ): Promise<WhisparrRootFolderOption[]> {
+    const payload = await this.fetchArrayPayload(
+      this.resolveRootFoldersEndpoint(config.baseUrl),
+      config,
+    );
+
+    return payload
+      .map((entry) => this.parseRootFolderEntry(entry))
+      .filter((entry): entry is WhisparrRootFolderOption => entry !== null);
+  }
+
+  async getQualityProfiles(
+    config: WhisparrAdapterBaseConfig,
+  ): Promise<WhisparrQualityProfileOption[]> {
+    const payload = await this.fetchArrayPayload(
+      this.resolveQualityProfilesEndpoint(config.baseUrl),
+      config,
+    );
+
+    return payload
+      .map((entry) => this.parseQualityProfileEntry(entry))
+      .filter((entry): entry is WhisparrQualityProfileOption => entry !== null);
+  }
+
+  async getTags(config: WhisparrAdapterBaseConfig): Promise<WhisparrTagOption[]> {
+    const payload = await this.fetchArrayPayload(
+      this.resolveTagsEndpoint(config.baseUrl),
+      config,
+    );
+
+    return payload
+      .map((entry) => this.parseTagEntry(entry))
+      .filter((entry): entry is WhisparrTagOption => entry !== null);
+  }
+
+  async createMovie(
+    input: WhisparrCreateMovieInput,
+    config: WhisparrAdapterBaseConfig,
+  ): Promise<WhisparrCreateMovieResult> {
+    const payload = await this.fetchJsonPayload(
+      this.resolveMovieCreateEndpoint(config.baseUrl),
+      config,
+      {
+        method: 'POST',
+        body: input,
+      },
+    );
+
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      this.logger.error(
+        `Whisparr create movie payload has unexpected shape: ${this.safeJson({
+          payloadShape: this.describePayloadShape(payload),
+          payloadPreview: this.previewPayload(payload),
+        })}`,
+      );
+      throw new BadGatewayException(
+        'Whisparr provider returned an unexpected create-movie response shape.',
+      );
+    }
+
+    const movieId = this.readNumber((payload as Record<string, unknown>).id);
+    return { movieId };
+  }
+
   private async fetchAllQueueRecords(
     config: WhisparrAdapterBaseConfig,
   ): Promise<unknown[]> {
@@ -288,10 +387,19 @@ export class WhisparrAdapter {
   private async fetchJsonPayload(
     endpoint: string,
     config: WhisparrAdapterBaseConfig,
+    options?: {
+      method?: 'GET' | 'POST';
+      body?: unknown;
+    },
   ): Promise<unknown> {
     const headers: Record<string, string> = {
       Accept: 'application/json',
     };
+    const method = options?.method ?? 'GET';
+    const body = options?.body;
+    if (body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     if (config.apiKey?.trim()) {
       headers['X-Api-Key'] = config.apiKey.trim();
@@ -300,8 +408,9 @@ export class WhisparrAdapter {
     let response: Response;
     try {
       response = await fetch(endpoint, {
-        method: 'GET',
+        method,
         headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
       });
     } catch (error) {
       this.logger.error(
@@ -400,6 +509,60 @@ export class WhisparrAdapter {
     };
   }
 
+  private parseRootFolderEntry(entry: unknown): WhisparrRootFolderOption | null {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+
+    const id = this.readNumber((entry as Record<string, unknown>).id);
+    const path = this.readString((entry as Record<string, unknown>).path);
+    if (id === null || !path) {
+      return null;
+    }
+
+    return {
+      id,
+      path,
+      accessible: (entry as Record<string, unknown>).accessible === true,
+    };
+  }
+
+  private parseQualityProfileEntry(
+    entry: unknown,
+  ): WhisparrQualityProfileOption | null {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+
+    const id = this.readNumber((entry as Record<string, unknown>).id);
+    const name = this.readString((entry as Record<string, unknown>).name);
+    if (id === null || !name) {
+      return null;
+    }
+
+    return {
+      id,
+      name,
+    };
+  }
+
+  private parseTagEntry(entry: unknown): WhisparrTagOption | null {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+
+    const id = this.readNumber((entry as Record<string, unknown>).id);
+    const label = this.readString((entry as Record<string, unknown>).label);
+    if (id === null || !label) {
+      return null;
+    }
+
+    return {
+      id,
+      label,
+    };
+  }
+
   private readString(value: unknown): string | null {
     if (typeof value !== 'string') {
       return null;
@@ -449,6 +612,38 @@ export class WhisparrAdapter {
     parsed.searchParams.set('page', String(page));
     parsed.searchParams.set('pageSize', String(pageSize));
 
+    return parsed.toString();
+  }
+
+  private resolveRootFoldersEndpoint(baseUrl: string): string {
+    const parsed = new URL(baseUrl);
+    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+    parsed.pathname = `${cleanPath}/api/v3/rootFolder`;
+    parsed.search = '';
+    return parsed.toString();
+  }
+
+  private resolveQualityProfilesEndpoint(baseUrl: string): string {
+    const parsed = new URL(baseUrl);
+    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+    parsed.pathname = `${cleanPath}/api/v3/qualityprofile`;
+    parsed.search = '';
+    return parsed.toString();
+  }
+
+  private resolveTagsEndpoint(baseUrl: string): string {
+    const parsed = new URL(baseUrl);
+    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+    parsed.pathname = `${cleanPath}/api/v3/tag`;
+    parsed.search = '';
+    return parsed.toString();
+  }
+
+  private resolveMovieCreateEndpoint(baseUrl: string): string {
+    const parsed = new URL(baseUrl);
+    const cleanPath = parsed.pathname.replace(/\/+$/, '');
+    parsed.pathname = `${cleanPath}/api/v3/movie`;
+    parsed.search = '';
     return parsed.toString();
   }
 

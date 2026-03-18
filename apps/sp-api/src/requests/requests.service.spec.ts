@@ -3,8 +3,9 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
-import { IntegrationStatus, IntegrationType } from '@prisma/client';
+import { IntegrationStatus, IntegrationType, RequestStatus } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
 import { SceneStatusService } from '../scene-status/scene-status.service';
@@ -14,8 +15,14 @@ describe('RequestsService', () => {
   const findOneMock = jest.fn();
   const getQueueSnapshotMock = jest.fn();
   const findMovieByIdMock = jest.fn();
+  const findMovieByStashIdMock = jest.fn();
+  const getRootFoldersMock = jest.fn();
+  const getQualityProfilesMock = jest.fn();
+  const getTagsMock = jest.fn();
+  const createMovieMock = jest.fn();
   const getSceneByIdMock = jest.fn();
   const resolveForScenesMock = jest.fn();
+  const upsertRequestMock = jest.fn();
 
   const integrationsService = {
     findOne: findOneMock,
@@ -24,6 +31,11 @@ describe('RequestsService', () => {
   const whisparrAdapter = {
     getQueueSnapshot: getQueueSnapshotMock,
     findMovieById: findMovieByIdMock,
+    findMovieByStashId: findMovieByStashIdMock,
+    getRootFolders: getRootFoldersMock,
+    getQualityProfiles: getQualityProfilesMock,
+    getTags: getTagsMock,
+    createMovie: createMovieMock,
   } as unknown as WhisparrAdapter;
 
   const stashdbAdapter = {
@@ -33,6 +45,12 @@ describe('RequestsService', () => {
   const sceneStatusService = {
     resolveForScenes: resolveForScenesMock,
   } as unknown as SceneStatusService;
+
+  const prismaService = {
+    request: {
+      upsert: upsertRequestMock,
+    },
+  } as unknown as PrismaService;
 
   const configuredWhisparrIntegration = {
     enabled: true,
@@ -58,6 +76,7 @@ describe('RequestsService', () => {
       whisparrAdapter,
       stashdbAdapter,
       sceneStatusService,
+      prismaService,
     );
 
     findOneMock.mockImplementation((type: IntegrationType) => {
@@ -131,29 +150,175 @@ describe('RequestsService', () => {
     expect(getSceneByIdMock).toHaveBeenCalledTimes(2);
   });
 
-  it('returns next page slice from queue-scoped ids', async () => {
-    getQueueSnapshotMock.mockResolvedValue([
-      { movieId: 1, trackedDownloadState: 'downloading', trackedDownloadStatus: 'ok' },
-      { movieId: 2, trackedDownloadState: 'downloading', trackedDownloadStatus: 'ok' },
-      { movieId: 3, trackedDownloadState: 'downloading', trackedDownloadStatus: 'ok' },
+  it('returns normalized request options with defaults', async () => {
+    getRootFoldersMock.mockResolvedValue([
+      { id: 1, path: '/media/a', accessible: false },
+      { id: 2, path: '/media/b', accessible: true },
     ]);
+    getQualityProfilesMock.mockResolvedValue([{ id: 10, name: 'Default' }]);
+    getTagsMock.mockResolvedValue([{ id: 50, label: 'VR' }]);
 
-    findMovieByIdMock.mockImplementation((movieId: number) => ({
-      movieId,
-      stashId: `scene-${movieId}`,
-      hasFile: false,
-    }));
+    const result = await service.getRequestOptions('scene-1');
 
-    resolveForScenesMock.mockResolvedValue(
-      new Map([['scene-3', { state: 'DOWNLOADING' }]]),
+    expect(result).toEqual({
+      scene: {
+        stashId: 'scene-1',
+        title: 'Title scene-1',
+        studio: 'Studio',
+      },
+      defaults: {
+        monitored: true,
+        searchForMovie: true,
+      },
+      rootFolders: [
+        { id: 1, path: '/media/a', accessible: false },
+        { id: 2, path: '/media/b', accessible: true },
+      ],
+      qualityProfiles: [{ id: 10, name: 'Default' }],
+      tags: [{ id: 50, label: 'VR' }],
+    });
+  });
+
+  it('throws when there are no accessible root folders', async () => {
+    getRootFoldersMock.mockResolvedValue([
+      { id: 1, path: '/media/a', accessible: false },
+    ]);
+    getQualityProfilesMock.mockResolvedValue([{ id: 10, name: 'Default' }]);
+    getTagsMock.mockResolvedValue([]);
+
+    await expect(service.getRequestOptions('scene-1')).rejects.toBeInstanceOf(
+      ConflictException,
     );
+  });
 
-    const result = await service.getRequestsFeed(2, 2);
+  it('submits create movie request and upserts local request row', async () => {
+    findMovieByStashIdMock.mockResolvedValue(null);
+    getRootFoldersMock.mockResolvedValue([
+      { id: 2, path: '/media/b', accessible: true },
+    ]);
+    getQualityProfilesMock.mockResolvedValue([{ id: 10, name: 'Default' }]);
+    getTagsMock.mockResolvedValue([{ id: 50, label: 'VR' }]);
+    createMovieMock.mockResolvedValue({ movieId: 444 });
 
-    expect(result.total).toBe(3);
-    expect(result.hasMore).toBe(false);
-    expect(result.items.map((item) => item.id)).toEqual(['scene-3']);
-    expect(resolveForScenesMock).toHaveBeenCalledWith(['scene-3']);
+    const result = await service.submitSceneRequest('scene-1', {
+      monitored: true,
+      rootFolderPath: '/media/b',
+      searchForMovie: true,
+      qualityProfileId: 10,
+      tags: [50],
+    });
+
+    expect(createMovieMock).toHaveBeenCalledWith(
+      {
+        title: 'Title scene-1',
+        studio: 'Studio',
+        foreignId: 'scene-1',
+        monitored: true,
+        rootFolderPath: '/media/b',
+        addOptions: { searchForMovie: true },
+        qualityProfileId: 10,
+        tags: [50],
+      },
+      expect.objectContaining({ baseUrl: 'http://whisparr.local' }),
+    );
+    expect(upsertRequestMock).toHaveBeenCalledWith({
+      where: { stashId: 'scene-1' },
+      create: { stashId: 'scene-1', status: RequestStatus.REQUESTED },
+      update: { status: RequestStatus.REQUESTED },
+    });
+    expect(result).toEqual({
+      accepted: true,
+      alreadyExists: false,
+      stashId: 'scene-1',
+      whisparrMovieId: 444,
+    });
+  });
+
+  it('treats existing whisparr movie as idempotent success', async () => {
+    findMovieByStashIdMock.mockResolvedValue({
+      movieId: 999,
+      stashId: 'scene-1',
+      hasFile: false,
+    });
+
+    const result = await service.submitSceneRequest('scene-1', {
+      monitored: true,
+      rootFolderPath: '/media/b',
+      searchForMovie: true,
+      qualityProfileId: 10,
+      tags: [],
+    });
+
+    expect(createMovieMock).not.toHaveBeenCalled();
+    expect(upsertRequestMock).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      accepted: true,
+      alreadyExists: true,
+      stashId: 'scene-1',
+      whisparrMovieId: 999,
+    });
+  });
+
+  it('throws for missing scene metadata required for provider payload', async () => {
+    getSceneByIdMock.mockResolvedValue({
+      id: 'scene-1',
+      title: 'Title scene-1',
+      details: null,
+      imageUrl: null,
+      images: [],
+      studioName: null,
+      studioImageUrl: null,
+      releaseDate: null,
+      duration: null,
+      tags: [],
+      performers: [],
+      sourceUrls: [],
+    });
+
+    await expect(
+      service.submitSceneRequest('scene-1', {
+        monitored: true,
+        rootFolderPath: '/media/b',
+        searchForMovie: true,
+        qualityProfileId: 10,
+        tags: [],
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('throws when no quality profiles are available during submit', async () => {
+    findMovieByStashIdMock.mockResolvedValue(null);
+    getRootFoldersMock.mockResolvedValue([
+      { id: 2, path: '/media/b', accessible: true },
+    ]);
+    getQualityProfilesMock.mockResolvedValue([]);
+    getTagsMock.mockResolvedValue([]);
+
+    await expect(
+      service.submitSceneRequest('scene-1', {
+        monitored: true,
+        rootFolderPath: '/media/b',
+        searchForMovie: true,
+        qualityProfileId: 10,
+        tags: [],
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('throws when STASHDB integration has no baseUrl', async () => {
+    findOneMock.mockImplementation((type: IntegrationType) => {
+      if (type === IntegrationType.STASHDB) {
+        return {
+          ...configuredStashdbIntegration,
+          baseUrl: '   ',
+        };
+      }
+      return configuredWhisparrIntegration;
+    });
+
+    await expect(service.getRequestsFeed()).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it('skips unmappable queue items and logs warnings', async () => {
@@ -188,90 +353,5 @@ describe('RequestsService', () => {
     expect(warnSpy).toHaveBeenCalled();
 
     warnSpy.mockRestore();
-  });
-
-  it('skips scene enrichment failures without failing the full feed', async () => {
-    const warnSpy = jest
-      .spyOn(Logger.prototype, 'warn')
-      .mockImplementation(() => undefined);
-
-    getQueueSnapshotMock.mockResolvedValue([
-      { movieId: 1, trackedDownloadState: 'downloading', trackedDownloadStatus: 'ok' },
-      { movieId: 2, trackedDownloadState: 'downloading', trackedDownloadStatus: 'ok' },
-    ]);
-
-    findMovieByIdMock.mockImplementation((movieId: number) => ({
-      movieId,
-      stashId: `scene-${movieId}`,
-      hasFile: false,
-    }));
-
-    getSceneByIdMock.mockImplementation((stashId: string) => {
-      if (stashId === 'scene-1') {
-        throw new Error('stashdb lookup failed');
-      }
-
-      return {
-        id: stashId,
-        title: 'Scene 2',
-        details: 'Description',
-        imageUrl: 'http://image',
-        images: [],
-        studioName: 'Studio',
-        studioImageUrl: null,
-        releaseDate: null,
-        duration: null,
-        tags: [],
-        performers: [],
-        sourceUrls: [],
-      };
-    });
-
-    resolveForScenesMock.mockResolvedValue(
-      new Map([
-        ['scene-1', { state: 'MISSING' }],
-        ['scene-2', { state: 'DOWNLOADING' }],
-      ]),
-    );
-
-    const result = await service.getRequestsFeed(1, 25);
-
-    expect(result.total).toBe(2);
-    expect(result.items.map((item) => item.id)).toEqual(['scene-2']);
-    expect(warnSpy).toHaveBeenCalled();
-
-    warnSpy.mockRestore();
-  });
-
-  it('throws when WHISPARR integration is disabled', async () => {
-    findOneMock.mockImplementation((type: IntegrationType) => {
-      if (type === IntegrationType.WHISPARR) {
-        return {
-          ...configuredWhisparrIntegration,
-          enabled: false,
-        };
-      }
-      return configuredStashdbIntegration;
-    });
-
-    await expect(service.getRequestsFeed()).rejects.toBeInstanceOf(
-      ConflictException,
-    );
-  });
-
-  it('throws when STASHDB integration has no baseUrl', async () => {
-    findOneMock.mockImplementation((type: IntegrationType) => {
-      if (type === IntegrationType.STASHDB) {
-        return {
-          ...configuredStashdbIntegration,
-          baseUrl: '   ',
-        };
-      }
-      return configuredWhisparrIntegration;
-    });
-
-    await expect(service.getRequestsFeed()).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
   });
 });

@@ -1,13 +1,14 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { DiscoverService } from '../../core/api/discover.service';
-import { SceneDetails } from '../../core/api/discover.types';
+import { SceneDetails, SceneRequestOptions } from '../../core/api/discover.types';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
 @Component({
   selector: 'app-scene-page',
-  imports: [RouterLink, SceneStatusBadgeComponent],
+  imports: [RouterLink, SceneStatusBadgeComponent, ReactiveFormsModule],
   templateUrl: './scene-page.component.html',
   styleUrl: './scene-page.component.scss',
 })
@@ -20,13 +21,32 @@ export class ScenePageComponent implements OnInit {
   protected readonly scene = signal<SceneDetails | null>(null);
   protected readonly descriptionExpanded = signal(false);
   protected readonly selectedStashCopyUrl = signal<string | null>(null);
+  protected readonly requestPanelOpen = signal(false);
+  protected readonly requestOptionsLoading = signal(false);
+  protected readonly requestOptionsError = signal<string | null>(null);
+  protected readonly requestOptions = signal<SceneRequestOptions | null>(null);
+  protected readonly requestSubmitLoading = signal(false);
+  protected readonly requestSubmitError = signal<string | null>(null);
+
+  protected readonly requestForm = new FormGroup({
+    monitored: new FormControl(true, { nonNullable: true }),
+    rootFolderPath: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required],
+    }),
+    searchForMovie: new FormControl(true, { nonNullable: true }),
+    qualityProfileId: new FormControl<number | null>(null, {
+      validators: [Validators.required, Validators.min(1)],
+    }),
+    tags: new FormControl<number[]>([], { nonNullable: true }),
+  });
 
   ngOnInit(): void {
-    this.loadScene();
+    this.loadSceneByRoute();
   }
 
   protected retry(): void {
-    this.loadScene();
+    this.loadSceneByRoute();
   }
 
   protected toggleDescription(): void {
@@ -127,18 +147,138 @@ export class ScenePageComponent implements OnInit {
     return gender;
   }
 
-  private loadScene(): void {
+  protected canRequestScene(scene: SceneDetails): boolean {
+    return scene.status.state === 'NOT_REQUESTED';
+  }
+
+  protected openRequestPanel(scene: SceneDetails): void {
+    if (!this.canRequestScene(scene) || this.requestOptionsLoading()) {
+      return;
+    }
+
+    this.requestPanelOpen.set(true);
+    this.requestSubmitError.set(null);
+
+    if (this.requestOptions()) {
+      return;
+    }
+
+    this.requestOptionsLoading.set(true);
+    this.requestOptionsError.set(null);
+
+    this.discoverService
+      .getSceneRequestOptions(scene.id)
+      .pipe(
+        finalize(() => {
+          this.requestOptionsLoading.set(false);
+        }),
+      )
+      .subscribe({
+        next: (options) => {
+          this.requestOptions.set(options);
+          this.requestForm.patchValue({
+            monitored: options.defaults.monitored,
+            searchForMovie: options.defaults.searchForMovie,
+            rootFolderPath:
+              options.rootFolders.find((folder) => folder.accessible)?.path ??
+              options.rootFolders[0]?.path ??
+              '',
+            qualityProfileId: options.qualityProfiles[0]?.id ?? null,
+            tags: [],
+          });
+        },
+        error: () => {
+          this.requestOptionsError.set('Failed to load request options from the API.');
+        },
+      });
+  }
+
+  protected closeRequestPanel(): void {
+    this.requestPanelOpen.set(false);
+    this.requestSubmitLoading.set(false);
+    this.requestSubmitError.set(null);
+  }
+
+  protected toggleTagSelection(tagId: number, checked: boolean): void {
+    const current = this.requestForm.controls.tags.value;
+    if (checked) {
+      if (!current.includes(tagId)) {
+        this.requestForm.controls.tags.setValue([...current, tagId]);
+      }
+      return;
+    }
+
+    this.requestForm.controls.tags.setValue(current.filter((id) => id !== tagId));
+  }
+
+  protected tagChecked(tagId: number): boolean {
+    return this.requestForm.controls.tags.value.includes(tagId);
+  }
+
+  protected submitSceneRequest(scene: SceneDetails): void {
+    if (this.requestSubmitLoading()) {
+      return;
+    }
+
+    if (this.requestForm.invalid) {
+      this.requestForm.markAllAsTouched();
+      return;
+    }
+
+    const qualityProfileId = this.requestForm.controls.qualityProfileId.value;
+    if (!qualityProfileId) {
+      this.requestForm.controls.qualityProfileId.markAsTouched();
+      return;
+    }
+
+    this.requestSubmitLoading.set(true);
+    this.requestSubmitError.set(null);
+
+    this.discoverService
+      .submitSceneRequest(scene.id, {
+        monitored: this.requestForm.controls.monitored.value,
+        rootFolderPath: this.requestForm.controls.rootFolderPath.value,
+        searchForMovie: this.requestForm.controls.searchForMovie.value,
+        qualityProfileId,
+        tags: this.requestForm.controls.tags.value,
+      })
+      .pipe(
+        finalize(() => {
+          this.requestSubmitLoading.set(false);
+        }),
+      )
+      .subscribe({
+        next: () => {
+          this.requestPanelOpen.set(false);
+          this.requestOptions.set(null);
+          this.loadScene(scene.id);
+        },
+        error: () => {
+          this.requestSubmitError.set('Failed to submit request to the API.');
+        },
+      });
+  }
+
+  private loadSceneByRoute(): void {
     const stashIdParam = this.route.snapshot.paramMap.get('stashId')?.trim();
     if (!stashIdParam) {
       this.error.set('Scene id is missing from the route.');
       this.loading.set(false);
       return;
     }
+    this.loadScene(stashIdParam);
+  }
 
+  private loadScene(stashIdParam: string): void {
     this.loading.set(true);
     this.error.set(null);
     this.descriptionExpanded.set(false);
     this.selectedStashCopyUrl.set(null);
+    this.requestPanelOpen.set(false);
+    this.requestOptionsLoading.set(false);
+    this.requestOptionsError.set(null);
+    this.requestSubmitLoading.set(false);
+    this.requestSubmitError.set(null);
 
     this.discoverService
       .getSceneDetails(stashIdParam)

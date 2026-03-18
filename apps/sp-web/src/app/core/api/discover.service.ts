@@ -1,7 +1,13 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { DiscoverResponse, SceneDetails } from './discover.types';
+import {
+  DiscoverResponse,
+  SceneDetails,
+  SceneRequestOptions,
+  SubmitSceneRequestPayload,
+  SubmitSceneRequestResponse,
+} from './discover.types';
 
 @Injectable({
   providedIn: 'root',
@@ -33,6 +39,22 @@ export class DiscoverService {
   getSceneDetails(stashId: string): Observable<SceneDetails> {
     return this.http.get<SceneDetails>(
       `/api/scenes/${encodeURIComponent(stashId)}`,
+    );
+  }
+
+  getSceneRequestOptions(stashId: string): Observable<SceneRequestOptions> {
+    return this.http.get<SceneRequestOptions>(
+      `/api/requests/${encodeURIComponent(stashId)}/options`,
+    );
+  }
+
+  submitSceneRequest(
+    stashId: string,
+    payload: SubmitSceneRequestPayload,
+  ): Observable<SubmitSceneRequestResponse> {
+    return this.http.post<SubmitSceneRequestResponse>(
+      `/api/requests/${encodeURIComponent(stashId)}`,
+      payload,
     );
   }
 }

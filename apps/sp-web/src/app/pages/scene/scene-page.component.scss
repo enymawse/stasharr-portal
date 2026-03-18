@@ -215,6 +215,11 @@ a.studio-logo-overlay:focus-visible {
   padding: 0.34rem 0.62rem;
 }
 
+.request-button {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 .stash-copy-selector {
   display: inline-flex;
   align-items: center;
@@ -231,6 +236,81 @@ a.studio-logo-overlay:focus-visible {
   color: var(--text-primary);
   font-size: 0.76rem;
   padding: 0.25rem 0.36rem;
+}
+
+.request-panel {
+  margin-top: 0.4rem;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 72%, transparent);
+  border-radius: 10px;
+  background: rgb(10 22 34 / 76%);
+  padding: 0.72rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.request-panel form {
+  display: grid;
+  gap: 0.62rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: #ecf6ff;
+}
+
+.field select {
+  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  padding: 0.35rem 0.42rem;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.68rem;
+}
+
+.checks label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: #d9ebff;
+}
+
+.tags-field {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 62%, transparent);
+  border-radius: 8px;
+  padding: 0.4rem 0.55rem 0.55rem;
+}
+
+.tags-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem 0.62rem;
+}
+
+.tags-grid label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.26rem;
+  font-size: 0.8rem;
+}
+
+.request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.request-actions .secondary {
+  background: transparent;
 }
 
 .content-shell {

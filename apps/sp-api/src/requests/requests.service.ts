@@ -5,11 +5,17 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { IntegrationStatus, IntegrationType } from '@prisma/client';
+import {
+  IntegrationStatus,
+  IntegrationType,
+  RequestStatus,
+} from '@prisma/client';
 import {
   DiscoverItemDto,
   DiscoverResponseDto,
 } from '../discover/dto/discover-item.dto';
+import { IntegrationsService } from '../integrations/integrations.service';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   StashdbAdapter,
   StashdbSceneDetails,
@@ -18,8 +24,11 @@ import {
   WhisparrAdapter,
   WhisparrAdapterBaseConfig,
 } from '../providers/whisparr/whisparr.adapter';
+import { SceneStatusDto } from '../scene-status/dto/scene-status.dto';
 import { SceneStatusService } from '../scene-status/scene-status.service';
-import { IntegrationsService } from '../integrations/integrations.service';
+import { RequestOptionsDto } from './dto/request-options.dto';
+import { SubmitSceneRequestDto } from './dto/submit-scene-request.dto';
+import { SubmitSceneRequestResponseDto } from './dto/submit-scene-request-response.dto';
 
 @Injectable()
 export class RequestsService {
@@ -34,6 +43,7 @@ export class RequestsService {
     private readonly whisparrAdapter: WhisparrAdapter,
     private readonly stashdbAdapter: StashdbAdapter,
     private readonly sceneStatusService: SceneStatusService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async getRequestsFeed(
@@ -80,17 +90,6 @@ export class RequestsService {
     const statuses = await this.sceneStatusService.resolveForScenes(pageStashIds);
     const items = await this.enrichSceneCards(pageStashIds, stashdbConfig, statuses);
 
-    this.logger.debug(
-      `Requests feed page built: ${this.safeJson({
-        page,
-        perPage,
-        total,
-        hasMore,
-        requestedIds: pageStashIds,
-        returnedItems: items.length,
-      })}`,
-    );
-
     return {
       total,
       page,
@@ -98,6 +97,184 @@ export class RequestsService {
       hasMore,
       items,
     };
+  }
+
+  async getRequestOptions(stashId: string): Promise<RequestOptionsDto> {
+    const normalizedStashId = stashId.trim();
+    if (!normalizedStashId) {
+      throw new BadRequestException('Scene stashId is required.');
+    }
+
+    const whisparrConfig = await this.getWhisparrConfig();
+    const stashdbConfig = await this.getStashdbConfig();
+
+    const scene = await this.stashdbAdapter.getSceneById(
+      normalizedStashId,
+      stashdbConfig,
+    );
+
+    const [rootFolders, qualityProfiles, tags] = await Promise.all([
+      this.whisparrAdapter.getRootFolders(whisparrConfig),
+      this.whisparrAdapter.getQualityProfiles(whisparrConfig),
+      this.whisparrAdapter.getTags(whisparrConfig),
+    ]);
+
+    if (rootFolders.filter((folder) => folder.accessible).length === 0) {
+      throw new ConflictException(
+        'No accessible Whisparr root folders are available.',
+      );
+    }
+
+    if (qualityProfiles.length === 0) {
+      throw new ConflictException('No Whisparr quality profiles are available.');
+    }
+
+    return {
+      scene: {
+        stashId: scene.id,
+        title: scene.title,
+        studio: scene.studioName,
+      },
+      defaults: {
+        monitored: true,
+        searchForMovie: true,
+      },
+      rootFolders,
+      qualityProfiles,
+      tags,
+    };
+  }
+
+  async submitSceneRequest(
+    stashId: string,
+    dto: SubmitSceneRequestDto,
+  ): Promise<SubmitSceneRequestResponseDto> {
+    const normalizedStashId = stashId.trim();
+    if (!normalizedStashId) {
+      throw new BadRequestException('Scene stashId is required.');
+    }
+
+    const whisparrConfig = await this.getWhisparrConfig();
+    const stashdbConfig = await this.getStashdbConfig();
+
+    const scene = await this.stashdbAdapter.getSceneById(
+      normalizedStashId,
+      stashdbConfig,
+    );
+    const title = scene.title.trim();
+    const studio = scene.studioName?.trim() ?? '';
+
+    if (!title) {
+      throw new ConflictException(
+        'Scene metadata is missing a title required for Whisparr submission.',
+      );
+    }
+
+    if (!studio) {
+      throw new ConflictException(
+        'Scene metadata is missing a studio required for Whisparr submission.',
+      );
+    }
+
+    const existingMovie = await this.whisparrAdapter.findMovieByStashId(
+      normalizedStashId,
+      whisparrConfig,
+    );
+    if (existingMovie) {
+      await this.upsertLocalRequestRow(normalizedStashId);
+      return {
+        accepted: true,
+        alreadyExists: true,
+        stashId: normalizedStashId,
+        whisparrMovieId: existingMovie.movieId,
+      };
+    }
+
+    const [rootFolders, qualityProfiles, tags] = await Promise.all([
+      this.whisparrAdapter.getRootFolders(whisparrConfig),
+      this.whisparrAdapter.getQualityProfiles(whisparrConfig),
+      this.whisparrAdapter.getTags(whisparrConfig),
+    ]);
+
+    if (rootFolders.filter((folder) => folder.accessible).length === 0) {
+      throw new ConflictException(
+        'No accessible Whisparr root folders are available.',
+      );
+    }
+
+    if (qualityProfiles.length === 0) {
+      throw new ConflictException('No Whisparr quality profiles are available.');
+    }
+
+    const selectedRootFolder = rootFolders.find(
+      (folder) => folder.path === dto.rootFolderPath,
+    );
+    if (!selectedRootFolder) {
+      throw new BadRequestException(
+        'Selected root folder does not exist in Whisparr.',
+      );
+    }
+    if (!selectedRootFolder.accessible) {
+      throw new BadRequestException(
+        'Selected root folder is not accessible in Whisparr.',
+      );
+    }
+
+    const selectedQualityProfile = qualityProfiles.find(
+      (profile) => profile.id === dto.qualityProfileId,
+    );
+    if (!selectedQualityProfile) {
+      throw new BadRequestException(
+        'Selected quality profile does not exist in Whisparr.',
+      );
+    }
+
+    const allowedTagIds = new Set(tags.map((tag) => tag.id));
+    for (const tagId of dto.tags) {
+      if (!allowedTagIds.has(tagId)) {
+        throw new BadRequestException(
+          `Selected tag id ${tagId} does not exist in Whisparr.`,
+        );
+      }
+    }
+
+    const createdMovie = await this.whisparrAdapter.createMovie(
+      {
+        title,
+        studio,
+        foreignId: normalizedStashId,
+        monitored: dto.monitored,
+        rootFolderPath: dto.rootFolderPath,
+        addOptions: {
+          searchForMovie: dto.searchForMovie,
+        },
+        qualityProfileId: dto.qualityProfileId,
+        tags: dto.tags,
+      },
+      whisparrConfig,
+    );
+
+    await this.upsertLocalRequestRow(normalizedStashId);
+
+    return {
+      accepted: true,
+      alreadyExists: false,
+      stashId: normalizedStashId,
+      whisparrMovieId: createdMovie.movieId ?? null,
+    };
+  }
+
+  private async upsertLocalRequestRow(stashId: string): Promise<void> {
+    await this.prisma.request.upsert({
+      where: { stashId },
+      create: {
+        stashId,
+        status: RequestStatus.REQUESTED,
+      },
+      update: {
+        status: RequestStatus.REQUESTED,
+      },
+    });
   }
 
   private async resolveStashIdsForQueueMovieIds(
@@ -134,24 +311,26 @@ export class RequestsService {
         const movie = results[index] ?? null;
 
         if (!movie) {
-          this.logger.warn(`Skipping queue movieId with no movie mapping: ${movieId}`);
+          this.logger.warn(
+            `Skipping queue movieId with no movie mapping: ${movieId}`,
+          );
           continue;
         }
 
-        const stashId = movie.stashId.trim();
-        if (!stashId) {
+        const queueStashId = movie.stashId.trim();
+        if (!queueStashId) {
           this.logger.warn(
             `Skipping queue movieId with empty stashId mapping: ${movieId}`,
           );
           continue;
         }
 
-        if (seenStashIds.has(stashId)) {
+        if (seenStashIds.has(queueStashId)) {
           continue;
         }
 
-        seenStashIds.add(stashId);
-        orderedStashIds.push(stashId);
+        seenStashIds.add(queueStashId);
+        orderedStashIds.push(queueStashId);
       }
     }
 
@@ -161,12 +340,15 @@ export class RequestsService {
   private async enrichSceneCards(
     stashIds: string[],
     stashdbConfig: { baseUrl: string; apiKey: string | null },
-    statuses: Map<string, { state: 'NOT_REQUESTED' | 'DOWNLOADING' | 'AVAILABLE' | 'MISSING' }>,
+    statuses: Map<string, SceneStatusDto>,
   ): Promise<DiscoverItemDto[]> {
     const items = await Promise.all(
       stashIds.map(async (stashId) => {
         try {
-          const scene = await this.stashdbAdapter.getSceneById(stashId, stashdbConfig);
+          const scene = await this.stashdbAdapter.getSceneById(
+            stashId,
+            stashdbConfig,
+          );
           return this.mapSceneToCard(scene, statuses.get(stashId));
         } catch (error) {
           this.logger.warn(
@@ -185,7 +367,7 @@ export class RequestsService {
 
   private mapSceneToCard(
     scene: StashdbSceneDetails,
-    status: { state: 'NOT_REQUESTED' | 'DOWNLOADING' | 'AVAILABLE' | 'MISSING' } | undefined,
+    status: SceneStatusDto | undefined,
   ): DiscoverItemDto {
     return {
       id: scene.id,
@@ -217,7 +399,10 @@ export class RequestsService {
     return ordered;
   }
 
-  private async getWhisparrConfig(): Promise<{ baseUrl: string; apiKey: string | null }> {
+  private async getWhisparrConfig(): Promise<{
+    baseUrl: string;
+    apiKey: string | null;
+  }> {
     const integration = await this.getIntegration(IntegrationType.WHISPARR);
 
     if (!integration.enabled) {
@@ -230,7 +415,9 @@ export class RequestsService {
 
     const baseUrl = integration.baseUrl?.trim();
     if (!baseUrl) {
-      throw new BadRequestException('WHISPARR integration is missing a base URL.');
+      throw new BadRequestException(
+        'WHISPARR integration is missing a base URL.',
+      );
     }
 
     return {
@@ -239,7 +426,10 @@ export class RequestsService {
     };
   }
 
-  private async getStashdbConfig(): Promise<{ baseUrl: string; apiKey: string | null }> {
+  private async getStashdbConfig(): Promise<{
+    baseUrl: string;
+    apiKey: string | null;
+  }> {
     const integration = await this.getIntegration(IntegrationType.STASHDB);
 
     if (!integration.enabled) {
@@ -266,7 +456,9 @@ export class RequestsService {
       return await this.integrationsService.findOne(type);
     } catch (error) {
       if (error instanceof NotFoundException) {
-        throw new ConflictException(`${type} integration has not been created yet.`);
+        throw new ConflictException(
+          `${type} integration has not been created yet.`,
+        );
       }
 
       throw error;

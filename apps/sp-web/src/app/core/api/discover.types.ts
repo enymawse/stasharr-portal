@@ -94,3 +94,49 @@ export interface SceneDetails {
   stash: SceneStashAvailability | null;
   whisparr: SceneWhisparrAvailability | null;
 }
+
+export interface SceneRequestOptionsRootFolder {
+  id: number;
+  path: string;
+  accessible: boolean;
+}
+
+export interface SceneRequestOptionsQualityProfile {
+  id: number;
+  name: string;
+}
+
+export interface SceneRequestOptionsTag {
+  id: number;
+  label: string;
+}
+
+export interface SceneRequestOptions {
+  scene: {
+    stashId: string;
+    title: string;
+    studio: string | null;
+  };
+  defaults: {
+    monitored: boolean;
+    searchForMovie: boolean;
+  };
+  rootFolders: SceneRequestOptionsRootFolder[];
+  qualityProfiles: SceneRequestOptionsQualityProfile[];
+  tags: SceneRequestOptionsTag[];
+}
+
+export interface SubmitSceneRequestPayload {
+  monitored: boolean;
+  rootFolderPath: string;
+  searchForMovie: boolean;
+  qualityProfileId: number;
+  tags: number[];
+}
+
+export interface SubmitSceneRequestResponse {
+  accepted: boolean;
+  alreadyExists: boolean;
+  stashId: string;
+  whisparrMovieId: number | null;
+}

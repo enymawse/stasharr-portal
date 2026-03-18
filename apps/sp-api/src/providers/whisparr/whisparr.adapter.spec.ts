@@ -335,6 +335,136 @@ describe('WhisparrAdapter', () => {
     });
   });
 
+  describe('request workflow methods', () => {
+    it('normalizes root folders', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve([
+            { id: 1, path: '/media/a', accessible: true },
+            { id: 2, path: '/media/b', accessible: false },
+            { id: 3, accessible: true },
+          ]),
+      } as Response);
+
+      await expect(
+        adapter.getRootFolders({
+          baseUrl: 'http://whisparr.local',
+        }),
+      ).resolves.toEqual([
+        { id: 1, path: '/media/a', accessible: true },
+        { id: 2, path: '/media/b', accessible: false },
+      ]);
+    });
+
+    it('normalizes quality profiles', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve([
+            { id: 10, name: 'Default' },
+            { id: 11 },
+          ]),
+      } as Response);
+
+      await expect(
+        adapter.getQualityProfiles({
+          baseUrl: 'http://whisparr.local',
+        }),
+      ).resolves.toEqual([{ id: 10, name: 'Default' }]);
+    });
+
+    it('normalizes tags', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve([
+            { id: 50, label: 'VR' },
+            { id: 51, label: '' },
+          ]),
+      } as Response);
+
+      await expect(
+        adapter.getTags({
+          baseUrl: 'http://whisparr.local',
+        }),
+      ).resolves.toEqual([{ id: 50, label: 'VR' }]);
+    });
+
+    it('submits create movie payload', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            id: 777,
+          }),
+      } as Response);
+
+      await expect(
+        adapter.createMovie(
+          {
+            title: 'Scene title',
+            studio: 'Scene studio',
+            foreignId: 'scene-1',
+            monitored: true,
+            rootFolderPath: '/media/a',
+            addOptions: { searchForMovie: true },
+            qualityProfileId: 10,
+            tags: [50],
+          },
+          {
+            baseUrl: 'http://whisparr.local',
+            apiKey: 'secret',
+          },
+        ),
+      ).resolves.toEqual({ movieId: 777 });
+
+      expect(fetchMock).toHaveBeenCalledWith('http://whisparr.local/api/v3/movie', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-Api-Key': 'secret',
+        },
+        body: JSON.stringify({
+          title: 'Scene title',
+          studio: 'Scene studio',
+          foreignId: 'scene-1',
+          monitored: true,
+          rootFolderPath: '/media/a',
+          addOptions: { searchForMovie: true },
+          qualityProfileId: 10,
+          tags: [50],
+        }),
+      });
+    });
+
+    it('throws for malformed create movie response payload', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(['unexpected']),
+      } as Response);
+
+      await expect(
+        adapter.createMovie(
+          {
+            title: 'Scene title',
+            studio: 'Scene studio',
+            foreignId: 'scene-1',
+            monitored: true,
+            rootFolderPath: '/media/a',
+            addOptions: { searchForMovie: true },
+            qualityProfileId: 10,
+            tags: [],
+          },
+          {
+            baseUrl: 'http://whisparr.local',
+          },
+        ),
+      ).rejects.toBeInstanceOf(BadGatewayException);
+    });
+  });
+
   it('builds scene view URL for deep-linking', () => {
     expect(adapter.buildSceneViewUrl('http://whisparr.local/base/', 1234)).toBe(
       'http://whisparr.local/base/movie/1234',
