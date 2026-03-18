@@ -74,14 +74,14 @@ describe('StashAdapter', () => {
         id: '3027',
         width: 3840,
         height: 2160,
-        viewUrl: 'http://stash.local/base/scene/3027',
+        viewUrl: 'http://stash.local/base/scenes/3027',
         label: '2160p',
       },
       {
         id: '3030',
         width: 1920,
         height: 1080,
-        viewUrl: 'http://stash.local/base/scene/3030',
+        viewUrl: 'http://stash.local/base/scenes/3030',
         label: '1080p',
       },
     ]);
@@ -130,7 +130,7 @@ describe('StashAdapter', () => {
         id: '3027',
         width: null,
         height: null,
-        viewUrl: 'http://stash.local/scene/3027',
+        viewUrl: 'http://stash.local/scenes/3027',
         label: 'Scene #3027',
       },
     ]);
@@ -163,7 +163,7 @@ describe('StashAdapter', () => {
         id: '3040',
         width: 1280,
         height: 720,
-        viewUrl: 'http://stash.local/scene/3040',
+        viewUrl: 'http://stash.local/scenes/3040',
         label: '720p',
       },
     ]);

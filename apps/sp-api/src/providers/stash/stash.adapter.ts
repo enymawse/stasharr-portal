@@ -208,7 +208,7 @@ export class StashAdapter {
   private resolveSceneViewUrl(baseUrl: string, sceneId: string): string {
     const parsed = new URL(baseUrl);
     const cleanPath = parsed.pathname.replace(/\/+$/, '');
-    parsed.pathname = `${cleanPath}/scene/${encodeURIComponent(sceneId)}`;
+    parsed.pathname = `${cleanPath}/scenes/${encodeURIComponent(sceneId)}`;
     parsed.search = '';
     return parsed.toString();
   }
