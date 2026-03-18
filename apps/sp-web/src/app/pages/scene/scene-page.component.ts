@@ -1,4 +1,14 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import {
+  Component,
+  ElementRef,
+  HostListener,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
@@ -15,6 +25,24 @@ import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene
 export class ScenePageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly discoverService = inject(DiscoverService);
+  private readonly document = inject(DOCUMENT);
+  private restoreBodyOverflowValue: string | null = null;
+  private previousFocusedElement: HTMLElement | null = null;
+
+  @ViewChild('requestTriggerButton')
+  private requestTriggerButton?: ElementRef<HTMLButtonElement>;
+
+  @ViewChild('requestCloseButton')
+  set requestCloseButton(elementRef: ElementRef<HTMLButtonElement> | undefined) {
+    const closeButton = elementRef?.nativeElement ?? null;
+    if (!closeButton || !this.requestPanelOpen()) {
+      return;
+    }
+
+    setTimeout(() => {
+      closeButton.focus();
+    }, 0);
+  }
 
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
@@ -43,6 +71,10 @@ export class ScenePageComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadSceneByRoute();
+  }
+
+  ngOnDestroy(): void {
+    this.unlockBodyScroll();
   }
 
   protected retry(): void {
@@ -156,8 +188,10 @@ export class ScenePageComponent implements OnInit {
       return;
     }
 
+    this.previousFocusedElement = this.document.activeElement as HTMLElement | null;
     this.requestPanelOpen.set(true);
     this.requestSubmitError.set(null);
+    this.lockBodyScroll();
 
     if (this.requestOptions()) {
       return;
@@ -194,9 +228,21 @@ export class ScenePageComponent implements OnInit {
   }
 
   protected closeRequestPanel(): void {
+    if (this.requestSubmitLoading()) {
+      return;
+    }
+
     this.requestPanelOpen.set(false);
     this.requestSubmitLoading.set(false);
     this.requestSubmitError.set(null);
+    this.unlockBodyScroll();
+
+    setTimeout(() => {
+      const focusTarget =
+        this.requestTriggerButton?.nativeElement ?? this.previousFocusedElement;
+      focusTarget?.focus();
+      this.previousFocusedElement = null;
+    }, 0);
   }
 
   protected toggleTagSelection(tagId: number, checked: boolean): void {
@@ -249,7 +295,7 @@ export class ScenePageComponent implements OnInit {
       )
       .subscribe({
         next: () => {
-          this.requestPanelOpen.set(false);
+          this.closeRequestPanel();
           this.requestOptions.set(null);
           this.loadScene(scene.id);
         },
@@ -257,6 +303,24 @@ export class ScenePageComponent implements OnInit {
           this.requestSubmitError.set('Failed to submit request to the API.');
         },
       });
+  }
+
+  protected onRequestModalBackdropClick(event: MouseEvent): void {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+
+    this.closeRequestPanel();
+  }
+
+  @HostListener('document:keydown.escape', ['$event'])
+  protected onEscapeKey(event: Event): void {
+    if (!this.requestPanelOpen()) {
+      return;
+    }
+
+    event.preventDefault();
+    this.closeRequestPanel();
   }
 
   private loadSceneByRoute(): void {
@@ -279,6 +343,7 @@ export class ScenePageComponent implements OnInit {
     this.requestOptionsError.set(null);
     this.requestSubmitLoading.set(false);
     this.requestSubmitError.set(null);
+    this.unlockBodyScroll();
 
     this.discoverService
       .getSceneDetails(stashIdParam)
@@ -300,5 +365,23 @@ export class ScenePageComponent implements OnInit {
 
   private normalizeDescription(description: string): string {
     return description.replaceAll(/\s+/g, ' ').trim();
+  }
+
+  private lockBodyScroll(): void {
+    if (this.restoreBodyOverflowValue !== null) {
+      return;
+    }
+
+    this.restoreBodyOverflowValue = this.document.body.style.overflow;
+    this.document.body.style.overflow = 'hidden';
+  }
+
+  private unlockBodyScroll(): void {
+    if (this.restoreBodyOverflowValue === null) {
+      return;
+    }
+
+    this.document.body.style.overflow = this.restoreBodyOverflowValue;
+    this.restoreBodyOverflowValue = null;
   }
 }

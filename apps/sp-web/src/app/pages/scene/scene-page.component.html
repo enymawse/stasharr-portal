@@ -109,17 +109,111 @@
               }
 
               @if (canRequestScene(scene)) {
-                <button type="button" class="request-button" (click)="openRequestPanel(scene)">
+                <button
+                  #requestTriggerButton
+                  type="button"
+                  class="request-button"
+                  (click)="openRequestPanel(scene)"
+                >
                   Request in Whisparr
                 </button>
               }
             </div>
           }
+        </div>
+      </div>
+    </section>
 
-          @if (requestPanelOpen()) {
-            <section class="request-panel">
-              <h2>Request Scene</h2>
+    <div class="content-shell">
+      @if (displayedDescription(scene.description); as description) {
+        <section class="section overview-section">
+          <h2>Overview</h2>
+          <p class="overview-text">{{ description }}</p>
 
+          @if (hasLongDescription(scene.description)) {
+            <button type="button" (click)="toggleDescription()">
+              {{ descriptionExpanded() ? 'Show less' : 'Show more' }}
+            </button>
+          }
+        </section>
+      }
+
+      @if (scene.performers.length > 0) {
+        <section class="section">
+          <h2>Performers</h2>
+          <div class="performer-grid">
+            @for (performer of scene.performers; track performer.id) {
+              <article class="performer-card">
+                @if (performer.imageUrl) {
+                  <img class="performer-image" [src]="performer.imageUrl" [alt]="performer.name" />
+                } @else {
+                  <div class="performer-image placeholder">
+                    {{ performerInitial(performer.name) }}
+                  </div>
+                }
+
+                <div class="performer-meta">
+                  <p class="performer-name">{{ performer.name }}</p>
+                  @if (formattedGender(performer.gender); as gender) {
+                    <p class="performer-gender">{{ gender }}</p>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+        </section>
+      }
+
+      @if (scene.tags.length > 0) {
+        <section class="section">
+          <h2>Tags</h2>
+          <div class="chips">
+            @for (tag of scene.tags; track tag.id) {
+              <span class="chip">{{ tag.name }}</span>
+            }
+          </div>
+        </section>
+      }
+
+    </div>
+
+    @if (requestPanelOpen()) {
+      <div class="request-modal-overlay" (click)="onRequestModalBackdropClick($event)">
+        <section
+          class="request-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="request-dialog-title"
+          (click)="$event.stopPropagation()"
+        >
+          @if (scene.imageUrl) {
+            <div
+              class="request-modal-art"
+              [style.background-image]="'url(' + scene.imageUrl + ')'"
+              aria-hidden="true"
+            ></div>
+          }
+          <div class="request-modal-shade" aria-hidden="true"></div>
+
+          <div class="request-modal-content">
+            <header class="request-modal-header">
+              <div>
+                <h2 id="request-dialog-title">Request in Whisparr</h2>
+                <p>{{ scene.title }}</p>
+              </div>
+              <button
+                #requestCloseButton
+                type="button"
+                class="close-modal"
+                aria-label="Close request dialog"
+                [disabled]="requestSubmitLoading()"
+                (click)="closeRequestPanel()"
+              >
+                Close
+              </button>
+            </header>
+
+            <div class="request-modal-body">
               @if (requestOptionsLoading()) {
                 <p class="state">Loading request options...</p>
               } @else if (requestOptionsError()) {
@@ -183,69 +277,21 @@
                     <button type="submit" [disabled]="requestSubmitLoading()">
                       {{ requestSubmitLoading() ? 'Submitting...' : 'Submit Request' }}
                     </button>
-                    <button type="button" class="secondary" (click)="closeRequestPanel()">
+                    <button
+                      type="button"
+                      class="secondary"
+                      [disabled]="requestSubmitLoading()"
+                      (click)="closeRequestPanel()"
+                    >
                       Cancel
                     </button>
                   </div>
                 </form>
               }
-            </section>
-          }
-        </div>
+            </div>
+          </div>
+        </section>
       </div>
-    </section>
-
-    <div class="content-shell">
-      @if (displayedDescription(scene.description); as description) {
-        <section class="section overview-section">
-          <h2>Overview</h2>
-          <p class="overview-text">{{ description }}</p>
-
-          @if (hasLongDescription(scene.description)) {
-            <button type="button" (click)="toggleDescription()">
-              {{ descriptionExpanded() ? 'Show less' : 'Show more' }}
-            </button>
-          }
-        </section>
-      }
-
-      @if (scene.performers.length > 0) {
-        <section class="section">
-          <h2>Performers</h2>
-          <div class="performer-grid">
-            @for (performer of scene.performers; track performer.id) {
-              <article class="performer-card">
-                @if (performer.imageUrl) {
-                  <img class="performer-image" [src]="performer.imageUrl" [alt]="performer.name" />
-                } @else {
-                  <div class="performer-image placeholder">
-                    {{ performerInitial(performer.name) }}
-                  </div>
-                }
-
-                <div class="performer-meta">
-                  <p class="performer-name">{{ performer.name }}</p>
-                  @if (formattedGender(performer.gender); as gender) {
-                    <p class="performer-gender">{{ gender }}</p>
-                  }
-                </div>
-              </article>
-            }
-          </div>
-        </section>
-      }
-
-      @if (scene.tags.length > 0) {
-        <section class="section">
-          <h2>Tags</h2>
-          <div class="chips">
-            @for (tag of scene.tags; track tag.id) {
-              <span class="chip">{{ tag.name }}</span>
-            }
-          </div>
-        </section>
-      }
-
-    </div>
+    }
   }
 </main>
