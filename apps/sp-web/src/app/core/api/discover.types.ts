@@ -1,9 +1,8 @@
 export type SceneStatusState =
-  | 'UNREQUESTED'
-  | 'REQUESTED'
-  | 'PROCESSING'
+  | 'NOT_REQUESTED'
+  | 'DOWNLOADING'
   | 'AVAILABLE'
-  | 'FAILED';
+  | 'MISSING';
 
 export interface SceneStatus {
   state: SceneStatusState;

@@ -35,7 +35,7 @@
                   <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
                 }
 
-                @if (item.status.state !== 'UNREQUESTED') {
+                @if (item.status.state !== 'NOT_REQUESTED') {
                   <app-scene-status-badge
                     class="status-icon"
                     [status]="item.status"

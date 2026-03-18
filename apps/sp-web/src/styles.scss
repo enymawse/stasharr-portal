@@ -35,21 +35,18 @@
   --chip-bg: #f2f7fd;
   --chip-border: #c6d4e2;
   --chip-text: #23425f;
-  --badge-unrequested-bg: #eef2f6;
-  --badge-unrequested-border: #d1dae4;
-  --badge-unrequested-text: #43576b;
-  --badge-requested-bg: #e5f0ff;
-  --badge-requested-border: #b6cbf3;
-  --badge-requested-text: #1e4c88;
-  --badge-processing-bg: #fff2d8;
-  --badge-processing-border: #ebcf98;
-  --badge-processing-text: #7f5607;
+  --badge-not-requested-bg: #eef2f6;
+  --badge-not-requested-border: #d1dae4;
+  --badge-not-requested-text: #43576b;
+  --badge-downloading-bg: #fff2d8;
+  --badge-downloading-border: #ebcf98;
+  --badge-downloading-text: #7f5607;
   --badge-available-bg: #e2f4e6;
   --badge-available-border: #add8b8;
   --badge-available-text: #1b6231;
-  --badge-failed-bg: #fbe8e8;
-  --badge-failed-border: #ebb4b4;
-  --badge-failed-text: #842121;
+  --badge-missing-bg: #fbe8e8;
+  --badge-missing-border: #ebb4b4;
+  --badge-missing-text: #842121;
   --shadow-sm: 0 6px 16px rgb(8 16 27 / 12%);
 }
 
@@ -76,21 +73,18 @@
   --chip-bg: #24384d;
   --chip-border: #3f5873;
   --chip-text: #d7e5f4;
-  --badge-unrequested-bg: #273647;
-  --badge-unrequested-border: #3e5269;
-  --badge-unrequested-text: #c0d0e3;
-  --badge-requested-bg: #213d61;
-  --badge-requested-border: #41658f;
-  --badge-requested-text: #cee0fb;
-  --badge-processing-bg: #524427;
-  --badge-processing-border: #8b7442;
-  --badge-processing-text: #f8dc99;
+  --badge-not-requested-bg: #273647;
+  --badge-not-requested-border: #3e5269;
+  --badge-not-requested-text: #c0d0e3;
+  --badge-downloading-bg: #524427;
+  --badge-downloading-border: #8b7442;
+  --badge-downloading-text: #f8dc99;
   --badge-available-bg: #1f4d33;
   --badge-available-border: #4c8d62;
   --badge-available-text: #ccefd4;
-  --badge-failed-bg: #522a2a;
-  --badge-failed-border: #8f4949;
-  --badge-failed-text: #f8c5c5;
+  --badge-missing-bg: #522a2a;
+  --badge-missing-border: #8f4949;
+  --badge-missing-text: #f8c5c5;
   --shadow-sm: 0 10px 22px rgb(0 0 0 / 40%);
 }
 

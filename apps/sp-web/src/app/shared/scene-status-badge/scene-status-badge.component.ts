@@ -19,19 +19,14 @@ import { SceneStatus } from '../../core/api/discover.types';
                 <path d="M20.3 7.2 10.5 17l-4.8-4.8 1.6-1.6 3.2 3.2 8.2-8.2z" />
               </svg>
             }
-            @case ('REQUESTED') {
+            @case ('DOWNLOADING') {
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 5a7 7 0 1 1-7 7h2a5 5 0 1 0 5-5z" />
                 <path d="M11 8h2v5h-2z" />
                 <path d="M12 12h4v2h-4z" />
               </svg>
             }
-            @case ('PROCESSING') {
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 4a8 8 0 0 1 8 8h-2a6 6 0 1 0-6 6v2a8 8 0 0 1 0-16z" />
-              </svg>
-            }
-            @case ('FAILED') {
+            @case ('MISSING') {
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m7.4 6 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6-4.6 4.6L6 16.6l4.6-4.6L6 7.4z" />
               </svg>
@@ -50,54 +45,48 @@ export class SceneStatusBadgeComponent {
   readonly mode = input<'badge' | 'icon'>('badge');
 
   protected readonly iconVisible = computed(
-    () => this.status().state !== 'UNREQUESTED',
+    () => this.status().state !== 'NOT_REQUESTED',
   );
 
   protected readonly badgeLabel = computed(() => {
     switch (this.status().state) {
-      case 'REQUESTED':
-        return 'Requested';
-      case 'PROCESSING':
-        return 'Processing';
+      case 'DOWNLOADING':
+        return 'Downloading';
       case 'AVAILABLE':
         return 'Available';
-      case 'FAILED':
-        return 'Failed';
-      case 'UNREQUESTED':
+      case 'MISSING':
+        return 'Missing';
+      case 'NOT_REQUESTED':
       default:
-        return 'Unrequested';
+        return 'Not Requested';
     }
   });
 
   protected readonly badgeClass = computed(() => {
     switch (this.status().state) {
-      case 'REQUESTED':
-        return 'badge requested';
-      case 'PROCESSING':
-        return 'badge processing';
+      case 'DOWNLOADING':
+        return 'badge downloading';
       case 'AVAILABLE':
         return 'badge available';
-      case 'FAILED':
-        return 'badge failed';
-      case 'UNREQUESTED':
+      case 'MISSING':
+        return 'badge missing';
+      case 'NOT_REQUESTED':
       default:
-        return 'badge unrequested';
+        return 'badge not-requested';
     }
   });
 
   protected readonly iconClass = computed(() => {
     switch (this.status().state) {
-      case 'REQUESTED':
-        return 'icon requested';
-      case 'PROCESSING':
-        return 'icon processing';
+      case 'DOWNLOADING':
+        return 'icon downloading';
       case 'AVAILABLE':
         return 'icon available';
-      case 'FAILED':
-        return 'icon failed';
-      case 'UNREQUESTED':
+      case 'MISSING':
+        return 'icon missing';
+      case 'NOT_REQUESTED':
       default:
-        return 'icon unrequested';
+        return 'icon not-requested';
     }
   });
 }

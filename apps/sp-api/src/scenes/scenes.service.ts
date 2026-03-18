@@ -78,7 +78,7 @@ export class ScenesService {
         duration: scene.duration,
         type: 'SCENE',
         source: 'STASHDB',
-        status: statuses.get(scene.id) ?? { state: 'UNREQUESTED' },
+        status: statuses.get(scene.id) ?? { state: 'NOT_REQUESTED' },
       })),
     };
   }
@@ -214,18 +214,18 @@ export class ScenesService {
         return null;
       }
 
-      const match = await this.whisparrAdapter.findSceneByStashId(stashId, {
+      const movie = await this.whisparrAdapter.findMovieByStashId(stashId, {
         baseUrl,
         apiKey: integration.apiKey,
       });
 
-      if (!match) {
+      if (!movie) {
         return null;
       }
 
       return {
         exists: true,
-        viewUrl: this.whisparrAdapter.buildSceneViewUrl(baseUrl, stashId),
+        viewUrl: this.whisparrAdapter.buildSceneViewUrl(baseUrl, movie.movieId),
       };
     } catch {
       return null;

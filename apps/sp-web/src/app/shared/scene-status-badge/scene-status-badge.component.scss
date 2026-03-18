@@ -28,22 +28,16 @@
   fill: currentColor;
 }
 
-.unrequested {
-  background: var(--badge-unrequested-bg);
-  border-color: var(--badge-unrequested-border);
-  color: var(--badge-unrequested-text);
+.not-requested {
+  background: var(--badge-not-requested-bg);
+  border-color: var(--badge-not-requested-border);
+  color: var(--badge-not-requested-text);
 }
 
-.requested {
-  background: var(--badge-requested-bg);
-  border-color: var(--badge-requested-border);
-  color: var(--badge-requested-text);
-}
-
-.processing {
-  background: var(--badge-processing-bg);
-  border-color: var(--badge-processing-border);
-  color: var(--badge-processing-text);
+.downloading {
+  background: var(--badge-downloading-bg);
+  border-color: var(--badge-downloading-border);
+  color: var(--badge-downloading-text);
 }
 
 .available {
@@ -52,8 +46,8 @@
   color: var(--badge-available-text);
 }
 
-.failed {
-  background: var(--badge-failed-bg);
-  border-color: var(--badge-failed-border);
-  color: var(--badge-failed-text);
+.missing {
+  background: var(--badge-missing-bg);
+  border-color: var(--badge-missing-border);
+  color: var(--badge-missing-text);
 }

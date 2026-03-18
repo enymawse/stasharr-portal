@@ -28,7 +28,7 @@ describe('ScenesService', () => {
   } as unknown as StashAdapter;
 
   const whisparrAdapter = {
-    findSceneByStashId: jest.fn(),
+    findMovieByStashId: jest.fn(),
     buildSceneViewUrl: jest.fn(),
   } as unknown as WhisparrAdapter;
 
@@ -125,7 +125,7 @@ describe('ScenesService', () => {
         new Map([['stashdb-scene-1', { state: 'AVAILABLE' }]]),
       );
     stashAdapter.findScenesByStashId = jest.fn().mockResolvedValue([]);
-    whisparrAdapter.findSceneByStashId = jest.fn().mockResolvedValue(null);
+    whisparrAdapter.findMovieByStashId = jest.fn().mockResolvedValue(null);
     whisparrAdapter.buildSceneViewUrl = jest
       .fn()
       .mockReturnValue('http://whisparr.local/movie/stashdb-scene-1');
@@ -224,9 +224,10 @@ describe('ScenesService', () => {
   });
 
   it('enriches scene details with whisparr view link when scene exists in whisparr', async () => {
-    whisparrAdapter.findSceneByStashId = jest.fn().mockResolvedValue({
+    whisparrAdapter.findMovieByStashId = jest.fn().mockResolvedValue({
+      movieId: 44,
       stashId: 'stashdb-scene-1',
-      available: false,
+      hasFile: false,
     });
 
     await expect(
@@ -241,7 +242,7 @@ describe('ScenesService', () => {
   });
 
   it('returns whisparr null when whisparr provider fails', async () => {
-    whisparrAdapter.findSceneByStashId = jest
+    whisparrAdapter.findMovieByStashId = jest
       .fn()
       .mockRejectedValue(new Error('provider failed'));
 

@@ -69,7 +69,7 @@ export class DiscoverService {
         duration: scene.duration,
         type: 'SCENE',
         source: 'STASHDB',
-        status: statuses.get(scene.id) ?? { state: 'UNREQUESTED' },
+        status: statuses.get(scene.id) ?? { state: 'NOT_REQUESTED' },
       })),
     };
   }
