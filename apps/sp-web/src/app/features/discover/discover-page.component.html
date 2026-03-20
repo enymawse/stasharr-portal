@@ -51,11 +51,6 @@
 
             <div class="media-bottom">
               <h2 class="media-title">{{ item.title }}</h2>
-              @if (truncatedDescription(item.description, isRequestable(item)); as description) {
-                <p class="media-description" [class.requestable]="isRequestable(item)">
-                  {{ description }}
-                </p>
-              }
               @if (isRequestable(item)) {
                 <button
                   type="button"

@@ -127,23 +127,6 @@ export class RequestsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     );
   }
 
-  protected truncatedDescription(
-    description: string | null,
-    requestable = false,
-  ): string | null {
-    if (!description) {
-      return null;
-    }
-
-    const singleLine = description.replaceAll(/\s+/g, ' ').trim();
-    const limit = requestable ? 138 : 220;
-    if (singleLine.length <= limit) {
-      return singleLine;
-    }
-
-    return `${singleLine.slice(0, limit - 3)}...`;
-  }
-
   private loadNextPage(): void {
     if (this.inFlight() || !this.hasMore()) {
       return;
