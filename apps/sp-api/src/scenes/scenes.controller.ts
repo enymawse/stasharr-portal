@@ -20,6 +20,7 @@ export class ScenesController {
       query.sort,
       query.tagIds,
       query.tagMode,
+      query.favorites,
     );
   }
 

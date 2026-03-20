@@ -337,6 +337,121 @@ describe('StashdbAdapter', () => {
     expect(requestBody.query).not.toContain('tags:');
   });
 
+  it('omits favorites filter when favorites is unset', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getScenesBySort({
+      baseUrl: 'http://stashdb.local/graphql',
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).not.toContain('favorites:');
+  });
+
+  it('includes favorites: ALL when requested', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getScenesBySort({
+      baseUrl: 'http://stashdb.local/graphql',
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      favorites: 'ALL',
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).toContain('favorites: ALL');
+  });
+
+  it('includes favorites: PERFORMER when requested', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getScenesBySort({
+      baseUrl: 'http://stashdb.local/graphql',
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      favorites: 'PERFORMER',
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).toContain('favorites: PERFORMER');
+  });
+
+  it('includes favorites: STUDIO when requested', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getScenesBySort({
+      baseUrl: 'http://stashdb.local/graphql',
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      favorites: 'STUDIO',
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).toContain('favorites: STUDIO');
+  });
+
   it('searches tags and normalizes result shape', async () => {
     fetchMock.mockResolvedValue({
       ok: true,

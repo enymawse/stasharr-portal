@@ -23,6 +23,7 @@ import {
 import { DiscoverService } from '../../core/api/discover.service';
 import {
   DiscoverItem,
+  SceneFavoritesFilter,
   SceneFeedSort,
   SceneRequestContext,
   SceneTagMatchMode,
@@ -31,10 +32,7 @@ import {
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
-type FavoritesFilterOption =
-  | 'ALL_FAVORITES'
-  | 'FAVORITE_PERFORMERS'
-  | 'FAVORITE_STUDIOS';
+type FavoritesFilterOption = 'NONE' | SceneFavoritesFilter;
 
 @Component({
   selector: 'app-scenes-page',
@@ -58,9 +56,10 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     value: FavoritesFilterOption;
     label: string;
   }> = [
-    { value: 'ALL_FAVORITES', label: 'All Favorites' },
-    { value: 'FAVORITE_PERFORMERS', label: 'Favorite Performers' },
-    { value: 'FAVORITE_STUDIOS', label: 'Favorite Studios' },
+    { value: 'NONE', label: 'Any Scene' },
+    { value: 'ALL', label: 'All Favorites' },
+    { value: 'PERFORMER', label: 'Favorite Performers' },
+    { value: 'STUDIO', label: 'Favorite Studios' },
   ];
   protected static readonly TAG_MATCH_OPTIONS: Array<{
     value: SceneTagMatchMode;
@@ -109,9 +108,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly requestModalOpen = signal(false);
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
   protected readonly selectedSort = signal<SceneFeedSort>('DATE');
-  protected readonly selectedFavorites = signal<FavoritesFilterOption>(
-    'ALL_FAVORITES',
-  );
+  protected readonly selectedFavorites = signal<FavoritesFilterOption>('NONE');
   protected readonly tagSearchTerm = signal('');
   protected readonly selectedTagMode = signal<SceneTagMatchMode>('OR');
   protected readonly selectedTags = signal<SceneTagOption[]>([]);
@@ -197,11 +194,17 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected onFavoritesChanged(nextValue: string): void {
     if (
-      nextValue === 'ALL_FAVORITES' ||
-      nextValue === 'FAVORITE_PERFORMERS' ||
-      nextValue === 'FAVORITE_STUDIOS'
+      nextValue === 'NONE' ||
+      nextValue === 'ALL' ||
+      nextValue === 'PERFORMER' ||
+      nextValue === 'STUDIO'
     ) {
+      if (this.selectedFavorites() === nextValue) {
+        return;
+      }
+
       this.selectedFavorites.set(nextValue);
+      this.resetFeedAndReload();
     }
   }
 
@@ -294,6 +297,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
         this.selectedSort(),
         this.selectedTagIds(),
         this.selectedTagMode(),
+        this.selectedFavoritesFilter(),
       )
       .pipe(
         finalize(() => {
@@ -366,6 +370,11 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private selectedTagIds(): string[] {
     return this.selectedTags().map((tag) => tag.id);
+  }
+
+  private selectedFavoritesFilter(): SceneFavoritesFilter | undefined {
+    const selectedFavorites = this.selectedFavorites();
+    return selectedFavorites === 'NONE' ? undefined : selectedFavorites;
   }
 
   private setupTagSearch(): void {

@@ -196,6 +196,7 @@ describe('ScenesService', () => {
       page: 1,
       perPage: 25,
       sort: 'DATE',
+      favorites: undefined,
       tagFilter: undefined,
     });
   });
@@ -209,12 +210,13 @@ describe('ScenesService', () => {
       page: 2,
       perPage: 10,
       sort: 'TITLE',
+      favorites: undefined,
       tagFilter: undefined,
     });
   });
 
-  it('forwards selected tags and AND mode to stashdb adapter', async () => {
-    await service.getScenesFeed(1, 25, 'DATE', ['t-1', 't-2', 't-1'], 'AND');
+  it('forwards ALL favorites filter to stashdb adapter', async () => {
+    await service.getScenesFeed(1, 25, 'DATE', [], 'OR', 'ALL');
 
     expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
       baseUrl: stashdbIntegration.baseUrl,
@@ -222,6 +224,56 @@ describe('ScenesService', () => {
       page: 1,
       perPage: 25,
       sort: 'DATE',
+      favorites: 'ALL',
+      tagFilter: undefined,
+    });
+  });
+
+  it('forwards PERFORMER favorites filter to stashdb adapter', async () => {
+    await service.getScenesFeed(1, 25, 'DATE', [], 'OR', 'PERFORMER');
+
+    expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      favorites: 'PERFORMER',
+      tagFilter: undefined,
+    });
+  });
+
+  it('forwards STUDIO favorites filter to stashdb adapter', async () => {
+    await service.getScenesFeed(1, 25, 'DATE', [], 'OR', 'STUDIO');
+
+    expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      favorites: 'STUDIO',
+      tagFilter: undefined,
+    });
+  });
+
+  it('forwards selected tags and AND mode to stashdb adapter', async () => {
+    await service.getScenesFeed(
+      1,
+      25,
+      'DATE',
+      ['t-1', 't-2', 't-1'],
+      'AND',
+      'PERFORMER',
+    );
+
+    expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      favorites: 'PERFORMER',
       tagFilter: {
         tagIds: ['t-1', 't-2'],
         mode: 'AND',

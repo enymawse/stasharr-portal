@@ -17,7 +17,11 @@ import {
   SceneStashAvailabilityDto,
   SceneWhisparrAvailabilityDto,
 } from './dto/scene-details.dto';
-import { SceneFeedSort, SceneTagMatchMode } from './dto/scenes-query.dto';
+import {
+  SceneFavoritesFilter,
+  SceneFeedSort,
+  SceneTagMatchMode,
+} from './dto/scenes-query.dto';
 
 @Injectable()
 export class ScenesService {
@@ -38,6 +42,7 @@ export class ScenesService {
     sort: SceneFeedSort = 'DATE',
     tagIds: string[] = [],
     tagMode: SceneTagMatchMode = 'OR',
+    favorites?: SceneFavoritesFilter,
   ): Promise<DiscoverResponseDto> {
     const integration = await this.getStashdbIntegration();
 
@@ -63,6 +68,7 @@ export class ScenesService {
       page,
       perPage,
       sort,
+      favorites,
       tagFilter:
         normalizedTagIds.length > 0
           ? {

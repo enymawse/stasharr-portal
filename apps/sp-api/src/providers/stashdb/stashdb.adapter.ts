@@ -24,8 +24,11 @@ export type StashdbSceneFeedSort =
 export interface StashdbAdapterSceneFeedConfig
   extends StashdbAdapterTrendingConfig {
   sort: StashdbSceneFeedSort;
+  favorites?: StashdbSceneFeedFavorites;
   tagFilter?: StashdbSceneTagFilter;
 }
+
+export type StashdbSceneFeedFavorites = 'PERFORMER' | 'STUDIO' | 'ALL';
 
 export type StashdbSceneTagFilterMode = 'OR' | 'AND';
 
@@ -269,6 +272,8 @@ export class StashdbAdapter {
     config: StashdbAdapterSceneFeedConfig | StashdbAdapterTrendingConfig,
     sort: StashdbSceneFeedSort,
   ): Promise<StashdbTrendingScenesResult> {
+    const favorites =
+      'favorites' in config && config.favorites ? config.favorites : null;
     const tagFilter =
       'tagFilter' in config &&
       config.tagFilter?.tagIds.length &&
@@ -278,12 +283,13 @@ export class StashdbAdapter {
     const tagModifier =
       tagFilter?.mode === 'AND' ? 'INCLUDES_ALL' : 'INCLUDES';
     const tagVariableDeclaration = tagFilter ? ', $tagIds: [ID!]!' : '';
+    const favoritesInput = favorites ? `, favorites: ${favorites}` : '';
     const tagInput = tagFilter
       ? `, tags: { value: $tagIds, modifier: ${tagModifier} }`
       : '';
     const query = `
       query QueryScenes($page: Int!, $perPage: Int!${tagVariableDeclaration}) {
-        queryScenes(input: { sort: ${sort}, direction: DESC, page: $page, per_page: $perPage${tagInput} }) {
+        queryScenes(input: { sort: ${sort}, direction: DESC, page: $page, per_page: $perPage${favoritesInput}${tagInput} }) {
           count
           scenes {
             id

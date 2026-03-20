@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   DiscoverResponse,
+  SceneFavoritesFilter,
   SceneFeedSort,
   SceneTagMatchMode,
   SceneTagOption,
@@ -31,6 +32,7 @@ export class DiscoverService {
     sort?: SceneFeedSort,
     tagIds?: string[],
     tagMode?: SceneTagMatchMode,
+    favorites?: SceneFavoritesFilter,
   ): Observable<DiscoverResponse> {
     let params = new HttpParams()
       .set('page', page.toString())
@@ -44,6 +46,9 @@ export class DiscoverService {
     }
     if (tagMode) {
       params = params.set('tagMode', tagMode);
+    }
+    if (favorites) {
+      params = params.set('favorites', favorites);
     }
 
     return this.http.get<DiscoverResponse>('/api/scenes', { params });

@@ -14,6 +14,13 @@ export type SceneFeedSort = (typeof SCENE_FEED_SORT_VALUES)[number];
 
 export const SCENE_TAG_MATCH_MODE_VALUES = ['OR', 'AND'] as const;
 export type SceneTagMatchMode = (typeof SCENE_TAG_MATCH_MODE_VALUES)[number];
+export const SCENE_FAVORITES_FILTER_VALUES = [
+  'ALL',
+  'PERFORMER',
+  'STUDIO',
+] as const;
+export type SceneFavoritesFilter =
+  (typeof SCENE_FAVORITES_FILTER_VALUES)[number];
 
 export class ScenesQueryDto extends DiscoverQueryDto {
   @IsOptional()
@@ -41,4 +48,8 @@ export class ScenesQueryDto extends DiscoverQueryDto {
   @IsOptional()
   @IsIn(SCENE_TAG_MATCH_MODE_VALUES)
   tagMode?: SceneTagMatchMode;
+
+  @IsOptional()
+  @IsIn(SCENE_FAVORITES_FILTER_VALUES)
+  favorites?: SceneFavoritesFilter;
 }

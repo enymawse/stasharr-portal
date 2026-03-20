@@ -38,6 +38,7 @@ export type SceneFeedSort =
   | 'UPDATED_AT';
 
 export type SceneTagMatchMode = 'OR' | 'AND';
+export type SceneFavoritesFilter = 'ALL' | 'PERFORMER' | 'STUDIO';
 
 export interface SceneTagOption {
   id: string;
