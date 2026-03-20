@@ -1,0 +1,662 @@
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  inject,
+  signal,
+} from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import {
+  Subject,
+  Subscription,
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  finalize,
+  map,
+  of,
+  switchMap,
+} from 'rxjs';
+import { DiscoverService } from '../../core/api/discover.service';
+import {
+  DiscoverItem,
+  PerformerDetails,
+  PerformerGender,
+  PerformerStudioOption,
+  SceneFeedSort,
+  SceneRequestContext,
+  SceneTagOption,
+} from '../../core/api/discover.types';
+import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
+import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
+
+interface SelectedStudioChip {
+  id: string;
+  label: string;
+}
+
+@Component({
+  selector: 'app-performer-page',
+  imports: [RouterLink, SceneStatusBadgeComponent, SceneRequestModalComponent],
+  templateUrl: './performer-page.component.html',
+  styleUrl: './performer-page.component.scss',
+})
+export class PerformerPageComponent
+  implements OnInit, AfterViewInit, OnDestroy
+{
+  private static readonly SCENES_PAGE_SIZE = 25;
+  private static readonly SEARCH_DEBOUNCE_MS = 250;
+
+  protected static readonly SCENE_SORT_OPTIONS: Array<{
+    value: SceneFeedSort;
+    label: string;
+  }> = [
+    { value: 'DATE', label: 'Date' },
+    { value: 'TITLE', label: 'Title' },
+    { value: 'TRENDING', label: 'Trending' },
+    { value: 'CREATED_AT', label: 'Created At' },
+    { value: 'UPDATED_AT', label: 'Updated At' },
+  ];
+
+  private readonly discoverService = inject(DiscoverService);
+  private readonly route = inject(ActivatedRoute);
+
+  private readonly studioSearchTerms = new Subject<string>();
+  private readonly tagSearchTerms = new Subject<string>();
+  private routeSubscription: Subscription | null = null;
+  private studioSearchSubscription: Subscription | null = null;
+  private tagSearchSubscription: Subscription | null = null;
+  private observer: IntersectionObserver | null = null;
+  private sentinelElement: HTMLDivElement | null = null;
+  private sentinelIntersecting = false;
+  private scenesFeedVersion = 0;
+  private pendingScenesReload = false;
+
+  @ViewChild('loadMoreSentinel')
+  set loadMoreSentinel(elementRef: ElementRef<HTMLDivElement> | undefined) {
+    const nextElement = elementRef?.nativeElement ?? null;
+    if (this.sentinelElement === nextElement) {
+      return;
+    }
+
+    if (this.observer && this.sentinelElement) {
+      this.observer.unobserve(this.sentinelElement);
+    }
+
+    this.sentinelElement = nextElement;
+
+    if (this.observer && this.sentinelElement) {
+      this.observer.observe(this.sentinelElement);
+    }
+  }
+
+  protected readonly performerId = signal<string | null>(null);
+  protected readonly performer = signal<PerformerDetails | null>(null);
+  protected readonly loadingPerformer = signal(false);
+  protected readonly performerError = signal<string | null>(null);
+  protected readonly activeImageIndex = signal(0);
+
+  protected readonly sceneSort = signal<SceneFeedSort>('DATE');
+  protected readonly onlyFavoriteStudios = signal(false);
+  protected readonly studioSearchTerm = signal('');
+  protected readonly selectedStudios = signal<SelectedStudioChip[]>([]);
+  protected readonly studioOptions = signal<PerformerStudioOption[]>([]);
+  protected readonly studioSearchLoading = signal(false);
+  protected readonly studioSearchError = signal<string | null>(null);
+  protected readonly tagSearchTerm = signal('');
+  protected readonly selectedTags = signal<SceneTagOption[]>([]);
+  protected readonly tagOptions = signal<SceneTagOption[]>([]);
+  protected readonly tagSearchLoading = signal(false);
+  protected readonly tagSearchError = signal<string | null>(null);
+  protected readonly sceneSortOptions = PerformerPageComponent.SCENE_SORT_OPTIONS;
+
+  protected readonly loadingScenes = signal(false);
+  protected readonly loadingMoreScenes = signal(false);
+  protected readonly scenesError = signal<string | null>(null);
+  protected readonly loadMoreScenesError = signal<string | null>(null);
+  protected readonly scenesTotal = signal(0);
+  protected readonly scenesPage = signal(0);
+  protected readonly scenesHasMore = signal(true);
+  protected readonly scenesInFlight = signal(false);
+  protected readonly scenes = signal<DiscoverItem[]>([]);
+
+  protected readonly requestModalOpen = signal(false);
+  protected readonly requestContext = signal<SceneRequestContext | null>(null);
+
+  ngOnInit(): void {
+    this.setupStudioSearch();
+    this.setupTagSearch();
+    this.routeSubscription = this.route.paramMap.subscribe((params) => {
+      const nextPerformerId = params.get('performerId')?.trim() ?? '';
+      if (!nextPerformerId) {
+        this.performerId.set(null);
+        this.performer.set(null);
+        this.performerError.set('Performer id is missing from the route.');
+        return;
+      }
+
+      this.performerId.set(nextPerformerId);
+      this.loadPerformer();
+      this.resetScenesAndReload();
+    });
+  }
+
+  ngAfterViewInit(): void {
+    this.setupIntersectionObserver();
+  }
+
+  ngOnDestroy(): void {
+    this.routeSubscription?.unsubscribe();
+    this.studioSearchSubscription?.unsubscribe();
+    this.tagSearchSubscription?.unsubscribe();
+    if (this.observer && this.sentinelElement) {
+      this.observer.unobserve(this.sentinelElement);
+    }
+    this.observer?.disconnect();
+  }
+
+  protected hasPerformer(): boolean {
+    return this.performer() !== null;
+  }
+
+  protected retryPerformerLoad(): void {
+    this.loadPerformer();
+  }
+
+  protected hasScenes(): boolean {
+    return this.scenes().length > 0;
+  }
+
+  protected retryInitialScenesLoad(): void {
+    if (this.scenesInFlight()) {
+      return;
+    }
+
+    this.scenesError.set(null);
+    this.loadNextScenesPage();
+  }
+
+  protected retryLoadMoreScenes(): void {
+    if (this.scenesInFlight() || !this.scenesHasMore()) {
+      return;
+    }
+
+    this.loadMoreScenesError.set(null);
+    this.loadNextScenesPage();
+  }
+
+  protected selectedStudiosIds(): string[] {
+    return this.selectedStudios().map((studio) => studio.id);
+  }
+
+  protected isRequestable(item: DiscoverItem): boolean {
+    return item.status.state === 'NOT_REQUESTED';
+  }
+
+  protected openRequestModal(item: DiscoverItem): void {
+    if (!this.isRequestable(item)) {
+      return;
+    }
+
+    this.requestContext.set({
+      id: item.id,
+      title: item.title,
+      imageUrl: item.imageUrl,
+    });
+    this.requestModalOpen.set(true);
+  }
+
+  protected onRequestModalClosed(): void {
+    this.requestModalOpen.set(false);
+  }
+
+  protected onRequestSubmitted(stashId: string): void {
+    this.scenes.update((current) =>
+      current.map((item) =>
+        item.id === stashId ? { ...item, status: { state: 'DOWNLOADING' } } : item,
+      ),
+    );
+  }
+
+  protected onSceneSortChanged(nextValue: string): void {
+    if (
+      nextValue === 'DATE' ||
+      nextValue === 'TITLE' ||
+      nextValue === 'TRENDING' ||
+      nextValue === 'CREATED_AT' ||
+      nextValue === 'UPDATED_AT'
+    ) {
+      if (this.sceneSort() === nextValue) {
+        return;
+      }
+
+      this.sceneSort.set(nextValue);
+      this.resetScenesAndReload();
+    }
+  }
+
+  protected onOnlyFavoriteStudiosChanged(nextValue: boolean): void {
+    if (this.onlyFavoriteStudios() === nextValue) {
+      return;
+    }
+
+    this.onlyFavoriteStudios.set(nextValue);
+    this.resetScenesAndReload();
+  }
+
+  protected onStudioSearchChanged(nextValue: string): void {
+    this.studioSearchTerm.set(nextValue);
+    this.studioSearchTerms.next(nextValue);
+  }
+
+  protected onTagSearchChanged(nextValue: string): void {
+    this.tagSearchTerm.set(nextValue);
+    this.tagSearchTerms.next(nextValue);
+  }
+
+  protected isStudioSelected(studioId: string): boolean {
+    return this.selectedStudios().some((studio) => studio.id === studioId);
+  }
+
+  protected toggleStudioNetwork(option: PerformerStudioOption): void {
+    const targetEntries: SelectedStudioChip[] = [
+      { id: option.id, label: option.name },
+      ...option.childStudios.map((child) => ({ id: child.id, label: child.name })),
+    ];
+    const allSelected = targetEntries.every((entry) =>
+      this.isStudioSelected(entry.id),
+    );
+
+    if (allSelected) {
+      this.selectedStudios.update((current) =>
+        current.filter(
+          (studio) => !targetEntries.some((entry) => entry.id === studio.id),
+        ),
+      );
+    } else {
+      this.selectedStudios.update((current) => {
+        const next = [...current];
+        for (const entry of targetEntries) {
+          if (!next.some((studio) => studio.id === entry.id)) {
+            next.push(entry);
+          }
+        }
+        return next;
+      });
+    }
+
+    this.resetScenesAndReload();
+  }
+
+  protected toggleStudioChild(child: { id: string; name: string }): void {
+    if (this.isStudioSelected(child.id)) {
+      this.selectedStudios.update((current) =>
+        current.filter((studio) => studio.id !== child.id),
+      );
+    } else {
+      this.selectedStudios.update((current) => [
+        ...current,
+        { id: child.id, label: child.name },
+      ]);
+    }
+
+    this.resetScenesAndReload();
+  }
+
+  protected removeSelectedStudio(studioId: string): void {
+    if (!this.isStudioSelected(studioId)) {
+      return;
+    }
+    this.selectedStudios.update((current) =>
+      current.filter((studio) => studio.id !== studioId),
+    );
+    this.resetScenesAndReload();
+  }
+
+  protected isTagSelected(tagId: string): boolean {
+    return this.selectedTags().some((tag) => tag.id === tagId);
+  }
+
+  protected toggleTagSelection(tag: SceneTagOption): void {
+    if (this.isTagSelected(tag.id)) {
+      this.selectedTags.update((current) =>
+        current.filter((selected) => selected.id !== tag.id),
+      );
+    } else {
+      this.selectedTags.update((current) => [...current, tag]);
+    }
+
+    this.resetScenesAndReload();
+  }
+
+  protected removeSelectedTag(tagId: string): void {
+    if (!this.isTagSelected(tagId)) {
+      return;
+    }
+    this.selectedTags.update((current) =>
+      current.filter((selected) => selected.id !== tagId),
+    );
+    this.resetScenesAndReload();
+  }
+
+  protected hasCarouselImages(): boolean {
+    return (this.performer()?.images.length ?? 0) > 0;
+  }
+
+  protected activeCarouselImageUrl(): string | null {
+    const images = this.performer()?.images ?? [];
+    if (images.length === 0) {
+      return this.performer()?.imageUrl ?? null;
+    }
+
+    const index = this.activeImageIndex();
+    if (index < 0 || index >= images.length) {
+      return images[0]?.url ?? null;
+    }
+
+    return images[index]?.url ?? null;
+  }
+
+  protected setActiveImage(index: number): void {
+    const imageCount = this.performer()?.images.length ?? 0;
+    if (imageCount === 0) {
+      return;
+    }
+
+    const nextIndex = Math.min(Math.max(index, 0), imageCount - 1);
+    this.activeImageIndex.set(nextIndex);
+  }
+
+  protected nextImage(): void {
+    const imageCount = this.performer()?.images.length ?? 0;
+    if (imageCount === 0) {
+      return;
+    }
+
+    this.activeImageIndex.set((this.activeImageIndex() + 1) % imageCount);
+  }
+
+  protected previousImage(): void {
+    const imageCount = this.performer()?.images.length ?? 0;
+    if (imageCount === 0) {
+      return;
+    }
+
+    this.activeImageIndex.set(
+      (this.activeImageIndex() - 1 + imageCount) % imageCount,
+    );
+  }
+
+  protected performerInitial(name: string): string {
+    return name.trim().charAt(0).toUpperCase();
+  }
+
+  protected formattedGender(gender: PerformerGender | null): string | null {
+    if (!gender) {
+      return null;
+    }
+
+    return gender
+      .split('_')
+      .map((token) => token.charAt(0) + token.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  protected metadataRows(performer: PerformerDetails): Array<{ label: string; value: string }> {
+    const rows: Array<{ label: string; value: string }> = [];
+    const pushIfValue = (label: string, value: string | number | null) => {
+      if (value === null || value === undefined || value === '') {
+        return;
+      }
+      rows.push({ label, value: String(value) });
+    };
+
+    pushIfValue('Gender', this.formattedGender(performer.gender));
+    pushIfValue('Age', performer.age);
+    pushIfValue('Birth Date', performer.birthDate);
+    pushIfValue('Country', performer.country);
+    pushIfValue('Ethnicity', performer.ethnicity);
+    pushIfValue('Eye Color', performer.eyeColor);
+    pushIfValue('Hair Color', performer.hairColor);
+    pushIfValue('Height', performer.height);
+    pushIfValue('Cup Size', performer.cupSize);
+    pushIfValue('Band Size', performer.bandSize);
+    pushIfValue('Waist Size', performer.waistSize);
+    pushIfValue('Hip Size', performer.hipSize);
+    pushIfValue('Breast Type', performer.breastType);
+    pushIfValue('Career Start Year', performer.careerStartYear);
+    pushIfValue('Career End Year', performer.careerEndYear);
+    pushIfValue('Created', performer.createdAt);
+    pushIfValue('Updated', performer.updatedAt);
+
+    return rows;
+  }
+
+  private loadPerformer(): void {
+    const currentPerformerId = this.performerId();
+    if (!currentPerformerId) {
+      return;
+    }
+
+    this.loadingPerformer.set(true);
+    this.performerError.set(null);
+
+    this.discoverService
+      .getPerformerDetails(currentPerformerId)
+      .pipe(
+        finalize(() => {
+          this.loadingPerformer.set(false);
+        }),
+      )
+      .subscribe({
+        next: (details) => {
+          this.performer.set(details);
+          this.activeImageIndex.set(0);
+        },
+        error: () => {
+          this.performerError.set('Failed to load performer details.');
+        },
+      });
+  }
+
+  private loadNextScenesPage(): void {
+    const currentPerformerId = this.performerId();
+    if (!currentPerformerId || this.scenesInFlight() || !this.scenesHasMore()) {
+      return;
+    }
+
+    const nextPage = this.scenesPage() + 1;
+    const isInitialPage = nextPage === 1;
+    const requestVersion = this.scenesFeedVersion;
+    this.scenesInFlight.set(true);
+
+    if (isInitialPage) {
+      this.loadingScenes.set(true);
+      this.scenesError.set(null);
+    } else {
+      this.loadingMoreScenes.set(true);
+      this.loadMoreScenesError.set(null);
+    }
+
+    this.discoverService
+      .getPerformerScenesFeed(
+        currentPerformerId,
+        nextPage,
+        PerformerPageComponent.SCENES_PAGE_SIZE,
+        {
+          sort: this.sceneSort(),
+          studioIds: this.selectedStudiosIds(),
+          tagIds: this.selectedTags().map((tag) => tag.id),
+          onlyFavoriteStudios: this.onlyFavoriteStudios(),
+        },
+      )
+      .pipe(
+        finalize(() => {
+          this.scenesInFlight.set(false);
+
+          if (requestVersion !== this.scenesFeedVersion) {
+            if (this.pendingScenesReload) {
+              this.pendingScenesReload = false;
+              this.loadNextScenesPage();
+            }
+            return;
+          }
+
+          if (isInitialPage) {
+            this.loadingScenes.set(false);
+          } else {
+            this.loadingMoreScenes.set(false);
+          }
+
+          if (this.sentinelIntersecting && this.scenesHasMore()) {
+            this.loadNextScenesPage();
+          }
+        }),
+      )
+      .subscribe({
+        next: (response) => {
+          if (requestVersion !== this.scenesFeedVersion) {
+            return;
+          }
+
+          this.scenesTotal.set(response.total);
+          this.scenesPage.set(response.page);
+          this.scenesHasMore.set(response.hasMore);
+          this.scenes.update((current) =>
+            isInitialPage ? response.items : [...current, ...response.items],
+          );
+        },
+        error: () => {
+          if (requestVersion !== this.scenesFeedVersion) {
+            return;
+          }
+
+          if (isInitialPage) {
+            this.scenesError.set('Failed to load performer scenes.');
+          } else {
+            this.loadMoreScenesError.set('Failed to load more performer scenes.');
+          }
+        },
+      });
+  }
+
+  private resetScenesAndReload(): void {
+    this.scenesFeedVersion += 1;
+    this.pendingScenesReload = false;
+    this.scenesPage.set(0);
+    this.scenesTotal.set(0);
+    this.scenesHasMore.set(true);
+    this.scenes.set([]);
+    this.loadingScenes.set(false);
+    this.loadingMoreScenes.set(false);
+    this.scenesError.set(null);
+    this.loadMoreScenesError.set(null);
+
+    if (this.scenesInFlight()) {
+      this.pendingScenesReload = true;
+      return;
+    }
+
+    this.loadNextScenesPage();
+  }
+
+  private setupStudioSearch(): void {
+    this.studioSearchSubscription = this.studioSearchTerms
+      .pipe(
+        map((value) => value.trim()),
+        debounceTime(PerformerPageComponent.SEARCH_DEBOUNCE_MS),
+        distinctUntilChanged(),
+        switchMap((query) => {
+          if (!query) {
+            this.studioOptions.set([]);
+            this.studioSearchError.set(null);
+            return of<PerformerStudioOption[]>([]);
+          }
+
+          this.studioSearchLoading.set(true);
+          this.studioSearchError.set(null);
+
+          return this.discoverService.searchPerformerStudios(query).pipe(
+            catchError(() => {
+              this.studioSearchError.set('Failed to load studio options.');
+              return of<PerformerStudioOption[]>([]);
+            }),
+            finalize(() => {
+              this.studioSearchLoading.set(false);
+            }),
+          );
+        }),
+      )
+      .subscribe((options) => {
+        this.studioOptions.set(options);
+      });
+  }
+
+  private setupTagSearch(): void {
+    this.tagSearchSubscription = this.tagSearchTerms
+      .pipe(
+        map((value) => value.trim()),
+        debounceTime(PerformerPageComponent.SEARCH_DEBOUNCE_MS),
+        distinctUntilChanged(),
+        switchMap((query) => {
+          if (!query) {
+            this.tagOptions.set([]);
+            this.tagSearchError.set(null);
+            return of<SceneTagOption[]>([]);
+          }
+
+          this.tagSearchLoading.set(true);
+          this.tagSearchError.set(null);
+
+          return this.discoverService.searchSceneTags(query).pipe(
+            catchError(() => {
+              this.tagSearchError.set('Failed to load tag options.');
+              return of<SceneTagOption[]>([]);
+            }),
+            finalize(() => {
+              this.tagSearchLoading.set(false);
+            }),
+          );
+        }),
+      )
+      .subscribe((options) => {
+        this.tagOptions.set(options);
+      });
+  }
+
+  private setupIntersectionObserver(): void {
+    if (!this.observer) {
+      this.observer = new IntersectionObserver(
+        (entries) => {
+          const [entry] = entries;
+          if (!entry) {
+            return;
+          }
+
+          this.sentinelIntersecting = entry.isIntersecting;
+          if (!entry.isIntersecting) {
+            return;
+          }
+
+          if (this.scenesInFlight() || !this.scenesHasMore()) {
+            return;
+          }
+
+          this.loadNextScenesPage();
+        },
+        {
+          root: null,
+          rootMargin: '300px 0px',
+          threshold: 0.01,
+        },
+      );
+    }
+
+    if (this.sentinelElement) {
+      this.observer.observe(this.sentinelElement);
+    }
+  }
+}

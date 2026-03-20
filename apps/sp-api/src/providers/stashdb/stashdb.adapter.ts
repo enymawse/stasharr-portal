@@ -70,6 +70,56 @@ export interface StashdbPerformerFeedConfig extends StashdbAdapterBaseConfig {
   favoritesOnly?: boolean;
 }
 
+export interface StashdbPerformerDetails {
+  id: string;
+  name: string;
+  disambiguation: string | null;
+  aliases: string[];
+  gender: StashdbPerformerGender | null;
+  birthDate: string | null;
+  deathDate: string | null;
+  age: number | null;
+  ethnicity: string | null;
+  country: string | null;
+  eyeColor: string | null;
+  hairColor: string | null;
+  height: string | null;
+  cupSize: string | null;
+  bandSize: number | null;
+  waistSize: number | null;
+  hipSize: number | null;
+  breastType: string | null;
+  careerStartYear: number | null;
+  careerEndYear: number | null;
+  deleted: boolean;
+  mergedIds: string[];
+  mergedIntoId: string | null;
+  isFavorite: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+  imageUrl: string | null;
+  images: StashdbSceneImage[];
+}
+
+export interface StashdbStudioOption {
+  id: string;
+  name: string;
+  childStudios: Array<{
+    id: string;
+    name: string;
+  }>;
+}
+
+export interface StashdbPerformerScenesConfig extends StashdbAdapterBaseConfig {
+  performerId: string;
+  page: number;
+  perPage: number;
+  sort: StashdbSceneFeedSort;
+  studioIds?: string[];
+  tagIds?: string[];
+  onlyFavoriteStudios?: boolean;
+}
+
 export interface StashdbScene {
   id: string;
   title: string;
@@ -204,6 +254,50 @@ interface StashdbGraphqlResponse {
         }>;
       }>;
     };
+    queryStudios?: {
+      studios?: Array<{
+        id?: unknown;
+        name?: unknown;
+        child_studios?: Array<{
+          id?: unknown;
+          name?: unknown;
+        }>;
+      }>;
+    };
+    findPerformer?: {
+      id?: unknown;
+      name?: unknown;
+      disambiguation?: unknown;
+      aliases?: unknown;
+      gender?: unknown;
+      birth_date?: unknown;
+      death_date?: unknown;
+      age?: unknown;
+      ethnicity?: unknown;
+      country?: unknown;
+      eye_color?: unknown;
+      hair_color?: unknown;
+      height?: unknown;
+      cup_size?: unknown;
+      band_size?: unknown;
+      waist_size?: unknown;
+      hip_size?: unknown;
+      breast_type?: unknown;
+      career_start_year?: unknown;
+      career_end_year?: unknown;
+      deleted?: unknown;
+      merged_ids?: unknown;
+      merged_into_id?: unknown;
+      is_favorite?: unknown;
+      created?: unknown;
+      updated?: unknown;
+      images?: Array<{
+        id?: unknown;
+        url?: unknown;
+        width?: unknown;
+        height?: unknown;
+      }>;
+    } | null;
     findScene?: {
       id?: unknown;
       title?: unknown;
@@ -420,6 +514,262 @@ export class StashdbAdapter {
     };
   }
 
+  async getPerformerById(
+    performerId: string,
+    config: StashdbAdapterBaseConfig,
+  ): Promise<StashdbPerformerDetails> {
+    const query = `
+      query FindPerformer($id: ID!) {
+        findPerformer(id: $id) {
+          id
+          name
+          disambiguation
+          aliases
+          gender
+          birth_date
+          death_date
+          age
+          ethnicity
+          country
+          eye_color
+          hair_color
+          height
+          cup_size
+          band_size
+          waist_size
+          hip_size
+          breast_type
+          career_start_year
+          career_end_year
+          deleted
+          merged_ids
+          merged_into_id
+          is_favorite
+          created
+          updated
+          images {
+            id
+            url
+            width
+            height
+          }
+        }
+      }
+    `;
+
+    const payload = await this.executeQuery(config, query, { id: performerId });
+    const performer = payload.data?.findPerformer;
+
+    if (!performer) {
+      throw new NotFoundException(
+        `Performer ${performerId} not found in StashDB.`,
+      );
+    }
+
+    if (typeof performer.id !== 'string' || typeof performer.name !== 'string') {
+      throw new BadGatewayException(
+        'StashDB performer response is missing required fields.',
+      );
+    }
+
+    const images = this.normalizeImages(performer.images);
+    const primaryImage = this.selectPrimaryImage(images);
+
+    return {
+      id: performer.id,
+      name: performer.name,
+      disambiguation: this.normalizeOptionalString(performer.disambiguation),
+      aliases: Array.isArray(performer.aliases)
+        ? performer.aliases.filter(
+            (alias): alias is string => typeof alias === 'string',
+          )
+        : [],
+      gender: this.normalizePerformerGender(performer.gender),
+      birthDate: this.normalizeOptionalString(performer.birth_date),
+      deathDate: this.normalizeOptionalString(performer.death_date),
+      age: typeof performer.age === 'number' ? performer.age : null,
+      ethnicity: this.normalizeOptionalString(performer.ethnicity),
+      country: this.normalizeOptionalString(performer.country),
+      eyeColor: this.normalizeOptionalString(performer.eye_color),
+      hairColor: this.normalizeOptionalString(performer.hair_color),
+      height: this.normalizeOptionalString(performer.height),
+      cupSize: this.normalizeOptionalString(performer.cup_size),
+      bandSize: typeof performer.band_size === 'number' ? performer.band_size : null,
+      waistSize:
+        typeof performer.waist_size === 'number' ? performer.waist_size : null,
+      hipSize: typeof performer.hip_size === 'number' ? performer.hip_size : null,
+      breastType: this.normalizeOptionalString(performer.breast_type),
+      careerStartYear:
+        typeof performer.career_start_year === 'number'
+          ? performer.career_start_year
+          : null,
+      careerEndYear:
+        typeof performer.career_end_year === 'number'
+          ? performer.career_end_year
+          : null,
+      deleted: performer.deleted === true,
+      mergedIds: Array.isArray(performer.merged_ids)
+        ? performer.merged_ids.filter(
+            (mergedId): mergedId is string => typeof mergedId === 'string',
+          )
+        : [],
+      mergedIntoId:
+        typeof performer.merged_into_id === 'string'
+          ? performer.merged_into_id
+          : null,
+      isFavorite: performer.is_favorite === true,
+      createdAt: this.normalizeOptionalString(performer.created),
+      updatedAt: this.normalizeOptionalString(performer.updated),
+      imageUrl: primaryImage?.url ?? null,
+      images,
+    };
+  }
+
+  async searchStudios(
+    queryText: string,
+    config: StashdbAdapterBaseConfig,
+  ): Promise<StashdbStudioOption[]> {
+    const query = `
+      query QueryStudios($name: String!) {
+        queryStudios(input: { name: $name }) {
+          studios {
+            name
+            id
+            child_studios {
+              id
+              name
+            }
+          }
+        }
+      }
+    `;
+
+    const payload = await this.executeQuery(config, query, { name: queryText });
+    const rawStudios = payload.data?.queryStudios?.studios ?? [];
+
+    return rawStudios
+      .map((studio): StashdbStudioOption | null => {
+        if (typeof studio.id !== 'string' || typeof studio.name !== 'string') {
+          return null;
+        }
+
+        const childStudios = (studio.child_studios ?? [])
+          .map((child): { id: string; name: string } | null => {
+            if (typeof child.id !== 'string' || typeof child.name !== 'string') {
+              return null;
+            }
+
+            return {
+              id: child.id,
+              name: child.name,
+            };
+          })
+          .filter(
+            (child): child is { id: string; name: string } => child !== null,
+          );
+
+        return {
+          id: studio.id,
+          name: studio.name,
+          childStudios,
+        };
+      })
+      .filter((studio): studio is StashdbStudioOption => studio !== null);
+  }
+
+  async getScenesForPerformer(
+    config: StashdbPerformerScenesConfig,
+  ): Promise<StashdbTrendingScenesResult> {
+    const normalizedStudioIds = (config.studioIds ?? [])
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
+    const normalizedTagIds = (config.tagIds ?? [])
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
+
+    const studioIds = [...new Set(normalizedStudioIds)];
+    const tagIds = [...new Set(normalizedTagIds)];
+
+    const variableDeclarations = ['$page: Int!', '$perPage: Int!', '$performerId: [ID!]!'];
+    const inputParts = [
+      `sort: ${config.sort}`,
+      'direction: DESC',
+      'page: $page',
+      'per_page: $perPage',
+      'performers: { value: $performerId, modifier: INCLUDES }',
+    ];
+
+    if (studioIds.length > 0) {
+      variableDeclarations.push('$studioIds: [ID!]!');
+      inputParts.push('studios: { value: $studioIds, modifier: INCLUDES }');
+    }
+
+    if (tagIds.length > 0) {
+      variableDeclarations.push('$tagIds: [ID!]!');
+      inputParts.push('tags: { value: $tagIds, modifier: INCLUDES }');
+    }
+
+    if (config.onlyFavoriteStudios) {
+      inputParts.push('favorites: STUDIO');
+    }
+
+    const query = `
+      query QueryScenesForPerformer(${variableDeclarations.join(', ')}) {
+        queryScenes(input: { ${inputParts.join(', ')} }) {
+          count
+          scenes {
+            id
+            title
+            details
+            date
+            release_date
+            created
+            updated
+            production_date
+            images {
+              id
+              url
+              width
+              height
+            }
+            studio {
+              id
+              name
+              images {
+                id
+                url
+                width
+                height
+              }
+            }
+            duration
+          }
+        }
+      }
+    `;
+
+    const variables: Record<string, unknown> = {
+      page: config.page,
+      perPage: config.perPage,
+      performerId: [config.performerId],
+    };
+    if (studioIds.length > 0) {
+      variables.studioIds = studioIds;
+    }
+    if (tagIds.length > 0) {
+      variables.tagIds = tagIds;
+    }
+
+    const payload = await this.executeQuery(config, query, variables);
+    const total =
+      typeof payload.data?.queryScenes?.count === 'number'
+        ? payload.data.queryScenes.count
+        : 0;
+    const scenes = this.normalizeSceneFeedItems(payload.data?.queryScenes?.scenes ?? []);
+
+    return { total, scenes };
+  }
+
   private async getSceneFeed(
     config: StashdbAdapterSceneFeedConfig | StashdbAdapterTrendingConfig,
     sort: StashdbSceneFeedSort,
@@ -487,52 +837,7 @@ export class StashdbAdapter {
       typeof payload.data?.queryScenes?.count === 'number'
         ? payload.data.queryScenes.count
         : 0;
-    const rawScenes = payload.data?.queryScenes?.scenes ?? [];
-    const scenes = rawScenes
-      .map((scene): StashdbScene | null => {
-        if (typeof scene.id !== 'string' || typeof scene.title !== 'string') {
-          return null;
-        }
-
-        const sceneImageUrl = this.selectPrimaryImage(
-          this.normalizeImages(scene.images),
-        )?.url;
-        const studioImageUrl = this.selectPrimaryImage(
-          this.normalizeImages(scene.studio?.images),
-        )?.url;
-
-        return {
-          id: scene.id,
-          title: scene.title,
-          details:
-            typeof scene.details === 'string' && scene.details.trim().length > 0
-              ? scene.details
-              : null,
-          imageUrl: sceneImageUrl ?? null,
-          studioName:
-            typeof scene.studio?.name === 'string' &&
-            scene.studio.name.length > 0
-              ? scene.studio.name
-              : null,
-          studioImageUrl: studioImageUrl ?? null,
-          date:
-            typeof scene.date === 'string' && scene.date.length > 0
-              ? scene.date
-              : null,
-          releaseDate:
-            typeof scene.release_date === 'string' &&
-            scene.release_date.length > 0
-              ? scene.release_date
-              : null,
-          productionDate:
-            typeof scene.production_date === 'string' &&
-            scene.production_date.length > 0
-              ? scene.production_date
-              : null,
-          duration: typeof scene.duration === 'number' ? scene.duration : null,
-        };
-      })
-      .filter((scene): scene is StashdbScene => scene !== null);
+    const scenes = this.normalizeSceneFeedItems(payload.data?.queryScenes?.scenes ?? []);
 
     return { total, scenes };
   }
@@ -801,6 +1106,89 @@ export class StashdbAdapter {
     }
 
     return null;
+  }
+
+  private normalizeSceneFeedItems(
+    rawScenes: Array<{
+      id?: unknown;
+      title?: unknown;
+      details?: unknown;
+      date?: unknown;
+      release_date?: unknown;
+      production_date?: unknown;
+      images?: Array<{
+        id?: unknown;
+        url?: unknown;
+        width?: unknown;
+        height?: unknown;
+      }>;
+      studio?: {
+        id?: unknown;
+        name?: unknown;
+        images?: Array<{
+          id?: unknown;
+          url?: unknown;
+          width?: unknown;
+          height?: unknown;
+        }>;
+      } | null;
+      duration?: unknown;
+    }>,
+  ): StashdbScene[] {
+    return rawScenes
+      .map((scene): StashdbScene | null => {
+        if (typeof scene.id !== 'string' || typeof scene.title !== 'string') {
+          return null;
+        }
+
+        const sceneImageUrl = this.selectPrimaryImage(
+          this.normalizeImages(scene.images),
+        )?.url;
+        const studioImageUrl = this.selectPrimaryImage(
+          this.normalizeImages(scene.studio?.images),
+        )?.url;
+
+        return {
+          id: scene.id,
+          title: scene.title,
+          details:
+            typeof scene.details === 'string' && scene.details.trim().length > 0
+              ? scene.details
+              : null,
+          imageUrl: sceneImageUrl ?? null,
+          studioName:
+            typeof scene.studio?.name === 'string' &&
+            scene.studio.name.length > 0
+              ? scene.studio.name
+              : null,
+          studioImageUrl: studioImageUrl ?? null,
+          date:
+            typeof scene.date === 'string' && scene.date.length > 0
+              ? scene.date
+              : null,
+          releaseDate:
+            typeof scene.release_date === 'string' &&
+            scene.release_date.length > 0
+              ? scene.release_date
+              : null,
+          productionDate:
+            typeof scene.production_date === 'string' &&
+            scene.production_date.length > 0
+              ? scene.production_date
+              : null,
+          duration: typeof scene.duration === 'number' ? scene.duration : null,
+        };
+      })
+      .filter((scene): scene is StashdbScene => scene !== null);
+  }
+
+  private normalizeOptionalString(value: unknown): string | null {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
   }
 
   private async executeQuery(

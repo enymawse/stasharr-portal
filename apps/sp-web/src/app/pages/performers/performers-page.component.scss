@@ -103,6 +103,18 @@ header p {
   display: grid;
 }
 
+.performer-link-stretch {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 10px;
+}
+
+.performer-link-stretch:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
 .favorite-star {
   position: absolute;
   top: 0.45rem;
@@ -112,6 +124,7 @@ header p {
   font-weight: 800;
   color: rgb(255 255 255 / 85%);
   text-shadow: 0 1px 3px rgb(0 0 0 / 55%);
+  pointer-events: none;
 }
 
 .favorite-star.is-favorite {

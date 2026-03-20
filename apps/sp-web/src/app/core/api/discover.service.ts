@@ -3,9 +3,11 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   DiscoverResponse,
+  PerformerDetails,
   PerformerFeedResponse,
   PerformerGender,
   PerformerSort,
+  PerformerStudioOption,
   SceneFavoritesFilter,
   SceneFeedSort,
   SceneTagMatchMode,
@@ -118,5 +120,52 @@ export class DiscoverService {
       params = params.set('favoritesOnly', 'true');
     }
     return this.http.get<PerformerFeedResponse>('/api/performers', { params });
+  }
+
+  getPerformerDetails(performerId: string): Observable<PerformerDetails> {
+    return this.http.get<PerformerDetails>(
+      `/api/performers/${encodeURIComponent(performerId)}`,
+    );
+  }
+
+  getPerformerScenesFeed(
+    performerId: string,
+    page: number,
+    perPage: number,
+    filters?: {
+      sort?: SceneFeedSort;
+      studioIds?: string[];
+      tagIds?: string[];
+      onlyFavoriteStudios?: boolean;
+    },
+  ): Observable<DiscoverResponse> {
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('perPage', perPage.toString());
+
+    if (filters?.sort) {
+      params = params.set('sort', filters.sort);
+    }
+    if (filters?.studioIds && filters.studioIds.length > 0) {
+      params = params.set('studioIds', filters.studioIds.join(','));
+    }
+    if (filters?.tagIds && filters.tagIds.length > 0) {
+      params = params.set('tagIds', filters.tagIds.join(','));
+    }
+    if (filters?.onlyFavoriteStudios) {
+      params = params.set('onlyFavoriteStudios', 'true');
+    }
+
+    return this.http.get<DiscoverResponse>(
+      `/api/performers/${encodeURIComponent(performerId)}/scenes`,
+      { params },
+    );
+  }
+
+  searchPerformerStudios(query: string): Observable<PerformerStudioOption[]> {
+    const params = new HttpParams().set('query', query);
+    return this.http.get<PerformerStudioOption[]>('/api/performers/studios', {
+      params,
+    });
   }
 }

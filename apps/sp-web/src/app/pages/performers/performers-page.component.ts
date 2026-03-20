@@ -8,6 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import {
   Subject,
   Subscription,
@@ -26,6 +27,7 @@ type GenderOption = PerformerGender | 'NONE';
 
 @Component({
   selector: 'app-performers-page',
+  imports: [RouterLink],
   templateUrl: './performers-page.component.html',
   styleUrl: './performers-page.component.scss',
 })

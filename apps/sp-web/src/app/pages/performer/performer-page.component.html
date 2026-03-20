@@ -1,0 +1,301 @@
+<main>
+  <a class="back-link" [routerLink]="['/performers']">Back to Performers</a>
+
+  @if (loadingPerformer()) {
+    <p class="state">Loading performer details...</p>
+  } @else if (performerError()) {
+    <p class="state error">{{ performerError() }}</p>
+    <button type="button" (click)="retryPerformerLoad()">Retry</button>
+  } @else if (performer(); as performer) {
+    <section class="hero-shell">
+      @if (activeCarouselImageUrl(); as backdropImage) {
+        <div
+          class="hero-backdrop"
+          [style.background-image]="'url(' + backdropImage + ')'"
+          aria-hidden="true"
+        ></div>
+      }
+      <div class="hero-shade" aria-hidden="true"></div>
+
+      <div class="hero-layout">
+        <div class="media-column">
+          <div class="carousel-main">
+            @if (activeCarouselImageUrl(); as activeImage) {
+              <img [src]="activeImage" [alt]="performer.name" />
+            } @else {
+              <div class="carousel-placeholder" aria-hidden="true">
+                {{ performerInitial(performer.name) }}
+              </div>
+            }
+          </div>
+
+          @if (hasCarouselImages()) {
+            <div class="carousel-controls">
+              <button type="button" (click)="previousImage()">Previous</button>
+              <button type="button" (click)="nextImage()">Next</button>
+            </div>
+
+            <div class="carousel-thumbs">
+              @for (image of performer.images; track image.id; let i = $index) {
+                <button
+                  type="button"
+                  class="thumb"
+                  [class.active]="activeImageIndex() === i"
+                  (click)="setActiveImage(i)"
+                >
+                  <img [src]="image.url" [alt]="performer.name + ' image ' + (i + 1)" />
+                </button>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="hero-info">
+          <div class="title-row">
+            <h1>{{ performer.name }}</h1>
+            <span
+              class="favorite-indicator"
+              [class.active]="performer.isFavorite"
+              [attr.aria-label]="performer.isFavorite ? 'Favorite performer' : 'Not favorite performer'"
+              role="img"
+            >
+              {{ performer.isFavorite ? '★' : '☆' }}
+            </span>
+          </div>
+
+          @if (performer.disambiguation) {
+            <p class="subheading">{{ performer.disambiguation }}</p>
+          }
+
+          @if (performer.aliases.length > 0) {
+            <p class="aliases">Also known as: {{ performer.aliases.join(', ') }}</p>
+          }
+
+          @if (performer.deleted || performer.mergedIntoId || performer.mergedIds.length > 0) {
+            <div class="meta-flags">
+              @if (performer.deleted) {
+                <span class="meta-chip warning">Marked Deleted</span>
+              }
+              @if (performer.mergedIntoId) {
+                <span class="meta-chip">Merged Into: {{ performer.mergedIntoId }}</span>
+              }
+              @if (performer.mergedIds.length > 0) {
+                <span class="meta-chip">Merged IDs: {{ performer.mergedIds.join(', ') }}</span>
+              }
+            </div>
+          }
+
+          @if (metadataRows(performer).length > 0) {
+            <div class="metadata-grid">
+              @for (row of metadataRows(performer); track row.label) {
+                <div class="metadata-item">
+                  <span class="label">{{ row.label }}</span>
+                  <span class="value">{{ row.value }}</span>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </section>
+
+    <section class="section controls-shell" aria-label="Performer scene filters">
+      <h2>Scenes</h2>
+      <div class="controls-row">
+        <label class="control-field">
+          <span>Sort</span>
+          <select
+            [value]="sceneSort()"
+            (change)="onSceneSortChanged($any($event.target).value)"
+          >
+            @for (option of sceneSortOptions; track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="control-field checkbox-field">
+          <span>Only Favorite Studios</span>
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              [checked]="onlyFavoriteStudios()"
+              (change)="onOnlyFavoriteStudiosChanged($any($event.target).checked)"
+            />
+            <span>Enabled</span>
+          </label>
+        </label>
+      </div>
+
+      <div class="filter-grid">
+        <div class="filter-panel">
+          <label class="control-field">
+            <span>Filter Studios</span>
+            <input
+              type="text"
+              [value]="studioSearchTerm()"
+              placeholder="Search studio networks"
+              (input)="onStudioSearchChanged($any($event.target).value)"
+            />
+          </label>
+
+          @if (selectedStudios().length > 0) {
+            <div class="chips">
+              @for (studio of selectedStudios(); track studio.id) {
+                <button type="button" class="chip" (click)="removeSelectedStudio(studio.id)">
+                  {{ studio.label }} ×
+                </button>
+              }
+            </div>
+          }
+
+          @if (studioSearchLoading()) {
+            <p class="hint">Searching studios...</p>
+          } @else if (studioSearchError()) {
+            <p class="hint error">{{ studioSearchError() }}</p>
+          } @else if (studioOptions().length > 0) {
+            <div class="options">
+              @for (option of studioOptions(); track option.id) {
+                <div class="option-group">
+                  <button
+                    type="button"
+                    class="option"
+                    [class.selected]="isStudioSelected(option.id)"
+                    (click)="toggleStudioNetwork(option)"
+                  >
+                    {{ option.name }} (Network)
+                  </button>
+                  @for (child of option.childStudios; track child.id) {
+                    <button
+                      type="button"
+                      class="option child"
+                      [class.selected]="isStudioSelected(child.id)"
+                      (click)="toggleStudioChild(child)"
+                    >
+                      {{ child.name }}
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="filter-panel">
+          <label class="control-field">
+            <span>Filter Tags</span>
+            <input
+              type="text"
+              [value]="tagSearchTerm()"
+              placeholder="Search scene tags"
+              (input)="onTagSearchChanged($any($event.target).value)"
+            />
+          </label>
+
+          @if (selectedTags().length > 0) {
+            <div class="chips">
+              @for (tag of selectedTags(); track tag.id) {
+                <button type="button" class="chip" (click)="removeSelectedTag(tag.id)">
+                  {{ tag.name }} ×
+                </button>
+              }
+            </div>
+          }
+
+          @if (tagSearchLoading()) {
+            <p class="hint">Searching tags...</p>
+          } @else if (tagSearchError()) {
+            <p class="hint error">{{ tagSearchError() }}</p>
+          } @else if (tagOptions().length > 0) {
+            <div class="options">
+              @for (tag of tagOptions(); track tag.id) {
+                <button
+                  type="button"
+                  class="option"
+                  [class.selected]="isTagSelected(tag.id)"
+                  (click)="toggleTagSelection(tag)"
+                >
+                  {{ tag.name }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </section>
+
+    @if (loadingScenes()) {
+      <p class="state">Loading performer scenes...</p>
+    } @else if (scenesError()) {
+      <p class="state error">{{ scenesError() }}</p>
+      <button type="button" (click)="retryInitialScenesLoad()">Retry</button>
+    } @else if (!hasScenes()) {
+      <p class="state">No scenes found for this performer and filters.</p>
+    } @else {
+      <section class="grid">
+        @for (item of scenes(); track item.id) {
+          <article class="card" [class.requestable]="isRequestable(item)">
+            <div class="media">
+              <a
+                class="media-link-stretch"
+                [routerLink]="['/scene', item.id]"
+                [attr.aria-label]="item.title"
+              ></a>
+
+              @if (item.imageUrl) {
+                <img class="thumbnail" [src]="item.imageUrl" [alt]="item.title" loading="lazy" />
+              } @else {
+                <div class="thumbnail placeholder" aria-hidden="true"></div>
+              }
+
+              <div class="media-top">
+                @if (item.studioImageUrl) {
+                  <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                    <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
+                  </div>
+                } @else if (item.studio) {
+                  <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                }
+
+                @if (item.status.state !== 'NOT_REQUESTED') {
+                  <app-scene-status-badge class="status-icon" [status]="item.status" mode="icon" />
+                }
+              </div>
+
+              <div class="media-bottom">
+                <h2 class="media-title">{{ item.title }}</h2>
+                @if (isRequestable(item)) {
+                  <button type="button" class="request-cta" (click)="openRequestModal(item)">
+                    Request
+                  </button>
+                }
+              </div>
+            </div>
+          </article>
+        }
+      </section>
+
+      <div #loadMoreSentinel class="load-sentinel"></div>
+
+      @if (loadingMoreScenes()) {
+        <p class="state">Loading more scenes...</p>
+      }
+
+      @if (loadMoreScenesError()) {
+        <div class="load-more-error">
+          <p class="state error">{{ loadMoreScenesError() }}</p>
+          <button type="button" (click)="retryLoadMoreScenes()">Retry</button>
+        </div>
+      }
+    }
+  }
+
+  <app-scene-request-modal
+    [open]="requestModalOpen()"
+    [sceneId]="requestContext()?.id ?? null"
+    [sceneTitle]="requestContext()?.title ?? null"
+    [sceneImageUrl]="requestContext()?.imageUrl ?? null"
+    (closed)="onRequestModalClosed()"
+    (submitted)="onRequestSubmitted($event)"
+  />
+</main>

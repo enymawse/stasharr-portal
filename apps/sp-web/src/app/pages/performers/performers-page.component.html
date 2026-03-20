@@ -68,6 +68,12 @@
     <section class="performer-grid">
       @for (item of items(); track item.id) {
         <article class="performer-card">
+          <a
+            class="performer-link-stretch"
+            [routerLink]="['/performer', item.id]"
+            [attr.aria-label]="'View performer ' + item.name"
+          ></a>
+
           <div
             class="favorite-star"
             [class.is-favorite]="item.isFavorite"

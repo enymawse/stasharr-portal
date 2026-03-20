@@ -11,6 +11,7 @@ import { ScenePageComponent } from './pages/scene/scene-page.component';
 import { SettingsPageComponent } from './pages/settings/settings-page.component';
 import { RequestsPageComponent } from './pages/requests/requests-page.component';
 import { PerformersPageComponent } from './pages/performers/performers-page.component';
+import { PerformerPageComponent } from './pages/performer/performer-page.component';
 
 export const routes: Routes = [
   {
@@ -42,6 +43,10 @@ export const routes: Routes = [
       {
         path: 'performers',
         component: PerformersPageComponent,
+      },
+      {
+        path: 'performer/:performerId',
+        component: PerformerPageComponent,
       },
       {
         path: 'settings',

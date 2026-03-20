@@ -1,6 +1,11 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
+import { DiscoverResponseDto } from '../discover/dto/discover-item.dto';
+import { PerformerDetailsDto } from './dto/performer-details.dto';
 import { PerformerFeedResponseDto } from './dto/performer-feed-response.dto';
+import { PerformerScenesQueryDto } from './dto/performer-scenes-query.dto';
+import { PerformerStudioOptionDto } from './dto/performer-studio-option.dto';
 import { PerformersQueryDto } from './dto/performers-query.dto';
+import { PerformerStudiosQueryDto } from './dto/performer-studios-query.dto';
 import { PerformersService } from './performers.service';
 
 @Controller('api/performers')
@@ -17,5 +22,37 @@ export class PerformersController {
       sort: query.sort,
       favoritesOnly: query.favoritesOnly,
     });
+  }
+
+  @Get('studios')
+  getStudioOptions(
+    @Query() query: PerformerStudiosQueryDto,
+  ): Promise<PerformerStudioOptionDto[]> {
+    return this.performersService.searchStudios(query.query);
+  }
+
+  @Get(':performerId/scenes')
+  getPerformerScenes(
+    @Param('performerId') performerId: string,
+    @Query() query: PerformerScenesQueryDto,
+  ): Promise<DiscoverResponseDto> {
+    return this.performersService.getPerformerScenes(
+      performerId,
+      query.page,
+      query.perPage,
+      {
+        sort: query.sort,
+        studioIds: query.studioIds,
+        tagIds: query.tagIds,
+        onlyFavoriteStudios: query.onlyFavoriteStudios,
+      },
+    );
+  }
+
+  @Get(':performerId')
+  getPerformerById(
+    @Param('performerId') performerId: string,
+  ): Promise<PerformerDetailsDto> {
+    return this.performersService.getPerformerById(performerId);
   }
 }

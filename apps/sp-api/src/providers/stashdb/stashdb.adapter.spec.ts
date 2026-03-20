@@ -613,4 +613,162 @@ describe('StashdbAdapter', () => {
 
     expect(requestBody.query).not.toContain('is_favorite: true');
   });
+
+  it('normalizes findPerformer response for performer details', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findPerformer: {
+              id: 'p-1',
+              name: 'Performer One',
+              disambiguation: 'v2',
+              aliases: ['Alias'],
+              gender: 'FEMALE',
+              birth_date: '1990-01-01',
+              death_date: null,
+              age: 35,
+              ethnicity: 'Ethnicity',
+              country: 'US',
+              eye_color: 'Brown',
+              hair_color: 'Black',
+              height: '170cm',
+              cup_size: 'C',
+              band_size: 34,
+              waist_size: 24,
+              hip_size: 35,
+              breast_type: 'NATURAL',
+              career_start_year: 2010,
+              career_end_year: null,
+              deleted: false,
+              merged_ids: ['p-old'],
+              merged_into_id: null,
+              is_favorite: true,
+              created: '2024-01-01',
+              updated: '2025-01-01',
+              images: [
+                { id: 'img-1', url: 'https://small.jpg', width: 320, height: 240 },
+                { id: 'img-2', url: 'https://large.jpg', width: 1024, height: 768 },
+              ],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.getPerformerById('p-1', { baseUrl: 'http://stashdb.local/graphql' }),
+    ).resolves.toMatchObject({
+      id: 'p-1',
+      name: 'Performer One',
+      isFavorite: true,
+      imageUrl: 'https://large.jpg',
+      images: [{ id: 'img-1' }, { id: 'img-2' }],
+    });
+  });
+
+  it('normalizes studio search with child studios', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryStudios: {
+              studios: [
+                {
+                  id: 'studio-1',
+                  name: 'Network',
+                  child_studios: [
+                    { id: 'studio-1a', name: 'Child A' },
+                    { id: 'studio-1b', name: 'Child B' },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.searchStudios('net', { baseUrl: 'http://stashdb.local/graphql' }),
+    ).resolves.toEqual([
+      {
+        id: 'studio-1',
+        name: 'Network',
+        childStudios: [
+          { id: 'studio-1a', name: 'Child A' },
+          { id: 'studio-1b', name: 'Child B' },
+        ],
+      },
+    ]);
+  });
+
+  it('builds performer-scoped scenes query with optional filters', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getScenesForPerformer({
+      baseUrl: 'http://stashdb.local/graphql',
+      performerId: 'p-1',
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      studioIds: ['studio-1'],
+      tagIds: ['tag-1', 'tag-2'],
+      onlyFavoriteStudios: true,
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string; variables: Record<string, unknown> };
+
+    expect(requestBody.query).toContain('performers: { value: $performerId, modifier: INCLUDES }');
+    expect(requestBody.query).toContain('studios: { value: $studioIds, modifier: INCLUDES }');
+    expect(requestBody.query).toContain('tags: { value: $tagIds, modifier: INCLUDES }');
+    expect(requestBody.query).toContain('favorites: STUDIO');
+    expect(requestBody.variables.performerId).toEqual(['p-1']);
+    expect(requestBody.variables.studioIds).toEqual(['studio-1']);
+    expect(requestBody.variables.tagIds).toEqual(['tag-1', 'tag-2']);
+  });
+
+  it('omits optional performer-scoped scene filters when unset', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getScenesForPerformer({
+      baseUrl: 'http://stashdb.local/graphql',
+      performerId: 'p-1',
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).not.toContain('studios:');
+    expect(requestBody.query).not.toContain('tags:');
+    expect(requestBody.query).not.toContain('favorites: STUDIO');
+  });
 });
