@@ -1,11 +1,53 @@
 <main>
   <header>
     <h1>Scenes</h1>
-    <p>Recently dated scenes from your configured StashDB integration.</p>
+    <p>Scene feed from your configured StashDB integration.</p>
     @if (!loading() && !error()) {
-      <p class="state">Total dated scenes: {{ total() }}</p>
+      <p class="state">Total scenes: {{ total() }}</p>
     }
   </header>
+
+  <section class="controls-shell" aria-label="Scenes controls">
+    <div class="controls-row">
+      <label class="control-field">
+        <span>Tag Filter</span>
+        <input
+          type="text"
+          [value]="tagFilter()"
+          placeholder="Filter by tag"
+          (input)="onTagFilterChanged($any($event.target).value)"
+        />
+      </label>
+
+      <label class="control-field">
+        <span>Sort By</span>
+        <select
+          [value]="selectedSort()"
+          (change)="onSortChanged($any($event.target).value)"
+        >
+          @for (option of sortOptions; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="control-field">
+        <span>Favorites</span>
+        <select
+          [value]="selectedFavorites()"
+          (change)="onFavoritesChanged($any($event.target).value)"
+        >
+          @for (option of favoritesOptions; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    <p class="controls-note">
+      Controls are scaffolded for upcoming backend wiring and do not affect the current feed yet.
+    </p>
+  </section>
 
   @if (loading()) {
     <p class="state">Loading scenes feed...</p>

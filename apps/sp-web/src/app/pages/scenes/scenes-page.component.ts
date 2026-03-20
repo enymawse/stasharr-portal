@@ -15,6 +15,17 @@ import { DiscoverItem, SceneRequestContext } from '../../core/api/discover.types
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
+type SceneSortOption =
+  | 'RELEASE_DATE'
+  | 'TITLE'
+  | 'TRENDING'
+  | 'CREATED_AT'
+  | 'UPDATED_AT';
+type FavoritesFilterOption =
+  | 'ALL_FAVORITES'
+  | 'FAVORITE_PERFORMERS'
+  | 'FAVORITE_STUDIOS';
+
 @Component({
   selector: 'app-scenes-page',
   imports: [RouterLink, SceneStatusBadgeComponent, SceneRequestModalComponent],
@@ -23,6 +34,24 @@ import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene
 })
 export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly PAGE_SIZE = 50;
+  protected static readonly SORT_OPTIONS: Array<{
+    value: SceneSortOption;
+    label: string;
+  }> = [
+    { value: 'RELEASE_DATE', label: 'Release Date' },
+    { value: 'TITLE', label: 'Title' },
+    { value: 'TRENDING', label: 'Trending' },
+    { value: 'CREATED_AT', label: 'Created At' },
+    { value: 'UPDATED_AT', label: 'Updated At' },
+  ];
+  protected static readonly FAVORITES_OPTIONS: Array<{
+    value: FavoritesFilterOption;
+    label: string;
+  }> = [
+    { value: 'ALL_FAVORITES', label: 'All Favorites' },
+    { value: 'FAVORITE_PERFORMERS', label: 'Favorite Performers' },
+    { value: 'FAVORITE_STUDIOS', label: 'Favorite Studios' },
+  ];
 
   private readonly discoverService = inject(DiscoverService);
   private observer: IntersectionObserver | null = null;
@@ -58,6 +87,13 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly items = signal<DiscoverItem[]>([]);
   protected readonly requestModalOpen = signal(false);
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
+  protected readonly selectedSort = signal<SceneSortOption>('RELEASE_DATE');
+  protected readonly selectedFavorites = signal<FavoritesFilterOption>(
+    'ALL_FAVORITES',
+  );
+  protected readonly tagFilter = signal('');
+  protected readonly sortOptions = ScenesPageComponent.SORT_OPTIONS;
+  protected readonly favoritesOptions = ScenesPageComponent.FAVORITES_OPTIONS;
 
   ngOnInit(): void {
     this.loadNextPage();
@@ -100,7 +136,9 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return item.status.state === 'NOT_REQUESTED';
   }
 
-  protected openRequestModal(item: DiscoverItem): void {    if (!this.isRequestable(item)) {      return;
+  protected openRequestModal(item: DiscoverItem): void {
+    if (!this.isRequestable(item)) {
+      return;
     }
 
     this.requestContext.set({
@@ -108,7 +146,34 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       title: item.title,
       imageUrl: item.imageUrl,
     });
-    this.requestModalOpen.set(true);  }
+    this.requestModalOpen.set(true);
+  }
+
+  protected onSortChanged(nextValue: string): void {
+    if (
+      nextValue === 'RELEASE_DATE' ||
+      nextValue === 'TITLE' ||
+      nextValue === 'TRENDING' ||
+      nextValue === 'CREATED_AT' ||
+      nextValue === 'UPDATED_AT'
+    ) {
+      this.selectedSort.set(nextValue);
+    }
+  }
+
+  protected onFavoritesChanged(nextValue: string): void {
+    if (
+      nextValue === 'ALL_FAVORITES' ||
+      nextValue === 'FAVORITE_PERFORMERS' ||
+      nextValue === 'FAVORITE_STUDIOS'
+    ) {
+      this.selectedFavorites.set(nextValue);
+    }
+  }
+
+  protected onTagFilterChanged(nextValue: string): void {
+    this.tagFilter.set(nextValue);
+  }
 
   protected onRequestModalClosed(): void {
     this.requestModalOpen.set(false);
