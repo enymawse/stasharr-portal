@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   DiscoverResponse,
+  SceneFeedSort,
   SceneDetails,
   SceneRequestOptions,
   SubmitSceneRequestPayload,
@@ -22,10 +23,19 @@ export class DiscoverService {
     return this.http.get<DiscoverResponse>('/api/discover', { params });
   }
 
-  getScenesFeed(page: number, perPage: number): Observable<DiscoverResponse> {
-    const params = new HttpParams()
+  getScenesFeed(
+    page: number,
+    perPage: number,
+    sort?: SceneFeedSort,
+  ): Observable<DiscoverResponse> {
+    let params = new HttpParams()
       .set('page', page.toString())
       .set('perPage', perPage.toString());
+
+    if (sort) {
+      params = params.set('sort', sort);
+    }
+
     return this.http.get<DiscoverResponse>('/api/scenes', { params });
   }
 

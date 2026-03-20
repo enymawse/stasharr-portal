@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import { DiscoverQueryDto } from '../discover/dto/discover-query.dto';
 import { DiscoverResponseDto } from '../discover/dto/discover-item.dto';
 import { SceneDetailsDto } from './dto/scene-details.dto';
+import { ScenesQueryDto } from './dto/scenes-query.dto';
 import { ScenesService } from './scenes.service';
 
 @Controller('api/scenes')
@@ -10,9 +10,9 @@ export class ScenesController {
 
   @Get()
   getScenesFeed(
-    @Query() query: DiscoverQueryDto,
+    @Query() query: ScenesQueryDto,
   ): Promise<DiscoverResponseDto> {
-    return this.scenesService.getScenesFeed(query.page, query.perPage);
+    return this.scenesService.getScenesFeed(query.page, query.perPage, query.sort);
   }
 
   @Get(':stashId')

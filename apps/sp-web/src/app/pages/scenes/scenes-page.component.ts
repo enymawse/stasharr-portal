@@ -11,16 +11,14 @@ import {
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { DiscoverService } from '../../core/api/discover.service';
-import { DiscoverItem, SceneRequestContext } from '../../core/api/discover.types';
+import {
+  DiscoverItem,
+  SceneFeedSort,
+  SceneRequestContext,
+} from '../../core/api/discover.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
-type SceneSortOption =
-  | 'RELEASE_DATE'
-  | 'TITLE'
-  | 'TRENDING'
-  | 'CREATED_AT'
-  | 'UPDATED_AT';
 type FavoritesFilterOption =
   | 'ALL_FAVORITES'
   | 'FAVORITE_PERFORMERS'
@@ -35,10 +33,10 @@ type FavoritesFilterOption =
 export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly PAGE_SIZE = 50;
   protected static readonly SORT_OPTIONS: Array<{
-    value: SceneSortOption;
+    value: SceneFeedSort;
     label: string;
   }> = [
-    { value: 'RELEASE_DATE', label: 'Release Date' },
+    { value: 'DATE', label: 'Release Date' },
     { value: 'TITLE', label: 'Title' },
     { value: 'TRENDING', label: 'Trending' },
     { value: 'CREATED_AT', label: 'Created At' },
@@ -87,7 +85,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly items = signal<DiscoverItem[]>([]);
   protected readonly requestModalOpen = signal(false);
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
-  protected readonly selectedSort = signal<SceneSortOption>('RELEASE_DATE');
+  protected readonly selectedSort = signal<SceneFeedSort>('DATE');
   protected readonly selectedFavorites = signal<FavoritesFilterOption>(
     'ALL_FAVORITES',
   );
@@ -151,13 +149,18 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected onSortChanged(nextValue: string): void {
     if (
-      nextValue === 'RELEASE_DATE' ||
+      nextValue === 'DATE' ||
       nextValue === 'TITLE' ||
       nextValue === 'TRENDING' ||
       nextValue === 'CREATED_AT' ||
       nextValue === 'UPDATED_AT'
     ) {
+      if (this.selectedSort() === nextValue) {
+        return;
+      }
+
       this.selectedSort.set(nextValue);
+      this.resetFeedAndReload();
     }
   }
 
@@ -210,7 +213,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.discoverService
-      .getScenesFeed(nextPage, ScenesPageComponent.PAGE_SIZE)
+      .getScenesFeed(nextPage, ScenesPageComponent.PAGE_SIZE, this.selectedSort())
       .pipe(
         finalize(() => {
           this.inFlight.set(false);
@@ -242,6 +245,16 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
           }
         },
       });
+  }
+
+  private resetFeedAndReload(): void {
+    this.page.set(0);
+    this.total.set(0);
+    this.hasMore.set(true);
+    this.items.set([]);
+    this.error.set(null);
+    this.loadMoreError.set(null);
+    this.loadNextPage();
   }
 
   private setupIntersectionObserver(): void {

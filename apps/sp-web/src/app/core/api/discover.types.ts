@@ -30,6 +30,13 @@ export interface DiscoverResponse {
   items: DiscoverItem[];
 }
 
+export type SceneFeedSort =
+  | 'DATE'
+  | 'TRENDING'
+  | 'TITLE'
+  | 'CREATED_AT'
+  | 'UPDATED_AT';
+
 export interface SceneImage {
   id: string;
   url: string;

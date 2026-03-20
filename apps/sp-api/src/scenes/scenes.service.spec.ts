@@ -16,7 +16,7 @@ describe('ScenesService', () => {
 
   const stashdbAdapter = {
     getSceneById: jest.fn(),
-    getScenesSortedByDate: jest.fn(),
+    getScenesBySort: jest.fn(),
   } as unknown as StashdbAdapter;
 
   const sceneStatusService = {
@@ -99,7 +99,7 @@ describe('ScenesService', () => {
       });
 
     stashdbAdapter.getSceneById = jest.fn().mockResolvedValue(sceneDetails);
-    stashdbAdapter.getScenesSortedByDate = jest.fn().mockResolvedValue({
+    stashdbAdapter.getScenesBySort = jest.fn().mockResolvedValue({
       total: 1,
       scenes: [
         {
@@ -165,7 +165,7 @@ describe('ScenesService', () => {
     });
   });
 
-  it('returns a date-sorted scenes feed with scene statuses', async () => {
+  it('defaults to DATE sort for scenes feed and returns statuses', async () => {
     await expect(service.getScenesFeed(1, 25)).resolves.toEqual({
       total: 1,
       page: 1,
@@ -186,6 +186,26 @@ describe('ScenesService', () => {
           status: { state: 'AVAILABLE' },
         },
       ],
+    });
+
+    expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+    });
+  });
+
+  it('forwards non-default sort to stashdb adapter', async () => {
+    await service.getScenesFeed(2, 10, 'TITLE');
+
+    expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
+      page: 2,
+      perPage: 10,
+      sort: 'TITLE',
     });
   });
 

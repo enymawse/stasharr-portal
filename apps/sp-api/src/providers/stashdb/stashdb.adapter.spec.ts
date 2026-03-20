@@ -206,4 +206,37 @@ describe('StashdbAdapter', () => {
 
     expect(requestBody.query).toContain('sort: DATE');
   });
+
+  it('passes through selected sort value for scene feeds', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.getScenesBySort({
+        baseUrl: 'http://stashdb.local/graphql',
+        page: 1,
+        perPage: 25,
+        sort: 'UPDATED_AT',
+      }),
+    ).resolves.toEqual({
+      total: 0,
+      scenes: [],
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).toContain('sort: UPDATED_AT');
+  });
 });

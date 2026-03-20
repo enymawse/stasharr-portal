@@ -14,7 +14,17 @@ export interface StashdbAdapterTrendingConfig extends StashdbAdapterBaseConfig {
   perPage: number;
 }
 
-type StashdbSceneFeedSort = 'TRENDING' | 'DATE';
+export type StashdbSceneFeedSort =
+  | 'DATE'
+  | 'TRENDING'
+  | 'TITLE'
+  | 'CREATED_AT'
+  | 'UPDATED_AT';
+
+export interface StashdbAdapterSceneFeedConfig
+  extends StashdbAdapterTrendingConfig {
+  sort: StashdbSceneFeedSort;
+}
 
 export interface StashdbScene {
   id: string;
@@ -180,6 +190,12 @@ export class StashdbAdapter {
     config: StashdbAdapterTrendingConfig,
   ): Promise<StashdbTrendingScenesResult> {
     return this.getSceneFeed(config, 'DATE');
+  }
+
+  async getScenesBySort(
+    config: StashdbAdapterSceneFeedConfig,
+  ): Promise<StashdbTrendingScenesResult> {
+    return this.getSceneFeed(config, config.sort);
   }
 
   private async getSceneFeed(

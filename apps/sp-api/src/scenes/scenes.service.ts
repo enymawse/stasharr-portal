@@ -16,6 +16,7 @@ import {
   SceneStashAvailabilityDto,
   SceneWhisparrAvailabilityDto,
 } from './dto/scene-details.dto';
+import { SceneFeedSort } from './dto/scenes-query.dto';
 
 @Injectable()
 export class ScenesService {
@@ -33,6 +34,7 @@ export class ScenesService {
   async getScenesFeed(
     page = ScenesService.DEFAULT_PAGE,
     perPage = ScenesService.DEFAULT_PER_PAGE,
+    sort: SceneFeedSort = 'DATE',
   ): Promise<DiscoverResponseDto> {
     const integration = await this.getStashdbIntegration();
 
@@ -50,11 +52,12 @@ export class ScenesService {
       );
     }
 
-    const scenes = await this.stashdbAdapter.getScenesSortedByDate({
+    const scenes = await this.stashdbAdapter.getScenesBySort({
       baseUrl: integration.baseUrl,
       apiKey: integration.apiKey,
       page,
       perPage,
+      sort,
     });
 
     const hasMore = page * perPage < scenes.total;
