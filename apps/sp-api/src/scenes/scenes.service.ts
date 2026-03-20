@@ -11,12 +11,13 @@ import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
 import { SceneStatusService } from '../scene-status/scene-status.service';
+import { SceneTagOptionDto } from './dto/scene-tag-option.dto';
 import {
   SceneDetailsDto,
   SceneStashAvailabilityDto,
   SceneWhisparrAvailabilityDto,
 } from './dto/scene-details.dto';
-import { SceneFeedSort } from './dto/scenes-query.dto';
+import { SceneFeedSort, SceneTagMatchMode } from './dto/scenes-query.dto';
 
 @Injectable()
 export class ScenesService {
@@ -35,6 +36,8 @@ export class ScenesService {
     page = ScenesService.DEFAULT_PAGE,
     perPage = ScenesService.DEFAULT_PER_PAGE,
     sort: SceneFeedSort = 'DATE',
+    tagIds: string[] = [],
+    tagMode: SceneTagMatchMode = 'OR',
   ): Promise<DiscoverResponseDto> {
     const integration = await this.getStashdbIntegration();
 
@@ -52,12 +55,21 @@ export class ScenesService {
       );
     }
 
+    const normalizedTagIds = this.normalizeTagIds(tagIds);
+
     const scenes = await this.stashdbAdapter.getScenesBySort({
       baseUrl: integration.baseUrl,
       apiKey: integration.apiKey,
       page,
       perPage,
       sort,
+      tagFilter:
+        normalizedTagIds.length > 0
+          ? {
+              tagIds: normalizedTagIds,
+              mode: tagMode,
+            }
+          : undefined,
     });
 
     const hasMore = page * perPage < scenes.total;
@@ -84,6 +96,35 @@ export class ScenesService {
         status: statuses.get(scene.id) ?? { state: 'NOT_REQUESTED' },
       })),
     };
+  }
+
+  async searchSceneTags(query?: string): Promise<SceneTagOptionDto[]> {
+    const normalizedQuery = query?.trim() ?? '';
+    if (!normalizedQuery) {
+      return [];
+    }
+
+    const integration = await this.getStashdbIntegration();
+
+    if (!integration.enabled) {
+      throw new ConflictException('STASHDB integration is disabled.');
+    }
+
+    if (integration.status !== IntegrationStatus.CONFIGURED) {
+      throw new ConflictException('STASHDB integration is not configured.');
+    }
+
+    if (!integration.baseUrl) {
+      throw new BadRequestException(
+        'STASHDB integration is missing a base URL.',
+      );
+    }
+
+    return this.stashdbAdapter.searchTags({
+      baseUrl: integration.baseUrl,
+      apiKey: integration.apiKey,
+      query: normalizedQuery,
+    });
   }
 
   async getSceneById(stashId: string): Promise<SceneDetailsDto> {
@@ -184,6 +225,10 @@ export class ScenesService {
 
       throw error;
     }
+  }
+
+  private normalizeTagIds(tagIds: string[]): string[] {
+    return [...new Set(tagIds.map((tagId) => tagId.trim()).filter(Boolean))];
   }
 
   private resolveStudioUrl(

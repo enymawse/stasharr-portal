@@ -239,4 +239,149 @@ describe('StashdbAdapter', () => {
 
     expect(requestBody.query).toContain('sort: UPDATED_AT');
   });
+
+  it('maps OR tag mode to INCLUDES and sends selected tag ids', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getScenesBySort({
+      baseUrl: 'http://stashdb.local/graphql',
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      tagFilter: {
+        tagIds: ['tag-1', 'tag-2'],
+        mode: 'OR',
+      },
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string; variables: { tagIds?: string[] } };
+
+    expect(requestBody.query).toContain('modifier: INCLUDES');
+    expect(requestBody.variables.tagIds).toEqual(['tag-1', 'tag-2']);
+  });
+
+  it('maps AND tag mode to INCLUDES_ALL', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getScenesBySort({
+      baseUrl: 'http://stashdb.local/graphql',
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      tagFilter: {
+        tagIds: ['tag-9'],
+        mode: 'AND',
+      },
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).toContain('modifier: INCLUDES_ALL');
+  });
+
+  it('omits tags filter when no tag ids are provided', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getScenesBySort({
+      baseUrl: 'http://stashdb.local/graphql',
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      tagFilter: {
+        tagIds: [],
+        mode: 'OR',
+      },
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).not.toContain('tags:');
+  });
+
+  it('searches tags and normalizes result shape', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryTags: {
+              tags: [
+                {
+                  id: 'tag-1',
+                  name: 'Natural',
+                  description: 'Natural scenes',
+                  aliases: ['Nat', 42],
+                },
+                {
+                  id: 12,
+                  name: 'Invalid',
+                  description: null,
+                  aliases: [],
+                },
+              ],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.searchTags({
+        baseUrl: 'http://stashdb.local/graphql',
+        query: 'nat',
+      }),
+    ).resolves.toEqual([
+      {
+        id: 'tag-1',
+        name: 'Natural',
+        description: 'Natural scenes',
+        aliases: ['Nat'],
+      },
+    ]);
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string; variables: { name?: string } };
+
+    expect(requestBody.query).toContain('queryTags');
+    expect(requestBody.variables.name).toBe('nat');
+  });
 });

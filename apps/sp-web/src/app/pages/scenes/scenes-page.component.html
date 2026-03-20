@@ -11,12 +11,66 @@
     <div class="controls-row">
       <label class="control-field">
         <span>Tag Filter</span>
-        <input
-          type="text"
-          [value]="tagFilter()"
-          placeholder="Filter by tag"
-          (input)="onTagFilterChanged($any($event.target).value)"
-        />
+        <div class="tag-picker-shell">
+          <div class="tag-input-row">
+            <input
+              type="text"
+              [value]="tagSearchTerm()"
+              placeholder="Search tags"
+              (input)="onTagSearchChanged($any($event.target).value)"
+            />
+            <select
+              class="tag-mode-select"
+              [value]="selectedTagMode()"
+              (change)="onTagMatchModeChanged($any($event.target).value)"
+            >
+              @for (option of tagMatchOptions; track option.value) {
+                <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
+          </div>
+
+          @if (selectedTags().length > 0) {
+            <div class="selected-tags" aria-label="Selected tags">
+              @for (tag of selectedTags(); track tag.id) {
+                <button
+                  type="button"
+                  class="tag-chip"
+                  (click)="removeSelectedTag(tag.id)"
+                  [attr.aria-label]="'Remove tag ' + tag.name"
+                >
+                  {{ tag.name }} <span aria-hidden="true">×</span>
+                </button>
+              }
+            </div>
+          }
+
+          @if (tagSearchLoading()) {
+            <p class="tag-state">Searching tags...</p>
+          } @else if (tagSearchError()) {
+            <p class="tag-state error">{{ tagSearchError() }}</p>
+          } @else if (tagSearchTerm().trim().length > 0 && tagOptions().length === 0) {
+            <p class="tag-state">No matching tags.</p>
+          } @else if (tagOptions().length > 0) {
+            <ul class="tag-options" aria-label="Tag search results">
+              @for (tag of tagOptions(); track tag.id) {
+                <li>
+                  <button
+                    type="button"
+                    class="tag-option"
+                    [class.selected]="isTagSelected(tag.id)"
+                    (click)="toggleTagSelection(tag)"
+                  >
+                    <span class="tag-option-name">{{ tag.name }}</span>
+                    @if (tag.description) {
+                      <span class="tag-option-description">{{ tag.description }}</span>
+                    }
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </div>
       </label>
 
       <label class="control-field">
@@ -45,7 +99,7 @@
     </div>
 
     <p class="controls-note">
-      Sort now updates the feed. Tag and favorites controls remain scaffolded.
+      Sort and tags are live. Favorites controls remain scaffolded.
     </p>
   </section>
 
@@ -53,7 +107,7 @@
     <p class="state">Loading scenes feed...</p>
   } @else if (error()) {
     <p class="state error">{{ error() }}</p>
-    <button type="button" (click)="retryInitialLoad()">Retry</button>
+    <button type="button" class="retry-button" (click)="retryInitialLoad()">Retry</button>
   } @else if (!hasItems()) {
     <p class="state">No dated scenes are available right now.</p>
   } @else {
@@ -117,7 +171,7 @@
     @if (loadMoreError()) {
       <div class="load-more-error">
         <p class="state error">{{ loadMoreError() }}</p>
-        <button type="button" (click)="retryLoadMore()">Retry</button>
+        <button type="button" class="retry-button" (click)="retryLoadMore()">Retry</button>
       </div>
     }
   }

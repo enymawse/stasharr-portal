@@ -41,13 +41,15 @@ header p {
 
 .controls-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 0.6rem;
+  align-items: start;
 }
 
 .control-field {
   display: grid;
   gap: 0.26rem;
+  min-width: 0;
 }
 
 .control-field span {
@@ -61,12 +63,107 @@ header p {
 .control-field input,
 .control-field select {
   width: 100%;
+  box-sizing: border-box;
   border-radius: 7px;
   border: 1px solid var(--border-strong);
   background: var(--surface-elevated);
   color: var(--text-primary);
   font-size: 0.85rem;
   padding: 0.38rem 0.44rem;
+}
+
+.tag-picker-shell {
+  position: relative;
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.tag-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 8.5rem);
+  gap: 0.35rem;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tag-input-row > * {
+  min-width: 0;
+}
+
+.tag-mode-select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.selected-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.tag-chip {
+  margin: 0;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 80%, #0f2236);
+  color: var(--text-primary);
+  font-size: 0.72rem;
+  line-height: 1.15;
+}
+
+.tag-chip span {
+  margin-left: 0.2rem;
+}
+
+.tag-options {
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-elevated) 85%, #0d1a29);
+  max-height: 11rem;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.24rem;
+}
+
+.tag-option {
+  width: 100%;
+  margin: 0;
+  text-align: left;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: rgb(255 255 255 / 3%);
+  padding: 0.28rem 0.35rem;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.tag-option.selected {
+  border-color: color-mix(in srgb, var(--focus-ring) 80%, transparent);
+  background: color-mix(in srgb, var(--focus-ring) 16%, transparent);
+}
+
+.tag-option-name {
+  color: var(--text-primary);
+  font-size: 0.77rem;
+  font-weight: 600;
+}
+
+.tag-option-description {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+}
+
+.tag-state {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
 }
 
 .controls-note {
@@ -271,7 +368,7 @@ header p {
   height: 1px;
 }
 
-button {
+.retry-button {
   margin-top: 0.5rem;
   padding: 0.45rem 0.75rem;
   border-radius: 6px;
@@ -300,6 +397,14 @@ button {
 @media (max-width: 560px) {
   .controls-row {
     grid-template-columns: 1fr;
+  }
+
+  .tag-input-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tag-mode-select {
+    min-width: 0;
   }
 
   .grid {

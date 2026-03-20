@@ -24,6 +24,18 @@ export type StashdbSceneFeedSort =
 export interface StashdbAdapterSceneFeedConfig
   extends StashdbAdapterTrendingConfig {
   sort: StashdbSceneFeedSort;
+  tagFilter?: StashdbSceneTagFilter;
+}
+
+export type StashdbSceneTagFilterMode = 'OR' | 'AND';
+
+export interface StashdbSceneTagFilter {
+  tagIds: string[];
+  mode: StashdbSceneTagFilterMode;
+}
+
+export interface StashdbTagSearchConfig extends StashdbAdapterBaseConfig {
+  query: string;
 }
 
 export interface StashdbScene {
@@ -55,6 +67,13 @@ export interface StashdbSceneTag {
   id: string;
   name: string;
   description: string | null;
+}
+
+export interface StashdbTagOption {
+  id: string;
+  name: string;
+  description: string | null;
+  aliases: string[];
 }
 
 export interface StashdbScenePerformer {
@@ -113,6 +132,14 @@ interface StashdbGraphqlResponse {
           }>;
         } | null;
         duration?: unknown;
+      }>;
+    };
+    queryTags?: {
+      tags?: Array<{
+        id?: unknown;
+        name?: unknown;
+        description?: unknown;
+        aliases?: unknown;
       }>;
     };
     findScene?: {
@@ -198,13 +225,65 @@ export class StashdbAdapter {
     return this.getSceneFeed(config, config.sort);
   }
 
+  async searchTags(config: StashdbTagSearchConfig): Promise<StashdbTagOption[]> {
+    const query = `
+      query QueryTags($name: String!) {
+        queryTags(input: { direction: ASC, sort: NAME, name: $name }) {
+          tags {
+            id
+            name
+            description
+            aliases
+          }
+        }
+      }
+    `;
+
+    const payload = await this.executeQuery(config, query, { name: config.query });
+    const rawTags = payload.data?.queryTags?.tags ?? [];
+
+    return rawTags
+      .map((tag): StashdbTagOption | null => {
+        if (typeof tag.id !== 'string' || typeof tag.name !== 'string') {
+          return null;
+        }
+
+        const aliases = Array.isArray(tag.aliases)
+          ? tag.aliases.filter((alias): alias is string => typeof alias === 'string')
+          : [];
+
+        return {
+          id: tag.id,
+          name: tag.name,
+          description:
+            typeof tag.description === 'string' && tag.description.trim().length > 0
+              ? tag.description
+              : null,
+          aliases,
+        };
+      })
+      .filter((tag): tag is StashdbTagOption => tag !== null);
+  }
+
   private async getSceneFeed(
-    config: StashdbAdapterTrendingConfig,
+    config: StashdbAdapterSceneFeedConfig | StashdbAdapterTrendingConfig,
     sort: StashdbSceneFeedSort,
   ): Promise<StashdbTrendingScenesResult> {
+    const tagFilter =
+      'tagFilter' in config &&
+      config.tagFilter?.tagIds.length &&
+      config.tagFilter.tagIds.length > 0
+        ? config.tagFilter
+        : null;
+    const tagModifier =
+      tagFilter?.mode === 'AND' ? 'INCLUDES_ALL' : 'INCLUDES';
+    const tagVariableDeclaration = tagFilter ? ', $tagIds: [ID!]!' : '';
+    const tagInput = tagFilter
+      ? `, tags: { value: $tagIds, modifier: ${tagModifier} }`
+      : '';
     const query = `
-      query QueryScenes($page: Int!, $perPage: Int!) {
-        queryScenes(input: { sort: ${sort}, page: $page, per_page: $perPage }) {
+      query QueryScenes($page: Int!, $perPage: Int!${tagVariableDeclaration}) {
+        queryScenes(input: { sort: ${sort}, direction: DESC, page: $page, per_page: $perPage${tagInput} }) {
           count
           scenes {
             id
@@ -236,10 +315,15 @@ export class StashdbAdapter {
         }
       }
     `;
-    const payload = await this.executeQuery(config, query, {
+    const variables: Record<string, unknown> = {
       page: config.page,
       perPage: config.perPage,
-    });
+    };
+    if (tagFilter) {
+      variables.tagIds = tagFilter.tagIds;
+    }
+
+    const payload = await this.executeQuery(config, query, variables);
 
     const total =
       typeof payload.data?.queryScenes?.count === 'number'

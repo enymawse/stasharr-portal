@@ -4,6 +4,8 @@ import { Observable } from 'rxjs';
 import {
   DiscoverResponse,
   SceneFeedSort,
+  SceneTagMatchMode,
+  SceneTagOption,
   SceneDetails,
   SceneRequestOptions,
   SubmitSceneRequestPayload,
@@ -27,6 +29,8 @@ export class DiscoverService {
     page: number,
     perPage: number,
     sort?: SceneFeedSort,
+    tagIds?: string[],
+    tagMode?: SceneTagMatchMode,
   ): Observable<DiscoverResponse> {
     let params = new HttpParams()
       .set('page', page.toString())
@@ -35,8 +39,19 @@ export class DiscoverService {
     if (sort) {
       params = params.set('sort', sort);
     }
+    if (tagIds && tagIds.length > 0) {
+      params = params.set('tagIds', tagIds.join(','));
+    }
+    if (tagMode) {
+      params = params.set('tagMode', tagMode);
+    }
 
     return this.http.get<DiscoverResponse>('/api/scenes', { params });
+  }
+
+  searchSceneTags(query: string): Observable<SceneTagOption[]> {
+    const params = new HttpParams().set('query', query);
+    return this.http.get<SceneTagOption[]>('/api/scenes/tags', { params });
   }
 
   getRequestsFeed(page: number, perPage: number): Observable<DiscoverResponse> {

@@ -17,6 +17,7 @@ describe('ScenesService', () => {
   const stashdbAdapter = {
     getSceneById: jest.fn(),
     getScenesBySort: jest.fn(),
+    searchTags: jest.fn(),
   } as unknown as StashdbAdapter;
 
   const sceneStatusService = {
@@ -116,6 +117,7 @@ describe('ScenesService', () => {
         },
       ],
     });
+    stashdbAdapter.searchTags = jest.fn().mockResolvedValue([]);
     sceneStatusService.resolveForScene = jest
       .fn()
       .mockResolvedValue({ state: 'AVAILABLE' });
@@ -194,6 +196,7 @@ describe('ScenesService', () => {
       page: 1,
       perPage: 25,
       sort: 'DATE',
+      tagFilter: undefined,
     });
   });
 
@@ -206,6 +209,49 @@ describe('ScenesService', () => {
       page: 2,
       perPage: 10,
       sort: 'TITLE',
+      tagFilter: undefined,
+    });
+  });
+
+  it('forwards selected tags and AND mode to stashdb adapter', async () => {
+    await service.getScenesFeed(1, 25, 'DATE', ['t-1', 't-2', 't-1'], 'AND');
+
+    expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      tagFilter: {
+        tagIds: ['t-1', 't-2'],
+        mode: 'AND',
+      },
+    });
+  });
+
+  it('returns scene tag options from stashdb', async () => {
+    stashdbAdapter.searchTags = jest.fn().mockResolvedValue([
+      {
+        id: 'tag-1',
+        name: 'Tag One',
+        description: null,
+        aliases: ['Alias 1'],
+      },
+    ]);
+
+    await expect(service.searchSceneTags('tag')).resolves.toEqual([
+      {
+        id: 'tag-1',
+        name: 'Tag One',
+        description: null,
+        aliases: ['Alias 1'],
+      },
+    ]);
+
+    expect(stashdbAdapter.searchTags).toHaveBeenCalledWith({
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
+      query: 'tag',
     });
   });
 

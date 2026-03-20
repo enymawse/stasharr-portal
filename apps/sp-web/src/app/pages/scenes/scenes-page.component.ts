@@ -9,12 +9,24 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
+import {
+  Subject,
+  Subscription,
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  finalize,
+  map,
+  of,
+  switchMap,
+} from 'rxjs';
 import { DiscoverService } from '../../core/api/discover.service';
 import {
   DiscoverItem,
   SceneFeedSort,
   SceneRequestContext,
+  SceneTagMatchMode,
+  SceneTagOption,
 } from '../../core/api/discover.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
@@ -50,11 +62,22 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     { value: 'FAVORITE_PERFORMERS', label: 'Favorite Performers' },
     { value: 'FAVORITE_STUDIOS', label: 'Favorite Studios' },
   ];
+  protected static readonly TAG_MATCH_OPTIONS: Array<{
+    value: SceneTagMatchMode;
+    label: string;
+  }> = [
+    { value: 'OR', label: 'OR (Any)' },
+    { value: 'AND', label: 'AND (All)' },
+  ];
 
   private readonly discoverService = inject(DiscoverService);
+  private readonly tagSearchTerms = new Subject<string>();
+  private tagSearchSubscription: Subscription | null = null;
   private observer: IntersectionObserver | null = null;
   private sentinelElement: HTMLDivElement | null = null;
   private sentinelIntersecting = false;
+  private feedVersion = 0;
+  private pendingReload = false;
 
   @ViewChild('loadMoreSentinel')
   set loadMoreSentinel(elementRef: ElementRef<HTMLDivElement> | undefined) {
@@ -89,11 +112,18 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly selectedFavorites = signal<FavoritesFilterOption>(
     'ALL_FAVORITES',
   );
-  protected readonly tagFilter = signal('');
+  protected readonly tagSearchTerm = signal('');
+  protected readonly selectedTagMode = signal<SceneTagMatchMode>('OR');
+  protected readonly selectedTags = signal<SceneTagOption[]>([]);
+  protected readonly tagOptions = signal<SceneTagOption[]>([]);
+  protected readonly tagSearchLoading = signal(false);
+  protected readonly tagSearchError = signal<string | null>(null);
   protected readonly sortOptions = ScenesPageComponent.SORT_OPTIONS;
   protected readonly favoritesOptions = ScenesPageComponent.FAVORITES_OPTIONS;
+  protected readonly tagMatchOptions = ScenesPageComponent.TAG_MATCH_OPTIONS;
 
   ngOnInit(): void {
+    this.setupTagSearch();
     this.loadNextPage();
   }
 
@@ -106,6 +136,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.observer.unobserve(this.sentinelElement);
     }
     this.observer?.disconnect();
+    this.tagSearchSubscription?.unsubscribe();
   }
 
   protected hasItems(): boolean {
@@ -174,8 +205,51 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  protected onTagFilterChanged(nextValue: string): void {
-    this.tagFilter.set(nextValue);
+  protected onTagSearchChanged(nextValue: string): void {
+    this.tagSearchTerm.set(nextValue);
+    this.tagSearchTerms.next(nextValue);
+  }
+
+  protected onTagMatchModeChanged(nextValue: string): void {
+    if (nextValue !== 'OR' && nextValue !== 'AND') {
+      return;
+    }
+    if (this.selectedTagMode() === nextValue) {
+      return;
+    }
+
+    this.selectedTagMode.set(nextValue);
+    if (this.selectedTags().length > 0) {
+      this.resetFeedAndReload();
+    }
+  }
+
+  protected isTagSelected(tagId: string): boolean {
+    return this.selectedTags().some((tag) => tag.id === tagId);
+  }
+
+  protected toggleTagSelection(tag: SceneTagOption): void {
+    const alreadySelected = this.isTagSelected(tag.id);
+    this.selectedTags.update((current) => {
+      if (alreadySelected) {
+        return current.filter((entry) => entry.id !== tag.id);
+      }
+
+      return [...current, tag];
+    });
+
+    this.resetFeedAndReload();
+  }
+
+  protected removeSelectedTag(tagId: string): void {
+    if (!this.isTagSelected(tagId)) {
+      return;
+    }
+
+    this.selectedTags.update((current) =>
+      current.filter((entry) => entry.id !== tagId),
+    );
+    this.resetFeedAndReload();
   }
 
   protected onRequestModalClosed(): void {
@@ -202,6 +276,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const nextPage = this.page() + 1;
     const isInitialPage = nextPage === 1;
+    const requestVersion = this.feedVersion;
     this.inFlight.set(true);
 
     if (isInitialPage) {
@@ -213,10 +288,25 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.discoverService
-      .getScenesFeed(nextPage, ScenesPageComponent.PAGE_SIZE, this.selectedSort())
+      .getScenesFeed(
+        nextPage,
+        ScenesPageComponent.PAGE_SIZE,
+        this.selectedSort(),
+        this.selectedTagIds(),
+        this.selectedTagMode(),
+      )
       .pipe(
         finalize(() => {
           this.inFlight.set(false);
+
+          if (requestVersion !== this.feedVersion) {
+            if (this.pendingReload) {
+              this.pendingReload = false;
+              this.loadNextPage();
+            }
+            return;
+          }
+
           if (isInitialPage) {
             this.loading.set(false);
           } else {
@@ -230,6 +320,10 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       )
       .subscribe({
         next: (response) => {
+          if (requestVersion !== this.feedVersion) {
+            return;
+          }
+
           this.total.set(response.total);
           this.page.set(response.page);
           this.hasMore.set(response.hasMore);
@@ -238,6 +332,10 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
           );
         },
         error: () => {
+          if (requestVersion !== this.feedVersion) {
+            return;
+          }
+
           if (isInitialPage) {
             this.error.set('Failed to load scenes feed from the API.');
           } else {
@@ -248,13 +346,58 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private resetFeedAndReload(): void {
+    this.feedVersion += 1;
+    this.pendingReload = false;
     this.page.set(0);
     this.total.set(0);
     this.hasMore.set(true);
     this.items.set([]);
+    this.loading.set(false);
+    this.loadingMore.set(false);
     this.error.set(null);
     this.loadMoreError.set(null);
+    if (this.inFlight()) {
+      this.pendingReload = true;
+      return;
+    }
+
     this.loadNextPage();
+  }
+
+  private selectedTagIds(): string[] {
+    return this.selectedTags().map((tag) => tag.id);
+  }
+
+  private setupTagSearch(): void {
+    this.tagSearchSubscription = this.tagSearchTerms
+      .pipe(
+        map((value) => value.trim()),
+        debounceTime(250),
+        distinctUntilChanged(),
+        switchMap((query) => {
+          if (!query) {
+            this.tagOptions.set([]);
+            this.tagSearchError.set(null);
+            return of<SceneTagOption[]>([]);
+          }
+
+          this.tagSearchLoading.set(true);
+          this.tagSearchError.set(null);
+
+          return this.discoverService.searchSceneTags(query).pipe(
+            catchError(() => {
+              this.tagSearchError.set('Failed to load tag options.');
+              return of<SceneTagOption[]>([]);
+            }),
+            finalize(() => {
+              this.tagSearchLoading.set(false);
+            }),
+          );
+        }),
+      )
+      .subscribe((options) => {
+        this.tagOptions.set(options);
+      });
   }
 
   private setupIntersectionObserver(): void {

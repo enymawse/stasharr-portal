@@ -37,6 +37,15 @@ export type SceneFeedSort =
   | 'CREATED_AT'
   | 'UPDATED_AT';
 
+export type SceneTagMatchMode = 'OR' | 'AND';
+
+export interface SceneTagOption {
+  id: string;
+  name: string;
+  description: string | null;
+  aliases: string[];
+}
+
 export interface SceneImage {
   id: string;
   url: string;
