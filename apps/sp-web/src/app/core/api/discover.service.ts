@@ -3,6 +3,9 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   DiscoverResponse,
+  PerformerFeedResponse,
+  PerformerGender,
+  PerformerSort,
   SceneFavoritesFilter,
   SceneFeedSort,
   SceneTagMatchMode,
@@ -86,5 +89,34 @@ export class DiscoverService {
       `/api/requests/${encodeURIComponent(stashId)}`,
       payload,
     );
+  }
+
+  getPerformersFeed(
+    page: number,
+    perPage: number,
+    filters?: {
+      name?: string;
+      gender?: PerformerGender;
+      sort?: PerformerSort;
+      favoritesOnly?: boolean;
+    },
+  ): Observable<PerformerFeedResponse> {
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('perPage', perPage.toString());
+
+    if (filters?.name) {
+      params = params.set('name', filters.name);
+    }
+    if (filters?.gender) {
+      params = params.set('gender', filters.gender);
+    }
+    if (filters?.sort) {
+      params = params.set('sort', filters.sort);
+    }
+    if (filters?.favoritesOnly) {
+      params = params.set('favoritesOnly', 'true');
+    }
+    return this.http.get<PerformerFeedResponse>('/api/performers', { params });
   }
 }

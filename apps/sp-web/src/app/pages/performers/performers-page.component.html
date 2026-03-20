@@ -1,0 +1,115 @@
+<main>
+  <header>
+    <h1>Performers</h1>
+    <p>Performer feed from your configured StashDB integration.</p>
+    @if (!loading() && !error()) {
+      <p class="state">Total performers: {{ total() }}</p>
+    }
+  </header>
+
+  <section class="controls-shell" aria-label="Performers controls">
+    <div class="controls-row">
+      <label class="control-field">
+        <span>Filter Performer Name</span>
+        <input
+          type="text"
+          [value]="nameFilter()"
+          placeholder="Search performer name"
+          (input)="onNameFilterChanged($any($event.target).value)"
+        />
+      </label>
+
+      <label class="control-field">
+        <span>Gender</span>
+        <select
+          [value]="selectedGender()"
+          (change)="onGenderChanged($any($event.target).value)"
+        >
+          @for (option of genderOptions; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="control-field">
+        <span>Sort By</span>
+        <select
+          [value]="selectedSort()"
+          (change)="onSortChanged($any($event.target).value)"
+        >
+          @for (option of sortOptions; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="control-field checkbox-field">
+        <span>Favorites Only</span>
+        <label class="checkbox-label">
+          <input
+            type="checkbox"
+            [checked]="favoritesOnly()"
+            (change)="onFavoritesOnlyChanged($any($event.target).checked)"
+          />
+          <span>Show favorites only</span>
+        </label>
+      </label>
+    </div>
+  </section>
+
+  @if (loading()) {
+    <p class="state">Loading performers feed...</p>
+  } @else if (error()) {
+    <p class="state error">{{ error() }}</p>
+    <button type="button" class="retry-button" (click)="retryInitialLoad()">Retry</button>
+  } @else if (!hasItems()) {
+    <p class="state">No performers are available for the current filters.</p>
+  } @else {
+    <section class="performer-grid">
+      @for (item of items(); track item.id) {
+        <article class="performer-card">
+          <div
+            class="favorite-star"
+            [class.is-favorite]="item.isFavorite"
+            role="img"
+            [attr.aria-label]="favoriteIndicatorLabel(item.isFavorite)"
+            [title]="favoriteIndicatorLabel(item.isFavorite)"
+          >
+            {{ item.isFavorite ? '★' : '☆' }}
+          </div>
+
+          @if (item.imageUrl) {
+            <img class="performer-image" [src]="item.imageUrl" [alt]="item.name" loading="lazy" />
+          } @else {
+            <div class="performer-image placeholder" aria-hidden="true">
+              {{ performerInitial(item.name) }}
+            </div>
+          }
+
+          <div class="performer-meta">
+            <p class="performer-name">{{ item.name }}</p>
+            <div class="performer-stats">
+              @if (formattedGender(item.gender); as gender) {
+                <p class="performer-gender">{{ gender }}</p>
+              }
+              <p class="performer-scene-count">Scenes: {{ item.sceneCount }}</p>
+            </div>
+          </div>
+        </article>
+      }
+    </section>
+
+    <div #loadMoreSentinel class="load-sentinel"></div>
+
+    @if (loadingMore()) {
+      <p class="state">Loading more performers...</p>
+    }
+
+    @if (loadMoreError()) {
+      <div class="load-more-error">
+        <p class="state error">{{ loadMoreError() }}</p>
+        <button type="button" class="retry-button" (click)="retryLoadMore()">Retry</button>
+      </div>
+    }
+  }
+</main>

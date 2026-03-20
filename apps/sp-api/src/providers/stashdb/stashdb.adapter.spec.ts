@@ -499,4 +499,118 @@ describe('StashdbAdapter', () => {
     expect(requestBody.query).toContain('queryTags');
     expect(requestBody.variables.name).toBe('nat');
   });
+
+  it('queries performers with default NAME sort', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryPerformers: {
+              count: 1,
+              performers: [
+                {
+                  id: 'p-1',
+                  name: 'Performer One',
+                  gender: 'FEMALE',
+                  scene_count: 12,
+                  is_favorite: true,
+                },
+              ],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.getPerformersFeed({
+        baseUrl: 'http://stashdb.local/graphql',
+        page: 1,
+        perPage: 50,
+      }),
+    ).resolves.toEqual({
+      total: 1,
+      performers: [
+        {
+          id: 'p-1',
+          name: 'Performer One',
+          gender: 'FEMALE',
+          sceneCount: 12,
+          isFavorite: true,
+          imageUrl: null,
+        },
+      ],
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).toContain('sort: NAME');
+    expect(requestBody.query).toContain('images');
+    expect(requestBody.query).not.toContain('is_favorite: true');
+  });
+
+  it('forwards performer feed filters and non-default sort', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryPerformers: {
+              count: 0,
+              performers: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getPerformersFeed({
+      baseUrl: 'http://stashdb.local/graphql',
+      page: 2,
+      perPage: 50,
+      name: 'aj',
+      gender: 'FEMALE',
+      sort: 'SCENE_COUNT',
+      favoritesOnly: true,
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string; variables: { name?: string } };
+
+    expect(requestBody.query).toContain('name: $name');
+    expect(requestBody.query).toContain('gender: FEMALE');
+    expect(requestBody.query).toContain('sort: SCENE_COUNT');
+    expect(requestBody.query).toContain('is_favorite: true');
+    expect(requestBody.variables.name).toBe('aj');
+  });
+
+  it('omits is_favorite filter when favoritesOnly is false', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryPerformers: {
+              count: 0,
+              performers: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getPerformersFeed({
+      baseUrl: 'http://stashdb.local/graphql',
+      page: 1,
+      perPage: 50,
+      favoritesOnly: false,
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).not.toContain('is_favorite: true');
+  });
 });

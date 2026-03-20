@@ -163,3 +163,39 @@ export interface SceneRequestContext {
   title: string;
   imageUrl: string | null;
 }
+
+export type PerformerSort =
+  | 'NAME'
+  | 'BIRTHDATE'
+  | 'SCENE_COUNT'
+  | 'CAREER_START_YEAR'
+  | 'DEBUT'
+  | 'LAST_SCENE'
+  | 'CREATED_AT'
+  | 'UPDATED_AT';
+
+export type PerformerGender =
+  | 'MALE'
+  | 'FEMALE'
+  | 'UNKNOWN'
+  | 'TRANSGENDER_MALE'
+  | 'TRANSGENDER_FEMALE'
+  | 'INTERSEX'
+  | 'NON_BINARY';
+
+export interface PerformerFeedItem {
+  id: string;
+  name: string;
+  gender: PerformerGender | null;
+  sceneCount: number;
+  isFavorite: boolean;
+  imageUrl: string | null;
+}
+
+export interface PerformerFeedResponse {
+  total: number;
+  page: number;
+  perPage: number;
+  hasMore: boolean;
+  items: PerformerFeedItem[];
+}

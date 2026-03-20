@@ -10,6 +10,7 @@ import { ScenesPageComponent } from './pages/scenes/scenes-page.component';
 import { ScenePageComponent } from './pages/scene/scene-page.component';
 import { SettingsPageComponent } from './pages/settings/settings-page.component';
 import { RequestsPageComponent } from './pages/requests/requests-page.component';
+import { PerformersPageComponent } from './pages/performers/performers-page.component';
 
 export const routes: Routes = [
   {
@@ -37,6 +38,10 @@ export const routes: Routes = [
       {
         path: 'requests',
         component: RequestsPageComponent,
+      },
+      {
+        path: 'performers',
+        component: PerformersPageComponent,
       },
       {
         path: 'settings',

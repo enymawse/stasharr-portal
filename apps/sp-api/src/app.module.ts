@@ -4,6 +4,7 @@ import { DiscoverModule } from './discover/discover.module';
 import { HealthModule } from './health/health.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { PerformersModule } from './performers/performers.module';
 import { RequestsModule } from './requests/requests.module';
 import { ScenesModule } from './scenes/scenes.module';
 import { SetupModule } from './setup/setup.module';
@@ -21,6 +22,7 @@ import { SetupModule } from './setup/setup.module';
     DiscoverModule,
     ScenesModule,
     RequestsModule,
+    PerformersModule,
   ],
 })
 export class AppModule {}

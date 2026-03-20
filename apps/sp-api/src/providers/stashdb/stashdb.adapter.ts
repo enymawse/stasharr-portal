@@ -41,6 +41,35 @@ export interface StashdbTagSearchConfig extends StashdbAdapterBaseConfig {
   query: string;
 }
 
+export type StashdbPerformerSort =
+  | 'NAME'
+  | 'BIRTHDATE'
+  | 'DEATHDATE'
+  | 'SCENE_COUNT'
+  | 'CAREER_START_YEAR'
+  | 'DEBUT'
+  | 'LAST_SCENE'
+  | 'CREATED_AT'
+  | 'UPDATED_AT';
+
+export type StashdbPerformerGender =
+  | 'MALE'
+  | 'FEMALE'
+  | 'UNKNOWN'
+  | 'TRANSGENDER_MALE'
+  | 'TRANSGENDER_FEMALE'
+  | 'INTERSEX'
+  | 'NON_BINARY';
+
+export interface StashdbPerformerFeedConfig extends StashdbAdapterBaseConfig {
+  page: number;
+  perPage: number;
+  name?: string;
+  gender?: StashdbPerformerGender;
+  sort?: StashdbPerformerSort;
+  favoritesOnly?: boolean;
+}
+
 export interface StashdbScene {
   id: string;
   title: string;
@@ -77,6 +106,20 @@ export interface StashdbTagOption {
   name: string;
   description: string | null;
   aliases: string[];
+}
+
+export interface StashdbPerformerFeedItem {
+  id: string;
+  name: string;
+  gender: StashdbPerformerGender | null;
+  sceneCount: number;
+  isFavorite: boolean;
+  imageUrl: string | null;
+}
+
+export interface StashdbPerformersFeedResult {
+  total: number;
+  performers: StashdbPerformerFeedItem[];
 }
 
 export interface StashdbScenePerformer {
@@ -143,6 +186,22 @@ interface StashdbGraphqlResponse {
         name?: unknown;
         description?: unknown;
         aliases?: unknown;
+      }>;
+    };
+    queryPerformers?: {
+      count?: unknown;
+      performers?: Array<{
+        id?: unknown;
+        name?: unknown;
+        gender?: unknown;
+        scene_count?: unknown;
+        is_favorite?: unknown;
+        images?: Array<{
+          id?: unknown;
+          url?: unknown;
+          width?: unknown;
+          height?: unknown;
+        }>;
       }>;
     };
     findScene?: {
@@ -266,6 +325,99 @@ export class StashdbAdapter {
         };
       })
       .filter((tag): tag is StashdbTagOption => tag !== null);
+  }
+
+  async getPerformersFeed(
+    config: StashdbPerformerFeedConfig,
+  ): Promise<StashdbPerformersFeedResult> {
+    const normalizedName = config.name?.trim() ?? '';
+    const sort = config.sort ?? 'NAME';
+    const inputParts = [
+      'per_page: $perPage',
+      'page: $page',
+      `sort: ${sort}`,
+    ];
+
+    if (normalizedName) {
+      inputParts.push('name: $name');
+    }
+
+    if (config.gender) {
+      inputParts.push(`gender: ${config.gender}`);
+    }
+
+    if (config.favoritesOnly) {
+      inputParts.push('is_favorite: true');
+    }
+
+    const nameVariableDeclaration = normalizedName ? ', $name: String!' : '';
+    const query = `
+      query QueryPerformers($page: Int!, $perPage: Int!${nameVariableDeclaration}) {
+        queryPerformers(input: { ${inputParts.join(', ')} }) {
+          count
+          performers {
+            id
+            name
+            gender
+            scene_count
+            is_favorite
+            images {
+              id
+              url
+              width
+              height
+            }
+          }
+        }
+      }
+    `;
+
+    const variables: Record<string, unknown> = {
+      page: config.page,
+      perPage: config.perPage,
+    };
+    if (normalizedName) {
+      variables.name = normalizedName;
+    }
+
+    const payload = await this.executeQuery(config, query, variables);
+    const total =
+      typeof payload.data?.queryPerformers?.count === 'number'
+        ? payload.data.queryPerformers.count
+        : 0;
+    const rawPerformers = payload.data?.queryPerformers?.performers ?? [];
+
+    const performers = rawPerformers
+      .map((performer): StashdbPerformerFeedItem | null => {
+        if (
+          typeof performer.id !== 'string' ||
+          typeof performer.name !== 'string'
+        ) {
+          return null;
+        }
+
+        return {
+          id: performer.id,
+          name: performer.name,
+          gender: this.normalizePerformerGender(performer.gender),
+          sceneCount:
+            typeof performer.scene_count === 'number'
+              ? performer.scene_count
+              : 0,
+          isFavorite: performer.is_favorite === true,
+          imageUrl:
+            this.selectPrimaryImage(this.normalizeImages(performer.images))
+              ?.url ?? null,
+        };
+      })
+      .filter(
+        (performer): performer is StashdbPerformerFeedItem => performer !== null,
+      );
+
+    return {
+      total,
+      performers,
+    };
   }
 
   private async getSceneFeed(
@@ -631,6 +783,24 @@ export class StashdbAdapter {
         };
       })
       .filter((image): image is StashdbSceneImage => image !== null);
+  }
+
+  private normalizePerformerGender(
+    value: unknown,
+  ): StashdbPerformerGender | null {
+    if (
+      value === 'MALE' ||
+      value === 'FEMALE' ||
+      value === 'UNKNOWN' ||
+      value === 'TRANSGENDER_MALE' ||
+      value === 'TRANSGENDER_FEMALE' ||
+      value === 'INTERSEX' ||
+      value === 'NON_BINARY'
+    ) {
+      return value;
+    }
+
+    return null;
   }
 
   private async executeQuery(

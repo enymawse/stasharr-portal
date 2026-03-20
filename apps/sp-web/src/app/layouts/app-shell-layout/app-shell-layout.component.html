@@ -74,6 +74,24 @@
       </a>
 
       <a
+        routerLink="/performers"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        class="nav-item"
+      >
+        <span class="icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path
+              d="M12 3a4.25 4.25 0 1 1 0 8.5A4.25 4.25 0 0 1 12 3Zm-7.5 15a5.5 5.5 0 0 1 11 0v1.5H4.5V18Zm12.5-2.6A4.6 4.6 0 0 1 21 20v-.5a3.5 3.5 0 0 0-3.5-3.5h-1.3a6.78 6.78 0 0 0 .8-1.6ZM16 5.2a3.4 3.4 0 0 1 0 6.6a5.89 5.89 0 0 0 .2-6.6H16Z"
+            />
+          </svg>
+        </span>
+        @if (!collapsed()) {
+          <span>Performers</span>
+        }
+      </a>
+
+      <a
         routerLink="/settings"
         routerLinkActive="active"
         [routerLinkActiveOptions]="{ exact: true }"

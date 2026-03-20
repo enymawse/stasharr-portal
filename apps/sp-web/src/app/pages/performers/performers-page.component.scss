@@ -1,0 +1,190 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+  color: var(--text-primary);
+  font-family: var(--app-font-family);
+}
+
+main {
+  max-width: min(1540px, 96vw);
+  margin: 0 auto;
+  padding: 1.2rem 1rem 1.5rem;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+header p {
+  margin-top: 0.5rem;
+}
+
+.state {
+  margin-top: 1rem;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.controls-shell {
+  margin-top: 0.9rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+}
+
+.controls-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+  align-items: start;
+}
+
+.control-field {
+  display: grid;
+  gap: 0.26rem;
+  min-width: 0;
+}
+
+.control-field span {
+  font-size: 0.74rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.control-field input,
+.control-field select {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  padding: 0.38rem 0.44rem;
+}
+
+.checkbox-field {
+  align-content: start;
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.84rem;
+  color: var(--text-primary);
+}
+
+.checkbox-label input {
+  width: 1rem;
+  height: 1rem;
+}
+
+.performer-grid {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+}
+
+.performer-card {
+  position: relative;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  display: grid;
+}
+
+.favorite-star {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.5rem;
+  z-index: 1;
+  font-size: 1rem;
+  font-weight: 800;
+  color: rgb(255 255 255 / 85%);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 55%);
+}
+
+.favorite-star.is-favorite {
+  color: #ffcf4a;
+}
+
+.performer-image {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+
+.performer-image.placeholder {
+  display: grid;
+  place-items: center;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #324455;
+}
+
+.performer-meta {
+  padding: 0.55rem 0.6rem 0.62rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.performer-name {
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.performer-stats {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.performer-gender,
+.performer-scene-count {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.load-sentinel {
+  height: 1px;
+}
+
+.retry-button {
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--button-border);
+  background: var(--button-bg);
+  color: var(--button-text);
+  cursor: pointer;
+}
+
+.load-more-error {
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 980px) {
+  .controls-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .controls-row {
+    grid-template-columns: 1fr;
+  }
+
+  .performer-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
