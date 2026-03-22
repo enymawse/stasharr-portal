@@ -1,118 +1,139 @@
-@if (open) {
-  <div class="request-modal-overlay" (click)="onBackdropClick($event)">
-    <section
-      class="request-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="request-dialog-title"
-      (click)="$event.stopPropagation()"
-    >
-      @if (sceneImageUrl) {
-        <div
-          class="request-modal-art"
-          [style.background-image]="'url(' + sceneImageUrl + ')'"
-          aria-hidden="true"
-        ></div>
-      }
-      <div class="request-modal-shade" aria-hidden="true"></div>
+<p-dialog
+  [visible]="open"
+  (visibleChange)="onDialogVisibleChange($event)"
+  [modal]="true"
+  [dismissableMask]="!requestSubmitLoading()"
+  [closeOnEscape]="!requestSubmitLoading()"
+  [draggable]="false"
+  [resizable]="false"
+  [closable]="false"
+  [blockScroll]="true"
+  [focusOnShow]="true"
+  [breakpoints]="dialogBreakpoints"
+  [appendTo]="'self'"
+  [style]="{ width: 'min(760px, 96vw)', maxHeight: 'min(86dvh, 780px)' }"
+  styleClass="request-dialog"
+  maskStyleClass="request-dialog-mask"
+>
+  <div class="request-modal-shell">
+    @if (sceneImageUrl) {
+      <div class="request-modal-art" [style.background-image]="'url(' + sceneImageUrl + ')'" aria-hidden="true"></div>
+    }
+    <div class="request-modal-shade" aria-hidden="true"></div>
 
-      <div class="request-modal-content">
-        <header class="request-modal-header">
-          <div>
-            <h2 id="request-dialog-title">Request in Whisparr</h2>
-            @if (sceneTitle) {
-              <p>{{ sceneTitle }}</p>
-            }
-          </div>
-          <button
-            #requestCloseButton
-            type="button"
-            class="close-modal"
-            aria-label="Close request dialog"
-            [disabled]="requestSubmitLoading()"
-            (click)="closeModal()"
-          >
-            Close
-          </button>
-        </header>
-
-        <div class="request-modal-body">
-          @if (requestOptionsLoading()) {
-            <p class="state">Loading request options...</p>
-          } @else if (requestOptionsError()) {
-            <p class="state error">{{ requestOptionsError() }}</p>
-          } @else if (requestOptions(); as options) {
-            <form [formGroup]="requestForm" (ngSubmit)="submitRequest()">
-              <label class="field">
-                <span>Root Folder</span>
-                <select formControlName="rootFolderPath">
-                  @for (folder of options.rootFolders; track folder.id) {
-                    <option [value]="folder.path" [disabled]="!folder.accessible">
-                      {{ folder.path }}{{ folder.accessible ? '' : ' (Unavailable)' }}
-                    </option>
-                  }
-                </select>
-              </label>
-
-              <label class="field">
-                <span>Quality Profile</span>
-                <select formControlName="qualityProfileId">
-                  @for (profile of options.qualityProfiles; track profile.id) {
-                    <option [ngValue]="profile.id">{{ profile.name }}</option>
-                  }
-                </select>
-              </label>
-
-              <div class="checks">
-                <label>
-                  <input type="checkbox" formControlName="monitored" />
-                  <span>Monitored</span>
-                </label>
-                <label>
-                  <input type="checkbox" formControlName="searchForMovie" />
-                  <span>Search Immediately</span>
-                </label>
-              </div>
-
-              @if (options.tags.length > 0) {
-                <fieldset class="tags-field">
-                  <legend>Tags</legend>
-                  <div class="tags-grid">
-                    @for (tag of options.tags; track tag.id) {
-                      <label>
-                        <input
-                          type="checkbox"
-                          [checked]="tagChecked(tag.id)"
-                          (change)="toggleTagSelection(tag.id, $any($event.target).checked)"
-                        />
-                        <span>{{ tag.label }}</span>
-                      </label>
-                    }
-                  </div>
-                </fieldset>
-              }
-
-              @if (requestSubmitError()) {
-                <p class="state error">{{ requestSubmitError() }}</p>
-              }
-
-              <div class="request-actions">
-                <button type="submit" [disabled]="requestSubmitLoading()">
-                  {{ requestSubmitLoading() ? 'Submitting...' : 'Submit Request' }}
-                </button>
-                <button
-                  type="button"
-                  class="secondary"
-                  [disabled]="requestSubmitLoading()"
-                  (click)="closeModal()"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+    <div class="request-modal-content">
+      <header class="request-modal-header">
+        <div>
+          <h2 id="request-dialog-title">Request in Whisparr</h2>
+          @if (sceneTitle) {
+            <p>{{ sceneTitle }}</p>
           }
         </div>
+        <button
+          type="button"
+          class="close-modal"
+          [disabled]="requestSubmitLoading()"
+          pButton
+          (click)="closeModal()"
+        >
+          Close
+        </button>
+      </header>
+
+      <div class="request-modal-body">
+        @if (requestOptionsLoading()) {
+          <p class="state">Loading request options...</p>
+        } @else if (requestOptionsError()) {
+          <p class="state error">{{ requestOptionsError() }}</p>
+        } @else {
+          <form [formGroup]="requestForm" (ngSubmit)="submitRequest()">
+            <label class="field" for="request-root-folder">
+              <span>Root Folder</span>
+              <p-select
+                inputId="request-root-folder"
+                formControlName="rootFolderPath"
+                [options]="rootFolderOptions()"
+                optionLabel="label"
+                optionValue="value"
+                optionDisabled="disabled"
+                [appendTo]="'body'"
+                panelStyleClass="request-select-panel"
+                scrollHeight="16rem"
+                placeholder="Select a root folder"
+                [invalid]="requestForm.controls.rootFolderPath.touched && requestForm.controls.rootFolderPath.invalid"
+              />
+            </label>
+
+            <label class="field" for="request-quality-profile">
+              <span>Quality Profile</span>
+              <p-select
+                inputId="request-quality-profile"
+                formControlName="qualityProfileId"
+                [options]="qualityProfileOptions()"
+                optionLabel="label"
+                optionValue="value"
+                [appendTo]="'body'"
+                panelStyleClass="request-select-panel"
+                scrollHeight="16rem"
+                placeholder="Select a quality profile"
+                [invalid]="requestForm.controls.qualityProfileId.touched && requestForm.controls.qualityProfileId.invalid"
+              />
+            </label>
+
+            <div class="checks">
+              <label class="toggle-field" for="request-monitored">
+                <p-toggleswitch inputId="request-monitored" formControlName="monitored" />
+                <span>Monitored</span>
+              </label>
+              <label class="toggle-field" for="request-search-now">
+                <p-toggleswitch inputId="request-search-now" formControlName="searchForMovie" />
+                <span>Search Immediately</span>
+              </label>
+            </div>
+
+            @if (tagOptions().length > 0) {
+              <label class="field" for="request-tags">
+                <span>Tags</span>
+                <p-multiselect
+                  inputId="request-tags"
+                  formControlName="tags"
+                  [options]="tagOptions()"
+                  optionLabel="label"
+                  optionValue="value"
+                  [appendTo]="'body'"
+                  panelStyleClass="request-multiselect-panel"
+                  scrollHeight="16rem"
+                  [showToggleAll]="false"
+                  [showHeader]="false"
+                  [maxSelectedLabels]="3"
+                  display="chip"
+                  placeholder="Select tags"
+                />
+              </label>
+            }
+
+            @if (requestSubmitError()) {
+              <p class="state error">{{ requestSubmitError() }}</p>
+            }
+
+            <div class="request-actions">
+              <button type="submit" [disabled]="requestSubmitLoading()" pButton>
+                {{ requestSubmitLoading() ? 'Submitting...' : 'Submit Request' }}
+              </button>
+              <button
+                type="button"
+                class="secondary"
+                [disabled]="requestSubmitLoading()"
+                pButton
+                text
+                (click)="closeModal()"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        }
       </div>
-    </section>
+    </div>
   </div>
-}
+</p-dialog>

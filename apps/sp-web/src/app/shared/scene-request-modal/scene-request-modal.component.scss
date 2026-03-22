@@ -2,21 +2,13 @@
   display: contents;
 }
 
-.request-modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: grid;
-  place-items: center;
-  padding: clamp(0.7rem, 2.4vw, 1.3rem);
+:host ::ng-deep .request-dialog-mask {
   background: rgb(4 10 16 / 62%);
   backdrop-filter: blur(5px);
+  padding: clamp(0.7rem, 2.4vw, 1.3rem);
 }
 
-.request-modal {
-  position: relative;
-  width: min(760px, 100%);
-  max-height: min(86dvh, 780px);
+:host ::ng-deep .request-dialog {
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border-strong) 72%, transparent);
@@ -25,6 +17,16 @@
     inset 0 1px 0 rgb(255 255 255 / 14%);
   isolation: isolate;
   background: linear-gradient(160deg, rgb(12 21 33 / 96%), rgb(9 18 30 / 94%));
+}
+
+:host ::ng-deep .request-dialog .p-dialog-content {
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+.request-modal-shell {
+  position: relative;
 }
 
 .request-modal-art {
@@ -78,11 +80,6 @@
   font-size: 0.84rem;
 }
 
-.close-modal {
-  font-size: 0.78rem;
-  padding: 0.34rem 0.62rem;
-}
-
 .request-modal-body {
   overflow-y: auto;
   padding: 0.85rem 1rem 1rem;
@@ -90,68 +87,34 @@
 
 .request-modal-body form {
   display: grid;
-  gap: 0.62rem;
+  gap: 0.72rem;
 }
 
 .field {
   display: grid;
-  gap: 0.3rem;
+  gap: 0.35rem;
   font-size: 0.85rem;
   color: #f4f8ff;
-}
-
-.field select {
-  border-radius: 7px;
-  border: 1px solid rgb(182 209 238 / 55%);
-  background: rgb(11 24 37 / 78%);
-  color: #f2f8ff;
-  font-size: 0.84rem;
-  padding: 0.35rem 0.42rem;
 }
 
 .checks {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.68rem;
+  gap: 0.8rem;
 }
 
-.checks label {
+.toggle-field {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.45rem;
   font-size: 0.82rem;
   color: #d9ebff;
-}
-
-.tags-field {
-  margin: 0;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 62%, transparent);
-  border-radius: 8px;
-  padding: 0.4rem 0.55rem 0.55rem;
-}
-
-.tags-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.42rem 0.62rem;
-}
-
-.tags-grid label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.26rem;
-  font-size: 0.8rem;
-  color: #eaf4ff;
 }
 
 .request-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
-}
-
-.request-actions .secondary {
-  background: transparent;
 }
 
 .state {
@@ -163,22 +126,63 @@
   color: var(--danger);
 }
 
-button {
+:host ::ng-deep .request-modal-body .p-select,
+:host ::ng-deep .request-modal-body .p-multiselect {
+  width: 100%;
+  border-radius: 7px;
+  border-color: rgb(182 209 238 / 55%);
+  background: rgb(11 24 37 / 78%);
+  color: #f2f8ff;
+}
+
+:host ::ng-deep .request-modal-body .p-select:not(.p-disabled):hover,
+:host ::ng-deep .request-modal-body .p-multiselect:not(.p-disabled):hover {
+  border-color: color-mix(in srgb, var(--focus-ring) 70%, #e5f4ff);
+}
+
+:host ::ng-deep .request-modal-body .p-select.p-focus,
+:host ::ng-deep .request-modal-body .p-multiselect.p-focus {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus-ring) 48%, transparent);
+}
+
+:host ::ng-deep .request-modal-body .p-select-label,
+:host ::ng-deep .request-modal-body .p-multiselect-label,
+:host ::ng-deep .request-modal-body .p-select-option,
+:host ::ng-deep .request-modal-body .p-multiselect-option {
+  font-size: 0.84rem;
+}
+
+:host ::ng-deep .request-modal-body .p-multiselect-chip {
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-border);
+  color: var(--chip-text);
+}
+
+:host ::ng-deep .request-modal-body .p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider {
+  background: color-mix(in srgb, var(--focus-ring) 80%, #1f74b6);
+}
+
+:host ::ng-deep .request-modal-body .p-toggleswitch .p-toggleswitch-slider {
+  background: color-mix(in srgb, var(--surface-raised) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
+}
+
+:host ::ng-deep .close-modal.p-button {
+  font-size: 0.78rem;
+  padding: 0.34rem 0.62rem;
+}
+
+:host ::ng-deep .request-actions .p-button {
   width: fit-content;
-  padding: 0.42rem 0.72rem;
   border-radius: 6px;
-  border: 1px solid var(--button-border);
-  background: var(--button-bg);
-  color: var(--button-text);
-  cursor: pointer;
+}
+
+:host ::ng-deep .request-actions .secondary.p-button {
+  color: color-mix(in srgb, var(--text-muted) 88%, #e6f3ff);
 }
 
 @media (max-width: 880px) {
-  .request-modal {
-    width: min(100%, 680px);
-    max-height: 92dvh;
-  }
-
   .request-modal-content {
     max-height: 92dvh;
   }

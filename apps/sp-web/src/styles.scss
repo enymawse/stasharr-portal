@@ -48,6 +48,19 @@
   --badge-missing-border: #ebb4b4;
   --badge-missing-text: #842121;
   --shadow-sm: 0 6px 16px rgb(8 16 27 / 12%);
+
+  /* PrimeNG token bridge: keep framework controls aligned with app surfaces/colors. */
+  --p-content-background: var(--surface-1);
+  --p-content-border-color: var(--border-subtle);
+  --p-content-color: var(--text-primary);
+  --p-text-color: var(--text-primary);
+  --p-text-muted-color: var(--text-muted);
+  --p-primary-color: var(--focus-ring);
+  --p-form-field-background: var(--surface-elevated);
+  --p-form-field-border-color: var(--border-subtle);
+  --p-form-field-color: var(--text-primary);
+  --p-overlay-modal-background: rgb(4 10 16 / 62%);
+  --p-mask-background: rgb(4 10 16 / 62%);
 }
 
 :root[data-theme='dark'] {
@@ -86,6 +99,18 @@
   --badge-missing-border: #8f4949;
   --badge-missing-text: #f8c5c5;
   --shadow-sm: 0 10px 22px rgb(0 0 0 / 40%);
+
+  --p-content-background: var(--surface-1);
+  --p-content-border-color: var(--border-subtle);
+  --p-content-color: var(--text-primary);
+  --p-text-color: var(--text-primary);
+  --p-text-muted-color: var(--text-muted);
+  --p-primary-color: var(--focus-ring);
+  --p-form-field-background: var(--surface-elevated);
+  --p-form-field-border-color: var(--border-strong);
+  --p-form-field-color: var(--text-primary);
+  --p-overlay-modal-background: rgb(4 10 16 / 68%);
+  --p-mask-background: rgb(4 10 16 / 68%);
 }
 
 html,
@@ -99,4 +124,17 @@ body {
 
 * {
   scrollbar-color: var(--border-strong) transparent;
+}
+
+.request-select-panel,
+.request-multiselect-panel {
+  border-color: color-mix(in srgb, var(--border-strong) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 90%, #0e1a28);
+}
+
+.request-select-panel .p-select-option,
+.request-multiselect-panel .p-multiselect-option,
+.request-select-panel .p-select-empty-message,
+.request-multiselect-panel .p-multiselect-empty-message {
+  font-size: 0.84rem;
 }
