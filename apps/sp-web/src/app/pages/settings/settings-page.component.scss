@@ -31,39 +31,33 @@ p {
   overflow: hidden;
 }
 
-.tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+.check {
+  color: #1f8c48;
+  font-weight: 700;
+  margin-left: 0.25rem;
+}
+
+:host ::ng-deep .settings-tabs .p-tablist {
   padding: 0.6rem;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.tab-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.38rem;
+:host ::ng-deep .settings-tabs .p-tab {
   border-radius: 999px;
-  padding: 0.34rem 0.68rem;
   border: 1px solid var(--border-subtle);
   background: var(--surface-elevated);
   color: var(--text-primary);
-  cursor: pointer;
   font-weight: 600;
+  margin-right: 0.4rem;
 }
 
-.tab-btn.active {
+:host ::ng-deep .settings-tabs .p-tab-active {
   background: var(--surface-raised);
   border-color: var(--border-strong);
 }
 
-.check {
-  color: #1f8c48;
-  font-weight: 700;
-}
-
-.panel {
+:host ::ng-deep .settings-tabs .p-tabpanels {
   padding: 0.85rem;
 }
 
@@ -97,15 +91,17 @@ label {
 }
 
 input[type='text'],
-input[type='password'] {
+:host ::ng-deep .p-inputtext {
   border-radius: 6px;
   border: 1px solid var(--border-strong);
   background: var(--surface-elevated);
   color: var(--text-primary);
   padding: 0.5rem 0.62rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.checkbox-row {
+.toggle-row {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -152,7 +148,7 @@ input[type='password'] {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
-button {
+:host ::ng-deep .p-button {
   padding: 0.42rem 0.72rem;
   border-radius: 7px;
   border: 1px solid var(--button-border);
@@ -161,31 +157,45 @@ button {
   cursor: pointer;
 }
 
-button:disabled {
+:host ::ng-deep .p-button:disabled {
   opacity: 0.72;
   cursor: default;
 }
 
-button.danger {
+:host ::ng-deep .p-button.danger {
   border-color: color-mix(in srgb, var(--danger) 70%, var(--border-strong));
   color: var(--danger);
   background: color-mix(in srgb, var(--surface-1) 88%, #ffecec);
 }
 
-.state {
+:host ::ng-deep .inline-message,
+:host ::ng-deep .state-message {
+  margin: 0;
   font-size: 0.9rem;
 }
 
-.state.success {
-  color: color-mix(in srgb, var(--badge-available-text) 82%, var(--text-primary));
+:host ::ng-deep .inline-message .p-message-content,
+:host ::ng-deep .state-message .p-message-content {
+  gap: 0.45rem;
 }
 
-.state.error {
-  color: var(--danger);
+:host ::ng-deep .settings-confirm-mask {
+  backdrop-filter: blur(4px);
 }
 
-.state.info {
-  color: color-mix(in srgb, var(--focus-ring) 72%, var(--text-primary));
+:host ::ng-deep .settings-confirm-dialog {
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
+  overflow: hidden;
+}
+
+:host ::ng-deep .settings-confirm-dialog .p-dialog-content {
+  padding: 0.9rem;
+}
+
+.confirm-dialog-content {
+  display: grid;
+  gap: 0.7rem;
 }
 
 @media (max-width: 720px) {

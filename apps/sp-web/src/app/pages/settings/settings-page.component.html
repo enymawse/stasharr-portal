@@ -5,48 +5,36 @@
   </header>
 
   @if (loading()) {
-    <p class="state">Loading settings...</p>
+    <p-message severity="info" text="Loading settings..." styleClass="state-message" />
   } @else if (loadError()) {
-    <p class="state error">{{ loadError() }}</p>
+    <p-message severity="error" styleClass="state-message">{{ loadError() }}</p-message>
   } @else {
     @if (globalMessage()) {
-      <p class="state info">{{ globalMessage() }}</p>
+      <p-message severity="info" styleClass="state-message">{{ globalMessage() }}</p-message>
     }
 
     <section class="tabs-shell">
-      <div class="tabs" role="tablist" aria-label="Service settings tabs">
-        @for (type of serviceTabs; track type) {
-          <button
-            type="button"
-            role="tab"
-            class="tab-btn"
-            [class.active]="isServiceTabActive(type)"
-            [attr.aria-selected]="isServiceTabActive(type)"
-            (click)="setActiveTab(type)"
-          >
-            <span>{{ labelFor(type) }}</span>
-            @if (configured(type)) {
-              <span class="check" aria-label="Configured">✓</span>
-            }
-          </button>
-        }
+      <p-tabs
+        [value]="activeTab()"
+        (valueChange)="onTabsValueChange($event)"
+        styleClass="settings-tabs"
+      >
+        <p-tablist>
+          @for (type of serviceTabs; track type) {
+            <p-tab [value]="type">
+              <span>{{ labelFor(type) }}</span>
+              @if (configured(type)) {
+                <span class="check" aria-label="Configured">✓</span>
+              }
+            </p-tab>
+          }
+          <p-tab value="ABOUT">About</p-tab>
+        </p-tablist>
 
-        <button
-          type="button"
-          role="tab"
-          class="tab-btn"
-          [class.active]="isActiveTab('ABOUT')"
-          [attr.aria-selected]="isActiveTab('ABOUT')"
-          (click)="setActiveTab('ABOUT')"
-        >
-          <span>About</span>
-        </button>
-      </div>
-
-      <div class="panel">
-        @for (type of serviceTabs; track type) {
-          @if (isServiceTabActive(type)) {
-            <section role="tabpanel" class="service-panel">
+        <p-tabpanels>
+          @for (type of serviceTabs; track type) {
+            <p-tabpanel [value]="type">
+              <section class="service-panel">
               <div class="panel-head">
                 <h2>{{ labelFor(type) }}</h2>
                 <p class="status">Status: {{ statusText(type) }}</p>
@@ -55,12 +43,13 @@
               <form [formGroup]="formFor(type)" (ngSubmit)="saveIntegration(type)">
                 <label>
                   Name
-                  <input type="text" formControlName="name" />
+                  <input pInputText type="text" formControlName="name" />
                 </label>
 
                 <label>
                   Base URL
                   <input
+                    pInputText
                     type="text"
                     formControlName="baseUrl"
                     placeholder="http://localhost:9999"
@@ -70,6 +59,7 @@
                 <label>
                   API Key
                   <input
+                    pInputText
                     type="password"
                     formControlName="apiKey"
                     placeholder="Enter to update key"
@@ -77,20 +67,26 @@
                 </label>
 
                 @if (hasStoredApiKey(type)) {
-                  <p class="hint">API key already stored. Leave blank to keep current key.</p>
+                  <p-message
+                    severity="info"
+                    text="API key already stored. Leave blank to keep current key."
+                    styleClass="inline-message"
+                  />
                 }
 
-                <label class="checkbox-row">
-                  <input type="checkbox" formControlName="enabled" />
-                  Enabled
+                <label class="toggle-row">
+                  <p-toggleswitch [inputId]="'enabled-' + type" formControlName="enabled" />
+                  <span>Enabled</span>
                 </label>
 
                 <div class="actions">
-                  <button type="submit" [disabled]="isSaving(type)">
+                  <button pButton type="submit" [disabled]="isSaving(type)">
                     {{ isSaving(type) ? 'Saving...' : 'Save changes' }}
                   </button>
                   <button
+                    pButton
                     type="button"
+                    text
                     [disabled]="isTesting(type)"
                     (click)="testIntegration(type)"
                   >
@@ -99,16 +95,24 @@
                 </div>
 
                 @if (saveSuccess(type)) {
-                  <p class="state success">{{ saveSuccess(type) }}</p>
+                  <p-message severity="success" styleClass="inline-message">
+                    {{ saveSuccess(type) }}
+                  </p-message>
                 }
                 @if (saveError(type)) {
-                  <p class="state error">{{ saveError(type) }}</p>
+                  <p-message severity="error" styleClass="inline-message">
+                    {{ saveError(type) }}
+                  </p-message>
                 }
                 @if (testSuccess(type)) {
-                  <p class="state success">{{ testSuccess(type) }}</p>
+                  <p-message severity="success" styleClass="inline-message">
+                    {{ testSuccess(type) }}
+                  </p-message>
                 }
                 @if (testError(type)) {
-                  <p class="state error">{{ testError(type) }}</p>
+                  <p-message severity="error" styleClass="inline-message">
+                    {{ testError(type) }}
+                  </p-message>
                 }
               </form>
 
@@ -123,86 +127,69 @@
 
               <div class="danger-card">
                 <h3>Reset {{ labelFor(type) }} Integration</h3>
-
-                @if (!shouldConfirmReset(type)) {
-                  <button
-                    type="button"
-                    class="danger"
-                    [disabled]="isResetting(type)"
-                    (click)="requestIntegrationReset(type)"
-                  >
-                    Reset {{ labelFor(type) }} Integration
-                  </button>
-                } @else {
-                  <p>Reset this integration and clear saved configuration?</p>
-                  <div class="actions">
-                    <button
-                      type="button"
-                      class="danger"
-                      [disabled]="isResetting(type)"
-                      (click)="resetIntegration(type)"
-                    >
-                      {{ isResetting(type) ? 'Resetting...' : 'Confirm reset' }}
-                    </button>
-                    <button
-                      type="button"
-                      [disabled]="isResetting(type)"
-                      (click)="cancelIntegrationReset(type)"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                }
+                <button
+                  pButton
+                  type="button"
+                  class="danger"
+                  [disabled]="isResetting(type)"
+                  (click)="requestIntegrationReset(type)"
+                >
+                  Reset {{ labelFor(type) }} Integration
+                </button>
 
                 @if (resetSuccess(type)) {
-                  <p class="state success">{{ resetSuccess(type) }}</p>
+                  <p-message severity="success" styleClass="inline-message">
+                    {{ resetSuccess(type) }}
+                  </p-message>
                 }
                 @if (resetError(type)) {
-                  <p class="state error">{{ resetError(type) }}</p>
+                  <p-message severity="error" styleClass="inline-message">
+                    {{ resetError(type) }}
+                  </p-message>
                 }
               </div>
             </section>
+            </p-tabpanel>
           }
-        }
+          <p-tabpanel value="ABOUT">
+            <section class="about-panel">
+              <h2>About</h2>
+              <p class="meta">Stasharr settings and metadata.</p>
 
-        @if (isActiveTab('ABOUT')) {
-          <section role="tabpanel" class="about-panel">
-            <h2>About</h2>
-            <p class="meta">Stasharr settings and metadata.</p>
+              <div class="about-list">
+                <p>
+                  Version: <strong>{{ health()?.version ?? 'Unknown' }}</strong>
+                </p>
+                <p>
+                  Documentation:
+                  <a href="#" target="_blank" rel="noopener noreferrer">Documentation (stub)</a>
+                </p>
+                <p>
+                  GitHub:
+                  <a
+                    href="https://github.com/enymawse/stasharr-portal"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    github.com/enymawse/stasharr-portal
+                  </a>
+                </p>
+              </div>
 
-            <div class="about-list">
-              <p>
-                Version: <strong>{{ health()?.version ?? 'Unknown' }}</strong>
-              </p>
-              <p>
-                Documentation:
-                <a href="#" target="_blank" rel="noopener noreferrer">Documentation (stub)</a>
-              </p>
-              <p>
-                GitHub:
-                <a
-                  href="https://github.com/enymawse/stasharr-portal"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  github.com/enymawse/stasharr-portal
-                </a>
-              </p>
-            </div>
-
-            <div class="release-stub">
-              <h3>Releases</h3>
-              <p>Release feed integration will be added in a future slice.</p>
-            </div>
-          </section>
-        }
-      </div>
+              <div class="release-stub">
+                <h3>Releases</h3>
+                <p>Release feed integration will be added in a future slice.</p>
+              </div>
+            </section>
+          </p-tabpanel>
+        </p-tabpanels>
+      </p-tabs>
     </section>
 
     <section class="global-health">
       <div class="panel-head">
         <h2>Service Health</h2>
-        <button type="button" [disabled]="refreshingHealth()" (click)="refreshHealth()">
+        <button pButton type="button" [disabled]="refreshingHealth()" (click)="refreshHealth()">
           {{ refreshingHealth() ? 'Refreshing...' : 'Refresh health' }}
         </button>
       </div>
@@ -222,7 +209,7 @@
       }
 
       @if (healthError()) {
-        <p class="state error">{{ healthError() }}</p>
+        <p-message severity="error" styleClass="inline-message">{{ healthError() }}</p-message>
       }
     </section>
 
@@ -230,13 +217,73 @@
       <h2>Global Danger Zone</h2>
       <p>Resetting all integrations clears configuration for Stash, Whisparr, and StashDB.</p>
 
-      @if (!confirmResetAll()) {
-        <button type="button" class="danger" (click)="requestResetAll()">
-          Reset all integrations
-        </button>
-      } @else {
+      <button pButton type="button" class="danger" (click)="requestResetAll()">
+        Reset all integrations
+      </button>
+    </section>
+
+    <p-dialog
+      [visible]="confirmResetType() !== null"
+      (visibleChange)="onIntegrationResetDialogVisibleChange($event)"
+      [modal]="true"
+      [dismissableMask]="!isPendingIntegrationResetRunning()"
+      [closeOnEscape]="!isPendingIntegrationResetRunning()"
+      [draggable]="false"
+      [resizable]="false"
+      [blockScroll]="true"
+      [appendTo]="'body'"
+      styleClass="settings-confirm-dialog"
+      maskStyleClass="settings-confirm-mask"
+      [style]="{ width: 'min(520px, 94vw)' }"
+      [showHeader]="false"
+    >
+      <div class="confirm-dialog-content">
+        <h3>Reset {{ pendingResetLabel() }} Integration?</h3>
+        <p>Reset this integration and clear saved configuration?</p>
         <div class="actions">
           <button
+            pButton
+            type="button"
+            class="danger"
+            [disabled]="confirmResetType() === null || isPendingIntegrationResetRunning()"
+            (click)="confirmPendingIntegrationReset()"
+          >
+            {{ isPendingIntegrationResetRunning() ? 'Resetting...' : 'Confirm reset' }}
+          </button>
+          <button
+            pButton
+            type="button"
+            text
+            [disabled]="isPendingIntegrationResetRunning()"
+            (click)="cancelPendingIntegrationReset()"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </p-dialog>
+
+    <p-dialog
+      [visible]="confirmResetAll()"
+      (visibleChange)="onResetAllDialogVisibleChange($event)"
+      [modal]="true"
+      [dismissableMask]="!resettingAll()"
+      [closeOnEscape]="!resettingAll()"
+      [draggable]="false"
+      [resizable]="false"
+      [blockScroll]="true"
+      [appendTo]="'body'"
+      styleClass="settings-confirm-dialog"
+      maskStyleClass="settings-confirm-mask"
+      [style]="{ width: 'min(520px, 94vw)' }"
+      [showHeader]="false"
+    >
+      <div class="confirm-dialog-content">
+        <h3>Reset All Integrations?</h3>
+        <p>Resetting all integrations clears configuration for Stash, Whisparr, and StashDB.</p>
+        <div class="actions">
+          <button
+            pButton
             type="button"
             class="danger"
             [disabled]="resettingAll()"
@@ -244,11 +291,11 @@
           >
             {{ resettingAll() ? 'Resetting...' : 'Confirm reset all' }}
           </button>
-          <button type="button" [disabled]="resettingAll()" (click)="cancelResetAll()">
+          <button pButton type="button" text [disabled]="resettingAll()" (click)="cancelResetAll()">
             Cancel
           </button>
         </div>
-      }
-    </section>
+      </div>
+    </p-dialog>
   }
 </main>

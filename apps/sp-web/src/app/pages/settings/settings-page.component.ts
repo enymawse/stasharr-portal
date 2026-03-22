@@ -1,6 +1,12 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { finalize, forkJoin } from 'rxjs';
+import { ButtonDirective } from 'primeng/button';
+import { Dialog } from 'primeng/dialog';
+import { InputText } from 'primeng/inputtext';
+import { Message } from 'primeng/message';
+import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
+import { ToggleSwitch } from 'primeng/toggleswitch';
 import { HealthService } from '../../core/api/health.service';
 import { HealthStatusResponse } from '../../core/api/health.types';
 import { IntegrationsService } from '../../core/api/integrations.service';
@@ -15,7 +21,19 @@ type SettingsTab = ServiceTab | 'ABOUT';
 
 @Component({
   selector: 'app-settings-page',
-  imports: [ReactiveFormsModule],
+  imports: [
+    ReactiveFormsModule,
+    Tabs,
+    TabList,
+    Tab,
+    TabPanels,
+    TabPanel,
+    InputText,
+    ToggleSwitch,
+    ButtonDirective,
+    Message,
+    Dialog,
+  ],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.scss',
 })
@@ -74,6 +92,16 @@ export class SettingsPageComponent implements OnInit {
 
   protected setActiveTab(tab: SettingsTab): void {
     this.activeTab.set(tab);
+  }
+
+  protected onTabsValueChange(nextValue: string | number | undefined): void {
+    if (!nextValue) {
+      return;
+    }
+
+    if (nextValue === 'ABOUT' || this.serviceTabs.includes(nextValue as IntegrationType)) {
+      this.activeTab.set(nextValue as SettingsTab);
+    }
   }
 
   protected isActiveTab(tab: SettingsTab): boolean {
@@ -170,6 +198,50 @@ export class SettingsPageComponent implements OnInit {
   protected requestResetAll(): void {
     this.globalMessage.set(null);
     this.confirmResetAll.set(true);
+  }
+
+  protected onIntegrationResetDialogVisibleChange(visible: boolean): void {
+    if (visible) {
+      return;
+    }
+
+    const resetType = this.confirmResetType();
+    if (resetType) {
+      this.cancelIntegrationReset(resetType);
+    }
+  }
+
+  protected onResetAllDialogVisibleChange(visible: boolean): void {
+    if (!visible) {
+      this.cancelResetAll();
+    }
+  }
+
+  protected confirmPendingIntegrationReset(): void {
+    const resetType = this.confirmResetType();
+    if (!resetType) {
+      return;
+    }
+
+    this.resetIntegration(resetType);
+  }
+
+  protected cancelPendingIntegrationReset(): void {
+    const resetType = this.confirmResetType();
+    if (!resetType) {
+      return;
+    }
+    this.cancelIntegrationReset(resetType);
+  }
+
+  protected isPendingIntegrationResetRunning(): boolean {
+    const resetType = this.confirmResetType();
+    return resetType ? this.isResetting(resetType) : false;
+  }
+
+  protected pendingResetLabel(): string {
+    const resetType = this.confirmResetType();
+    return resetType ? this.labelFor(resetType) : 'Integration';
   }
 
   protected cancelResetAll(): void {
