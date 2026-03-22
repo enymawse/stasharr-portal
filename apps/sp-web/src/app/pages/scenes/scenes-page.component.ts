@@ -8,6 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
   Subject,
@@ -20,6 +21,9 @@ import {
   of,
   switchMap,
 } from 'rxjs';
+import { InputText } from 'primeng/inputtext';
+import { MultiSelect } from 'primeng/multiselect';
+import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
 import {
   DiscoverItem,
@@ -33,10 +37,22 @@ import { SceneRequestModalComponent } from '../../shared/scene-request-modal/sce
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
 type FavoritesFilterOption = 'NONE' | SceneFavoritesFilter;
+interface MultiSelectOption {
+  label: string;
+  value: string;
+}
 
 @Component({
   selector: 'app-scenes-page',
-  imports: [RouterLink, SceneStatusBadgeComponent, SceneRequestModalComponent],
+  imports: [
+    RouterLink,
+    FormsModule,
+    InputText,
+    Select,
+    MultiSelect,
+    SceneStatusBadgeComponent,
+    SceneRequestModalComponent,
+  ],
   templateUrl: './scenes-page.component.html',
   styleUrl: './scenes-page.component.scss',
 })
@@ -112,7 +128,9 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly tagSearchTerm = signal('');
   protected readonly selectedTagMode = signal<SceneTagMatchMode>('OR');
   protected readonly selectedTags = signal<SceneTagOption[]>([]);
+  protected readonly selectedTagIdsModel = signal<string[]>([]);
   protected readonly tagOptions = signal<SceneTagOption[]>([]);
+  protected readonly tagSelectOptions = signal<MultiSelectOption[]>([]);
   protected readonly tagSearchLoading = signal(false);
   protected readonly tagSearchError = signal<string | null>(null);
   protected readonly sortOptions = ScenesPageComponent.SORT_OPTIONS;
@@ -213,6 +231,30 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.tagSearchTerms.next(nextValue);
   }
 
+  protected onTagSelectionChanged(nextValue: string[] | null): void {
+    const nextIds = this.dedupeStrings(nextValue ?? []);
+    this.selectedTagIdsModel.set(nextIds);
+
+    const previousTags = new Map(this.selectedTags().map((tag) => [tag.id, tag]));
+    const currentTags = new Map(this.tagOptions().map((tag) => [tag.id, tag]));
+    const nextSelected = nextIds
+      .map((id) => currentTags.get(id) ?? previousTags.get(id))
+      .filter((tag): tag is SceneTagOption => Boolean(tag));
+    const current = this.selectedTags();
+    const changed =
+      nextSelected.length !== current.length ||
+      nextSelected.some((tag) => !this.isTagSelected(tag.id));
+
+    this.selectedTags.set(nextSelected);
+    this.rebuildTagSelectOptions(this.tagOptions());
+
+    if (!changed) {
+      return;
+    }
+
+    this.resetFeedAndReload();
+  }
+
   protected onTagMatchModeChanged(nextValue: string): void {
     if (nextValue !== 'OR' && nextValue !== 'AND') {
       return;
@@ -229,30 +271,6 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected isTagSelected(tagId: string): boolean {
     return this.selectedTags().some((tag) => tag.id === tagId);
-  }
-
-  protected toggleTagSelection(tag: SceneTagOption): void {
-    const alreadySelected = this.isTagSelected(tag.id);
-    this.selectedTags.update((current) => {
-      if (alreadySelected) {
-        return current.filter((entry) => entry.id !== tag.id);
-      }
-
-      return [...current, tag];
-    });
-
-    this.resetFeedAndReload();
-  }
-
-  protected removeSelectedTag(tagId: string): void {
-    if (!this.isTagSelected(tagId)) {
-      return;
-    }
-
-    this.selectedTags.update((current) =>
-      current.filter((entry) => entry.id !== tagId),
-    );
-    this.resetFeedAndReload();
   }
 
   protected onRequestModalClosed(): void {
@@ -386,6 +404,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
         switchMap((query) => {
           if (!query) {
             this.tagOptions.set([]);
+            this.tagSelectOptions.set(this.selectedTagsToSelectOptions());
             this.tagSearchError.set(null);
             return of<SceneTagOption[]>([]);
           }
@@ -406,7 +425,43 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       )
       .subscribe((options) => {
         this.tagOptions.set(options);
+        this.rebuildTagSelectOptions(options);
       });
+  }
+
+  private selectedTagsToSelectOptions(): MultiSelectOption[] {
+    return this.selectedTags().map((tag) => ({
+      label: tag.name,
+      value: tag.id,
+    }));
+  }
+
+  private rebuildTagSelectOptions(searchResults: SceneTagOption[]): void {
+    const merged = new Map<string, MultiSelectOption>();
+
+    for (const selected of this.selectedTags()) {
+      merged.set(selected.id, {
+        label: selected.name,
+        value: selected.id,
+      });
+    }
+
+    for (const tag of searchResults) {
+      merged.set(tag.id, {
+        label: tag.name,
+        value: tag.id,
+      });
+    }
+
+    this.tagSelectOptions.set([...merged.values()]);
+  }
+
+  private dedupeStrings(values: string[]): string[] {
+    const deduped = new Set<string>();
+    for (const value of values) {
+      deduped.add(value);
+    }
+    return [...deduped];
   }
 
   private setupIntersectionObserver(): void {

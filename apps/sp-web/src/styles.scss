@@ -155,3 +155,16 @@ body {
 .performer-filter-tag-panel .p-multiselect-empty-message {
   font-size: 0.82rem;
 }
+
+.scenes-filter-select-panel,
+.scenes-filter-tag-panel {
+  border-color: color-mix(in srgb, var(--border-strong) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 90%, #0e1a28);
+}
+
+.scenes-filter-select-panel .p-select-option,
+.scenes-filter-select-panel .p-select-empty-message,
+.scenes-filter-tag-panel .p-multiselect-option,
+.scenes-filter-tag-panel .p-multiselect-empty-message {
+  font-size: 0.82rem;
+}

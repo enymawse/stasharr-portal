@@ -14,36 +14,39 @@
         <div class="tag-picker-shell">
           <div class="tag-input-row">
             <input
-              type="text"
+              pInputText
               [value]="tagSearchTerm()"
               placeholder="Search tags"
               (input)="onTagSearchChanged($any($event.target).value)"
             />
-            <select
+            <p-select
               class="tag-mode-select"
-              [value]="selectedTagMode()"
-              (change)="onTagMatchModeChanged($any($event.target).value)"
-            >
-              @for (option of tagMatchOptions; track option.value) {
-                <option [value]="option.value">{{ option.label }}</option>
-              }
-            </select>
+              inputId="scenes-tag-mode"
+              [ngModel]="selectedTagMode()"
+              (ngModelChange)="onTagMatchModeChanged($event)"
+              [options]="tagMatchOptions"
+              optionLabel="label"
+              optionValue="value"
+              [appendTo]="'body'"
+              panelStyleClass="scenes-filter-select-panel"
+            />
           </div>
 
-          @if (selectedTags().length > 0) {
-            <div class="selected-tags" aria-label="Selected tags">
-              @for (tag of selectedTags(); track tag.id) {
-                <button
-                  type="button"
-                  class="tag-chip"
-                  (click)="removeSelectedTag(tag.id)"
-                  [attr.aria-label]="'Remove tag ' + tag.name"
-                >
-                  {{ tag.name }} <span aria-hidden="true">×</span>
-                </button>
-              }
-            </div>
-          }
+          <p-multiselect
+            inputId="scenes-tags"
+            [ngModel]="selectedTagIdsModel()"
+            (ngModelChange)="onTagSelectionChanged($event)"
+            [options]="tagSelectOptions()"
+            optionLabel="label"
+            optionValue="value"
+            [showToggleAll]="false"
+            [showHeader]="false"
+            display="chip"
+            [appendTo]="'body'"
+            panelStyleClass="scenes-filter-tag-panel"
+            placeholder="Select matching tags"
+            scrollHeight="16rem"
+          />
 
           @if (tagSearchLoading()) {
             <p class="tag-state">Searching tags...</p>
@@ -51,50 +54,36 @@
             <p class="tag-state error">{{ tagSearchError() }}</p>
           } @else if (tagSearchTerm().trim().length > 0 && tagOptions().length === 0) {
             <p class="tag-state">No matching tags.</p>
-          } @else if (tagOptions().length > 0) {
-            <ul class="tag-options" aria-label="Tag search results">
-              @for (tag of tagOptions(); track tag.id) {
-                <li>
-                  <button
-                    type="button"
-                    class="tag-option"
-                    [class.selected]="isTagSelected(tag.id)"
-                    (click)="toggleTagSelection(tag)"
-                  >
-                    <span class="tag-option-name">{{ tag.name }}</span>
-                    @if (tag.description) {
-                      <span class="tag-option-description">{{ tag.description }}</span>
-                    }
-                  </button>
-                </li>
-              }
-            </ul>
           }
         </div>
       </label>
 
       <label class="control-field">
         <span>Sort By</span>
-        <select
-          [value]="selectedSort()"
-          (change)="onSortChanged($any($event.target).value)"
-        >
-          @for (option of sortOptions; track option.value) {
-            <option [value]="option.value">{{ option.label }}</option>
-          }
-        </select>
+        <p-select
+          inputId="scenes-sort"
+          [ngModel]="selectedSort()"
+          (ngModelChange)="onSortChanged($event)"
+          [options]="sortOptions"
+          optionLabel="label"
+          optionValue="value"
+          [appendTo]="'body'"
+          panelStyleClass="scenes-filter-select-panel"
+        />
       </label>
 
       <label class="control-field">
         <span>Favorites</span>
-        <select
-          [value]="selectedFavorites()"
-          (change)="onFavoritesChanged($any($event.target).value)"
-        >
-          @for (option of favoritesOptions; track option.value) {
-            <option [value]="option.value">{{ option.label }}</option>
-          }
-        </select>
+        <p-select
+          inputId="scenes-favorites"
+          [ngModel]="selectedFavorites()"
+          (ngModelChange)="onFavoritesChanged($event)"
+          [options]="favoritesOptions"
+          optionLabel="label"
+          optionValue="value"
+          [appendTo]="'body'"
+          panelStyleClass="scenes-filter-select-panel"
+        />
       </label>
     </div>
 

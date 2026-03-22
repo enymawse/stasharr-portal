@@ -73,7 +73,6 @@ header p {
 }
 
 .tag-picker-shell {
-  position: relative;
   display: grid;
   gap: 0.35rem;
   min-width: 0;
@@ -92,72 +91,26 @@ header p {
   min-width: 0;
 }
 
-.tag-mode-select {
+:host ::ng-deep .controls-shell .p-select,
+:host ::ng-deep .controls-shell .p-inputtext,
+:host ::ng-deep .controls-shell .p-multiselect {
   width: 100%;
-  max-width: 100%;
-  min-width: 0;
 }
 
-.selected-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-
-.tag-chip {
-  margin: 0;
-  padding: 0.15rem 0.4rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
-  background: color-mix(in srgb, var(--surface-elevated) 80%, #0f2236);
+:host ::ng-deep .controls-shell .p-select,
+:host ::ng-deep .controls-shell .p-inputtext,
+:host ::ng-deep .controls-shell .p-multiselect {
+  border-radius: 7px;
+  border-color: var(--border-strong);
+  background: var(--surface-elevated);
   color: var(--text-primary);
-  font-size: 0.72rem;
-  line-height: 1.15;
 }
 
-.tag-chip span {
-  margin-left: 0.2rem;
-}
-
-.tag-options {
-  margin: 0;
-  padding: 0.25rem;
-  list-style: none;
-  border-radius: 8px;
-  border: 1px solid var(--border-subtle);
-  background: color-mix(in srgb, var(--surface-elevated) 85%, #0d1a29);
-  max-height: 11rem;
-  overflow-y: auto;
-  display: grid;
-  gap: 0.24rem;
-}
-
-.tag-option {
-  width: 100%;
-  margin: 0;
-  text-align: left;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  background: rgb(255 255 255 / 3%);
-  padding: 0.28rem 0.35rem;
-  display: grid;
-  gap: 0.1rem;
-}
-
-.tag-option.selected {
-  border-color: color-mix(in srgb, var(--focus-ring) 80%, transparent);
-  background: color-mix(in srgb, var(--focus-ring) 16%, transparent);
-}
-
-.tag-option-name {
-  color: var(--text-primary);
-  font-size: 0.77rem;
-  font-weight: 600;
-}
-
-.tag-option-description {
-  color: var(--text-muted);
-  font-size: 0.68rem;
+:host ::ng-deep .controls-shell .p-select.p-focus,
+:host ::ng-deep .controls-shell .p-inputtext:focus,
+:host ::ng-deep .controls-shell .p-multiselect.p-focus {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus-ring) 44%, transparent);
 }
 
 .tag-state {
