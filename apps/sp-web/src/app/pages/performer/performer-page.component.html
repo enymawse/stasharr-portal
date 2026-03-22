@@ -104,23 +104,25 @@
       <div class="controls-row">
         <label class="control-field">
           <span>Sort</span>
-          <select
-            [value]="sceneSort()"
-            (change)="onSceneSortChanged($any($event.target).value)"
-          >
-            @for (option of sceneSortOptions; track option.value) {
-              <option [value]="option.value">{{ option.label }}</option>
-            }
-          </select>
+          <p-select
+            inputId="performer-sort"
+            [ngModel]="sceneSort()"
+            (ngModelChange)="onSceneSortChanged($event)"
+            [options]="sceneSortOptions"
+            optionLabel="label"
+            optionValue="value"
+            [appendTo]="'body'"
+            panelStyleClass="performer-filter-select-panel"
+          />
         </label>
 
         <label class="control-field checkbox-field">
           <span>Only Favorite Studios</span>
-          <label class="checkbox-label">
-            <input
-              type="checkbox"
-              [checked]="onlyFavoriteStudios()"
-              (change)="onOnlyFavoriteStudiosChanged($any($event.target).checked)"
+          <label class="toggle-label">
+            <p-toggleswitch
+              inputId="performer-favorite-studios"
+              [ngModel]="onlyFavoriteStudios()"
+              (ngModelChange)="onOnlyFavoriteStudiosChanged($event)"
             />
             <span>Enabled</span>
           </label>
@@ -132,52 +134,41 @@
           <label class="control-field">
             <span>Filter Studios</span>
             <input
-              type="text"
+              pInputText
               [value]="studioSearchTerm()"
               placeholder="Search studio networks"
               (input)="onStudioSearchChanged($any($event.target).value)"
             />
           </label>
 
-          @if (selectedStudios().length > 0) {
-            <div class="chips">
-              @for (studio of selectedStudios(); track studio.id) {
-                <button type="button" class="chip" (click)="removeSelectedStudio(studio.id)">
-                  {{ studio.label }} ×
-                </button>
-              }
-            </div>
-          }
+          <label class="control-field">
+            <span>Select Studios</span>
+            <p-multiselect
+              inputId="performer-studios"
+              [ngModel]="studioSelectedIds()"
+              (ngModelChange)="onStudioSelectionChanged($event)"
+              [options]="studioSelectOptions()"
+              [group]="true"
+              optionGroupLabel="label"
+              optionGroupChildren="items"
+              optionLabel="label"
+              optionValue="value"
+              display="chip"
+              placeholder="Choose studio networks or child studios"
+              [showToggleAll]="false"
+              [showHeader]="false"
+              [appendTo]="'body'"
+              panelStyleClass="performer-filter-studio-panel"
+              scrollHeight="18rem"
+            />
+          </label>
 
           @if (studioSearchLoading()) {
             <p class="hint">Searching studios...</p>
           } @else if (studioSearchError()) {
             <p class="hint error">{{ studioSearchError() }}</p>
-          } @else if (studioOptions().length > 0) {
-            <div class="options">
-              @for (option of studioOptions(); track option.id) {
-                <div class="option-group">
-                  <button
-                    type="button"
-                    class="option"
-                    [class.selected]="isStudioSelected(option.id)"
-                    (click)="toggleStudioNetwork(option)"
-                  >
-                    {{ option.name }} (Network)
-                  </button>
-                  @for (child of option.childStudios; track child.id) {
-                    <button
-                      type="button"
-                      class="option child"
-                      [class.selected]="isStudioSelected(child.id)"
-                      (click)="toggleStudioChild(child)"
-                    >
-                      {{ child.name }}
-                    </button>
-                  }
-                </div>
-              }
-            </div>
+          } @else if (studioSearchTerm().trim().length > 0 && studioOptions().length === 0) {
+            <p class="hint">No studios found for this query.</p>
           }
         </div>
 
@@ -185,40 +176,38 @@
           <label class="control-field">
             <span>Filter Tags</span>
             <input
-              type="text"
+              pInputText
               [value]="tagSearchTerm()"
               placeholder="Search scene tags"
               (input)="onTagSearchChanged($any($event.target).value)"
             />
           </label>
 
-          @if (selectedTags().length > 0) {
-            <div class="chips">
-              @for (tag of selectedTags(); track tag.id) {
-                <button type="button" class="chip" (click)="removeSelectedTag(tag.id)">
-                  {{ tag.name }} ×
-                </button>
-              }
-            </div>
-          }
+          <label class="control-field">
+            <span>Select Tags</span>
+            <p-multiselect
+              inputId="performer-tags"
+              [ngModel]="tagSelectedIds()"
+              (ngModelChange)="onTagSelectionChanged($event)"
+              [options]="tagSelectOptions()"
+              optionLabel="label"
+              optionValue="value"
+              [showToggleAll]="false"
+              [showHeader]="false"
+              display="chip"
+              [appendTo]="'body'"
+              panelStyleClass="performer-filter-tag-panel"
+              placeholder="Select tags"
+              scrollHeight="16rem"
+            />
+          </label>
 
           @if (tagSearchLoading()) {
             <p class="hint">Searching tags...</p>
           } @else if (tagSearchError()) {
             <p class="hint error">{{ tagSearchError() }}</p>
-          } @else if (tagOptions().length > 0) {
-            <div class="options">
-              @for (tag of tagOptions(); track tag.id) {
-                <button
-                  type="button"
-                  class="option"
-                  [class.selected]="isTagSelected(tag.id)"
-                  (click)="toggleTagSelection(tag)"
-                >
-                  {{ tag.name }}
-                </button>
-              }
-            </div>
+          } @else if (tagSearchTerm().trim().length > 0 && tagOptions().length === 0) {
+            <p class="hint">No tags found for this query.</p>
           }
         </div>
       </div>

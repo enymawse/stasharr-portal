@@ -283,7 +283,7 @@ main > button {
   padding: 0.38rem 0.44rem;
 }
 
-.checkbox-label {
+.toggle-label {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -302,55 +302,33 @@ main > button {
   background: var(--surface-2);
   padding: 0.65rem;
   display: grid;
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-.chip {
-  margin: 0;
-  padding: 0.15rem 0.4rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
-  background: color-mix(in srgb, var(--surface-elevated) 80%, #0f2236);
-  color: var(--text-primary);
-  font-size: 0.72rem;
-  line-height: 1.15;
-  cursor: pointer;
+  gap: 0.55rem;
 }
 
 .hint {
   font-size: 0.75rem;
 }
 
-.options {
-  display: grid;
-  gap: 0.28rem;
-  max-height: 220px;
-  overflow-y: auto;
+:host ::ng-deep .controls-shell .p-select,
+:host ::ng-deep .controls-shell .p-inputtext,
+:host ::ng-deep .controls-shell .p-multiselect {
+  width: 100%;
 }
 
-.option-group {
-  display: grid;
-}
-
-.option {
-  text-align: left;
-  margin: 0;
-  padding: 0.26rem 0.35rem;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  background: rgb(255 255 255 / 3%);
+:host ::ng-deep .controls-shell .p-select,
+:host ::ng-deep .controls-shell .p-inputtext,
+:host ::ng-deep .controls-shell .p-multiselect {
+  border-radius: 7px;
+  border-color: var(--border-strong);
+  background: var(--surface-elevated);
   color: var(--text-primary);
-  font-size: 0.78rem;
 }
 
-.option.selected {
-  border-color: color-mix(in srgb, var(--focus-ring) 80%, transparent);
-  background: color-mix(in srgb, var(--focus-ring) 16%, transparent);
+:host ::ng-deep .controls-shell .p-select.p-focus,
+:host ::ng-deep .controls-shell .p-inputtext:focus,
+:host ::ng-deep .controls-shell .p-multiselect.p-focus {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus-ring) 44%, transparent);
 }
 
 .grid {
