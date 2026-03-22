@@ -8,6 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
   Subject,
@@ -20,6 +21,10 @@ import {
   of,
   switchMap,
 } from 'rxjs';
+import { InputText } from 'primeng/inputtext';
+import { MultiSelect } from 'primeng/multiselect';
+import { Select } from 'primeng/select';
+import { ToggleSwitch } from 'primeng/toggleswitch';
 import { DiscoverService } from '../../core/api/discover.service';
 import {
   DiscoverItem,
@@ -38,9 +43,28 @@ interface SelectedStudioChip {
   label: string;
 }
 
+interface MultiSelectOption {
+  label: string;
+  value: string;
+}
+
+interface MultiSelectGroup {
+  label: string;
+  items: MultiSelectOption[];
+}
+
 @Component({
   selector: 'app-performer-page',
-  imports: [RouterLink, SceneStatusBadgeComponent, SceneRequestModalComponent],
+  imports: [
+    RouterLink,
+    FormsModule,
+    Select,
+    ToggleSwitch,
+    InputText,
+    MultiSelect,
+    SceneStatusBadgeComponent,
+    SceneRequestModalComponent,
+  ],
   templateUrl: './performer-page.component.html',
   styleUrl: './performer-page.component.scss',
 })
@@ -106,11 +130,15 @@ export class PerformerPageComponent
   protected readonly studioOptions = signal<PerformerStudioOption[]>([]);
   protected readonly studioSearchLoading = signal(false);
   protected readonly studioSearchError = signal<string | null>(null);
+  protected readonly studioSelectedIds = signal<string[]>([]);
+  protected readonly studioSelectOptions = signal<MultiSelectGroup[]>([]);
   protected readonly tagSearchTerm = signal('');
   protected readonly selectedTags = signal<SceneTagOption[]>([]);
   protected readonly tagOptions = signal<SceneTagOption[]>([]);
   protected readonly tagSearchLoading = signal(false);
   protected readonly tagSearchError = signal<string | null>(null);
+  protected readonly tagSelectedIds = signal<string[]>([]);
+  protected readonly tagSelectOptions = signal<MultiSelectOption[]>([]);
   protected readonly sceneSortOptions = PerformerPageComponent.SCENE_SORT_OPTIONS;
 
   protected readonly loadingScenes = signal(false);
@@ -252,6 +280,54 @@ export class PerformerPageComponent
     this.studioSearchTerms.next(nextValue);
   }
 
+  protected onStudioSelectionChanged(nextValue: string[] | null): void {
+    const nextIds = this.dedupeStrings(nextValue ?? []);
+    this.studioSelectedIds.set(nextIds);
+
+    const changed =
+      nextIds.length !== this.selectedStudios().length ||
+      nextIds.some((id) => !this.isStudioSelected(id));
+
+    if (!changed) {
+      return;
+    }
+
+    const previousLabels = new Map(
+      this.selectedStudios().map((studio) => [studio.id, studio.label]),
+    );
+    const currentLabels = this.studioLabelMap();
+    this.selectedStudios.set(
+      nextIds.map((id) => ({
+        id,
+        label: currentLabels.get(id) ?? previousLabels.get(id) ?? id,
+      })),
+    );
+    this.resetScenesAndReload();
+  }
+
+  protected onTagSelectionChanged(nextValue: string[] | null): void {
+    const nextIds = this.dedupeStrings(nextValue ?? []);
+    this.tagSelectedIds.set(nextIds);
+
+    const previousTags = new Map(this.selectedTags().map((tag) => [tag.id, tag]));
+    const currentTags = new Map(this.tagOptions().map((tag) => [tag.id, tag]));
+    const next = nextIds
+      .map((id) => currentTags.get(id) ?? previousTags.get(id))
+      .filter((tag): tag is SceneTagOption => Boolean(tag));
+    const current = this.selectedTags();
+    const changed =
+      next.length !== current.length || next.some((tag) => !this.isTagSelected(tag.id));
+
+    this.selectedTags.set(next);
+    this.rebuildTagSelectOptions(this.tagOptions());
+
+    if (!changed) {
+      return;
+    }
+
+    this.resetScenesAndReload();
+  }
+
   protected onTagSearchChanged(nextValue: string): void {
     this.tagSearchTerm.set(nextValue);
     this.tagSearchTerms.next(nextValue);
@@ -261,85 +337,8 @@ export class PerformerPageComponent
     return this.selectedStudios().some((studio) => studio.id === studioId);
   }
 
-  protected toggleStudioNetwork(option: PerformerStudioOption): void {
-    const targetEntries: SelectedStudioChip[] = [
-      { id: option.id, label: option.name },
-      ...option.childStudios.map((child) => ({ id: child.id, label: child.name })),
-    ];
-    const allSelected = targetEntries.every((entry) =>
-      this.isStudioSelected(entry.id),
-    );
-
-    if (allSelected) {
-      this.selectedStudios.update((current) =>
-        current.filter(
-          (studio) => !targetEntries.some((entry) => entry.id === studio.id),
-        ),
-      );
-    } else {
-      this.selectedStudios.update((current) => {
-        const next = [...current];
-        for (const entry of targetEntries) {
-          if (!next.some((studio) => studio.id === entry.id)) {
-            next.push(entry);
-          }
-        }
-        return next;
-      });
-    }
-
-    this.resetScenesAndReload();
-  }
-
-  protected toggleStudioChild(child: { id: string; name: string }): void {
-    if (this.isStudioSelected(child.id)) {
-      this.selectedStudios.update((current) =>
-        current.filter((studio) => studio.id !== child.id),
-      );
-    } else {
-      this.selectedStudios.update((current) => [
-        ...current,
-        { id: child.id, label: child.name },
-      ]);
-    }
-
-    this.resetScenesAndReload();
-  }
-
-  protected removeSelectedStudio(studioId: string): void {
-    if (!this.isStudioSelected(studioId)) {
-      return;
-    }
-    this.selectedStudios.update((current) =>
-      current.filter((studio) => studio.id !== studioId),
-    );
-    this.resetScenesAndReload();
-  }
-
   protected isTagSelected(tagId: string): boolean {
     return this.selectedTags().some((tag) => tag.id === tagId);
-  }
-
-  protected toggleTagSelection(tag: SceneTagOption): void {
-    if (this.isTagSelected(tag.id)) {
-      this.selectedTags.update((current) =>
-        current.filter((selected) => selected.id !== tag.id),
-      );
-    } else {
-      this.selectedTags.update((current) => [...current, tag]);
-    }
-
-    this.resetScenesAndReload();
-  }
-
-  protected removeSelectedTag(tagId: string): void {
-    if (!this.isTagSelected(tagId)) {
-      return;
-    }
-    this.selectedTags.update((current) =>
-      current.filter((selected) => selected.id !== tagId),
-    );
-    this.resetScenesAndReload();
   }
 
   protected hasCarouselImages(): boolean {
@@ -572,6 +571,7 @@ export class PerformerPageComponent
         switchMap((query) => {
           if (!query) {
             this.studioOptions.set([]);
+            this.studioSelectOptions.set([]);
             this.studioSearchError.set(null);
             return of<PerformerStudioOption[]>([]);
           }
@@ -592,6 +592,21 @@ export class PerformerPageComponent
       )
       .subscribe((options) => {
         this.studioOptions.set(options);
+        this.studioSelectOptions.set(
+          options.map((network) => ({
+            label: network.name,
+            items: [
+              {
+                label: `${network.name} (Network)`,
+                value: network.id,
+              },
+              ...network.childStudios.map((child) => ({
+                label: child.name,
+                value: child.id,
+              })),
+            ],
+          })),
+        );
       });
   }
 
@@ -624,7 +639,49 @@ export class PerformerPageComponent
       )
       .subscribe((options) => {
         this.tagOptions.set(options);
+        this.rebuildTagSelectOptions(options);
       });
+  }
+
+  private studioLabelMap(): Map<string, string> {
+    const labels = new Map<string, string>();
+
+    for (const option of this.studioOptions()) {
+      labels.set(option.id, option.name);
+      for (const child of option.childStudios) {
+        labels.set(child.id, child.name);
+      }
+    }
+
+    return labels;
+  }
+
+  private dedupeStrings(values: string[]): string[] {
+    const deduped = new Set<string>();
+    for (const value of values) {
+      deduped.add(value);
+    }
+    return [...deduped];
+  }
+
+  private rebuildTagSelectOptions(searchResults: SceneTagOption[]): void {
+    const merged = new Map<string, MultiSelectOption>();
+
+    for (const tag of this.selectedTags()) {
+      merged.set(tag.id, {
+        label: tag.name,
+        value: tag.id,
+      });
+    }
+
+    for (const tag of searchResults) {
+      merged.set(tag.id, {
+        label: tag.name,
+        value: tag.id,
+      });
+    }
+
+    this.tagSelectOptions.set([...merged.values()]);
   }
 
   private setupIntersectionObserver(): void {
