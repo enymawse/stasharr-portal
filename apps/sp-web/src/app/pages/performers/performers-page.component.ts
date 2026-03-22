@@ -8,6 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
   Subject,
@@ -16,6 +17,10 @@ import {
   distinctUntilChanged,
   finalize,
 } from 'rxjs';
+import { ButtonDirective } from 'primeng/button';
+import { InputText } from 'primeng/inputtext';
+import { Select } from 'primeng/select';
+import { ToggleSwitch } from 'primeng/toggleswitch';
 import { DiscoverService } from '../../core/api/discover.service';
 import {
   PerformerFeedItem,
@@ -27,7 +32,7 @@ type GenderOption = PerformerGender | 'NONE';
 
 @Component({
   selector: 'app-performers-page',
-  imports: [RouterLink],
+  imports: [RouterLink, FormsModule, InputText, Select, ToggleSwitch, ButtonDirective],
   templateUrl: './performers-page.component.html',
   styleUrl: './performers-page.component.scss',
 })

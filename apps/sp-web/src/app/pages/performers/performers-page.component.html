@@ -12,47 +12,54 @@
       <label class="control-field">
         <span>Filter Performer Name</span>
         <input
+          pInputText
           type="text"
-          [value]="nameFilter()"
+          [ngModel]="nameFilter()"
           placeholder="Search performer name"
-          (input)="onNameFilterChanged($any($event.target).value)"
+          (ngModelChange)="onNameFilterChanged($event)"
         />
       </label>
 
       <label class="control-field">
         <span>Gender</span>
-        <select
-          [value]="selectedGender()"
-          (change)="onGenderChanged($any($event.target).value)"
-        >
-          @for (option of genderOptions; track option.value) {
-            <option [value]="option.value">{{ option.label }}</option>
-          }
-        </select>
+        <p-select
+          inputId="performers-gender"
+          [ngModel]="selectedGender()"
+          (ngModelChange)="onGenderChanged($event)"
+          [options]="genderOptions"
+          optionLabel="label"
+          optionValue="value"
+          [appendTo]="'body'"
+          panelStyleClass="performer-filter-select-panel"
+        />
       </label>
 
       <label class="control-field">
         <span>Sort By</span>
-        <select
-          [value]="selectedSort()"
-          (change)="onSortChanged($any($event.target).value)"
-        >
-          @for (option of sortOptions; track option.value) {
-            <option [value]="option.value">{{ option.label }}</option>
-          }
-        </select>
+        <p-select
+          inputId="performers-sort"
+          [ngModel]="selectedSort()"
+          (ngModelChange)="onSortChanged($event)"
+          [options]="sortOptions"
+          optionLabel="label"
+          optionValue="value"
+          [appendTo]="'body'"
+          panelStyleClass="performer-filter-select-panel"
+        />
       </label>
 
-      <label class="control-field checkbox-field">
+      <label class="control-field favorites-field">
         <span>Favorites Only</span>
-        <label class="checkbox-label">
-          <input
-            type="checkbox"
-            [checked]="favoritesOnly()"
-            (change)="onFavoritesOnlyChanged($any($event.target).checked)"
+        <div class="favorites-toggle-row">
+          <p-toggleswitch
+            inputId="performers-favorites-only"
+            [ngModel]="favoritesOnly()"
+            (ngModelChange)="onFavoritesOnlyChanged($event)"
           />
-          <span>Show favorites only</span>
-        </label>
+          <label class="favorites-toggle-label" for="performers-favorites-only">
+            Show favorites only
+          </label>
+        </div>
       </label>
     </div>
   </section>
@@ -61,7 +68,7 @@
     <p class="state">Loading performers feed...</p>
   } @else if (error()) {
     <p class="state error">{{ error() }}</p>
-    <button type="button" class="retry-button" (click)="retryInitialLoad()">Retry</button>
+    <button pButton type="button" class="retry-button" (click)="retryInitialLoad()">Retry</button>
   } @else if (!hasItems()) {
     <p class="state">No performers are available for the current filters.</p>
   } @else {
@@ -114,7 +121,7 @@
     @if (loadMoreError()) {
       <div class="load-more-error">
         <p class="state error">{{ loadMoreError() }}</p>
-        <button type="button" class="retry-button" (click)="retryLoadMore()">Retry</button>
+        <button pButton type="button" class="retry-button" (click)="retryLoadMore()">Retry</button>
       </div>
     }
   }

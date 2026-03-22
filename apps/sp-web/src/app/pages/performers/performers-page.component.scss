@@ -30,6 +30,7 @@ header p {
 }
 
 .controls-shell {
+  --performers-filter-control-height: 2.5rem;
   margin-top: 0.9rem;
   padding: 0.75rem;
   border-radius: 10px;
@@ -58,23 +59,47 @@ header p {
   font-weight: 700;
 }
 
-.control-field input,
-.control-field select {
+:host ::ng-deep .controls-shell .p-select,
+:host ::ng-deep .controls-shell .p-inputtext {
   width: 100%;
+  height: var(--performers-filter-control-height);
   box-sizing: border-box;
   border-radius: 7px;
   border: 1px solid var(--border-strong);
   background: var(--surface-elevated);
   color: var(--text-primary);
   font-size: 0.85rem;
-  padding: 0.38rem 0.44rem;
 }
 
-.checkbox-field {
+:host ::ng-deep .controls-shell .p-inputtext {
+  padding: 0 0.55rem;
+}
+
+:host ::ng-deep .controls-shell .p-select-label {
+  display: flex;
+  align-items: center;
+  min-height: calc(var(--performers-filter-control-height) - 2px);
+  padding: 0 0.55rem;
+}
+
+:host ::ng-deep .controls-shell .p-select-dropdown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+}
+
+:host ::ng-deep .controls-shell .p-select.p-focus,
+:host ::ng-deep .controls-shell .p-inputtext:focus {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus-ring) 44%, transparent);
+}
+
+.favorites-field {
   align-content: start;
 }
 
-.checkbox-label {
+.favorites-toggle-row {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -82,9 +107,8 @@ header p {
   color: var(--text-primary);
 }
 
-.checkbox-label input {
-  width: 1rem;
-  height: 1rem;
+.favorites-toggle-label {
+  cursor: pointer;
 }
 
 .performer-grid {
@@ -172,14 +196,13 @@ header p {
   height: 1px;
 }
 
-.retry-button {
+:host ::ng-deep .retry-button.p-button {
   margin-top: 0.5rem;
-  padding: 0.45rem 0.75rem;
   border-radius: 6px;
   border: 1px solid var(--button-border);
   background: var(--button-bg);
   color: var(--button-text);
-  cursor: pointer;
+  padding: 0.45rem 0.75rem;
 }
 
 .load-more-error {
