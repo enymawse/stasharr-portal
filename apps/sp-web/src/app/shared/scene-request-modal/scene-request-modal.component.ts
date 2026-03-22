@@ -1,33 +1,52 @@
-import { DOCUMENT } from '@angular/common';
 import {
   Component,
-  ElementRef,
   EventEmitter,
-  HostListener,
   Input,
   OnChanges,
   OnDestroy,
   Output,
-  ViewChild,
+  computed,
   inject,
   signal,
 } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { Subscription } from 'rxjs';
+import { ButtonDirective } from 'primeng/button';
+import { Dialog } from 'primeng/dialog';
+import { MultiSelect } from 'primeng/multiselect';
+import { Select } from 'primeng/select';
+import { ToggleSwitch } from 'primeng/toggleswitch';
 import { DiscoverService } from '../../core/api/discover.service';
 import { SceneRequestOptions } from '../../core/api/discover.types';
 
+type StringSelectOption = {
+  label: string;
+  value: string;
+  disabled?: boolean;
+};
+
+type NumberSelectOption = {
+  label: string;
+  value: number;
+  disabled?: boolean;
+};
+
 @Component({
   selector: 'app-scene-request-modal',
-  imports: [ReactiveFormsModule],
+  imports: [
+    ReactiveFormsModule,
+    Dialog,
+    ButtonDirective,
+    Select,
+    ToggleSwitch,
+    MultiSelect,
+  ],
   templateUrl: './scene-request-modal.component.html',
   styleUrl: './scene-request-modal.component.scss',
 })
 export class SceneRequestModalComponent implements OnChanges, OnDestroy {
   private readonly discoverService = inject(DiscoverService);
-  private readonly document = inject(DOCUMENT);
-  private restoreBodyOverflowValue: string | null = null;
   private loadedForSceneId: string | null = null;
   private loadingSceneId: string | null = null;
   private optionsLoadSub: Subscription | null = null;
@@ -40,23 +59,53 @@ export class SceneRequestModalComponent implements OnChanges, OnDestroy {
   @Output() closed = new EventEmitter<void>();
   @Output() submitted = new EventEmitter<string>();
 
-  @ViewChild('requestCloseButton')
-  set requestCloseButton(elementRef: ElementRef<HTMLButtonElement> | undefined) {
-    const closeButton = elementRef?.nativeElement ?? null;
-    if (!closeButton || !this.open) {
-      return;
-    }
-
-    setTimeout(() => {
-      closeButton.focus();
-    }, 0);
-  }
-
   protected readonly requestOptionsLoading = signal(false);
   protected readonly requestOptionsError = signal<string | null>(null);
   protected readonly requestOptions = signal<SceneRequestOptions | null>(null);
   protected readonly requestSubmitLoading = signal(false);
   protected readonly requestSubmitError = signal<string | null>(null);
+
+  protected readonly dialogBreakpoints = {
+    '960px': '94vw',
+    '640px': '98vw',
+  };
+
+  protected readonly rootFolderOptions = computed<StringSelectOption[]>(() => {
+    const options = this.requestOptions();
+    if (!options) {
+      return [];
+    }
+
+    return options.rootFolders.map((folder) => ({
+      label: folder.accessible ? folder.path : `${folder.path} (Unavailable)`,
+      value: folder.path,
+      disabled: !folder.accessible,
+    }));
+  });
+
+  protected readonly qualityProfileOptions = computed<NumberSelectOption[]>(() => {
+    const options = this.requestOptions();
+    if (!options) {
+      return [];
+    }
+
+    return options.qualityProfiles.map((profile) => ({
+      label: profile.name,
+      value: profile.id,
+    }));
+  });
+
+  protected readonly tagOptions = computed<NumberSelectOption[]>(() => {
+    const options = this.requestOptions();
+    if (!options) {
+      return [];
+    }
+
+    return options.tags.map((tag) => ({
+      label: tag.label,
+      value: tag.id,
+    }));
+  });
 
   protected readonly requestForm = new FormGroup({
     monitored: new FormControl(true, { nonNullable: true }),
@@ -76,11 +125,9 @@ export class SceneRequestModalComponent implements OnChanges, OnDestroy {
       this.cancelOptionsLoad();
       this.requestOptionsLoading.set(false);
       this.requestSubmitLoading.set(false);
-      this.unlockBodyScroll();
       return;
     }
 
-    this.lockBodyScroll();
     this.requestSubmitError.set(null);
 
     const nextSceneId = this.sceneId?.trim() ?? '';
@@ -98,7 +145,6 @@ export class SceneRequestModalComponent implements OnChanges, OnDestroy {
 
   ngOnDestroy(): void {
     this.cancelOptionsLoad();
-    this.unlockBodyScroll();
   }
 
   protected closeModal(): void {
@@ -109,28 +155,12 @@ export class SceneRequestModalComponent implements OnChanges, OnDestroy {
     this.closed.emit();
   }
 
-  protected onBackdropClick(event: MouseEvent): void {
-    if (event.target !== event.currentTarget) {
+  protected onDialogVisibleChange(visible: boolean): void {
+    if (visible || !this.open) {
       return;
     }
 
     this.closeModal();
-  }
-
-  protected toggleTagSelection(tagId: number, checked: boolean): void {
-    const current = this.requestForm.controls.tags.value;
-    if (checked) {
-      if (!current.includes(tagId)) {
-        this.requestForm.controls.tags.setValue([...current, tagId]);
-      }
-      return;
-    }
-
-    this.requestForm.controls.tags.setValue(current.filter((id) => id !== tagId));
-  }
-
-  protected tagChecked(tagId: number): boolean {
-    return this.requestForm.controls.tags.value.includes(tagId);
   }
 
   protected submitRequest(): void {
@@ -180,34 +210,6 @@ export class SceneRequestModalComponent implements OnChanges, OnDestroy {
           this.requestSubmitError.set('Failed to submit request to the API.');
         },
       });
-  }
-
-  @HostListener('document:keydown.escape', ['$event'])
-  protected onEscapeKey(event: Event): void {
-    if (!this.open) {
-      return;
-    }
-
-    event.preventDefault();
-    this.closeModal();
-  }
-
-  private lockBodyScroll(): void {
-    if (this.restoreBodyOverflowValue !== null) {
-      return;
-    }
-
-    this.restoreBodyOverflowValue = this.document.body.style.overflow;
-    this.document.body.style.overflow = 'hidden';
-  }
-
-  private unlockBodyScroll(): void {
-    if (this.restoreBodyOverflowValue === null) {
-      return;
-    }
-
-    this.document.body.style.overflow = this.restoreBodyOverflowValue;
-    this.restoreBodyOverflowValue = null;
   }
 
   private loadOptionsForScene(sceneId: string): void {
