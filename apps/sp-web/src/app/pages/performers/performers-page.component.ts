@@ -25,6 +25,7 @@ import { Select } from 'primeng/select';
 import { ToggleSwitch } from 'primeng/toggleswitch';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DiscoverService } from '../../core/api/discover.service';
+import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import {
   PerformerFeedItem,
   PerformerGender,
@@ -83,6 +84,7 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
   ];
 
   private readonly discoverService = inject(DiscoverService);
+  private readonly notifications = inject(AppNotificationsService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly nameFilterTerms = new Subject<string>();
@@ -126,6 +128,7 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
   protected readonly selectedGender = signal<GenderOption>(PerformersPageComponent.DEFAULT_GENDER);
   protected readonly selectedSort = signal<PerformerSort>(PerformersPageComponent.DEFAULT_SORT);
   protected readonly favoritesOnly = signal(false);
+  protected readonly favoriteInFlightById = signal<Record<string, boolean>>({});
   protected readonly sortOptions = PerformersPageComponent.SORT_OPTIONS;
   protected readonly genderOptions = PerformersPageComponent.GENDER_OPTIONS;
 
@@ -242,8 +245,66 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
       .join(' ');
   }
 
-  protected favoriteIndicatorLabel(isFavorite: boolean): string {
-    return isFavorite ? 'Favorite performer' : 'Not marked favorite';
+  protected favoriteToggleLabel(isFavorite: boolean): string {
+    return isFavorite ? 'Unfavorite performer' : 'Favorite performer';
+  }
+
+  protected favoriteToggleBusy(performerId: string): boolean {
+    return this.favoriteInFlightById()[performerId] === true;
+  }
+
+  protected togglePerformerFavorite(
+    event: Event,
+    performer: PerformerFeedItem,
+  ): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (this.favoriteToggleBusy(performer.id)) {
+      return;
+    }
+
+    const nextFavorite = !performer.isFavorite;
+    this.setFavoriteToggleBusy(performer.id, true);
+
+    this.discoverService
+      .favoritePerformer(performer.id, nextFavorite)
+      .pipe(
+        finalize(() => {
+          this.setFavoriteToggleBusy(performer.id, false);
+        }),
+      )
+      .subscribe({
+        next: (result) => {
+          if (this.favoritesOnly() && !nextFavorite) {
+            this.resetFeedAndReload();
+          } else {
+            this.items.update((current) =>
+              current.map((item) =>
+                item.id === performer.id
+                  ? { ...item, isFavorite: nextFavorite }
+                  : item,
+              ),
+            );
+          }
+
+          if (nextFavorite && result.alreadyFavorited) {
+            this.notifications.info('Performer already favorited');
+            return;
+          }
+
+          this.notifications.success(
+            nextFavorite ? 'Performer favorited' : 'Performer unfavorited',
+          );
+        },
+        error: () => {
+          this.notifications.error(
+            nextFavorite
+              ? 'Failed to favorite performer'
+              : 'Failed to unfavorite performer',
+          );
+        },
+      });
   }
 
   protected currentRouteUrl(): string {
@@ -512,5 +573,20 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
     if (this.sentinelElement) {
       this.observer.observe(this.sentinelElement);
     }
+  }
+
+  private setFavoriteToggleBusy(performerId: string, busy: boolean): void {
+    this.favoriteInFlightById.update((current) => {
+      if (busy) {
+        return {
+          ...current,
+          [performerId]: true,
+        };
+      }
+
+      const next = { ...current };
+      delete next[performerId];
+      return next;
+    });
   }
 }

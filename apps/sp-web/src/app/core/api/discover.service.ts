@@ -174,17 +174,23 @@ export class DiscoverService {
     });
   }
 
-  favoritePerformer(performerId: string): Observable<FavoriteMutationResponse> {
+  favoritePerformer(
+    performerId: string,
+    favorite: boolean,
+  ): Observable<FavoriteMutationResponse> {
     return this.http.post<FavoriteMutationResponse>(
       `/api/performers/${encodeURIComponent(performerId)}/favorite`,
-      {},
+      { favorite },
     );
   }
 
-  favoriteStudio(studioId: string): Observable<FavoriteMutationResponse> {
+  favoriteStudio(
+    studioId: string,
+    favorite: boolean,
+  ): Observable<FavoriteMutationResponse> {
     return this.http.post<FavoriteMutationResponse>(
       `/api/scenes/studios/${encodeURIComponent(studioId)}/favorite`,
-      {},
+      { favorite },
     );
   }
 }

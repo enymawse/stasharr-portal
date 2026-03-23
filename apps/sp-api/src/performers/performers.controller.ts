@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { DiscoverResponseDto } from '../discover/dto/discover-item.dto';
 import { PerformerDetailsDto } from './dto/performer-details.dto';
 import { PerformerFeedResponseDto } from './dto/performer-feed-response.dto';
@@ -6,6 +6,7 @@ import { PerformerScenesQueryDto } from './dto/performer-scenes-query.dto';
 import { PerformerStudioOptionDto } from './dto/performer-studio-option.dto';
 import { PerformersQueryDto } from './dto/performers-query.dto';
 import { PerformerStudiosQueryDto } from './dto/performer-studios-query.dto';
+import { ToggleFavoriteDto } from './dto/toggle-favorite.dto';
 import { PerformersService } from './performers.service';
 
 @Controller('api/performers')
@@ -59,7 +60,8 @@ export class PerformersController {
   @Post(':performerId/favorite')
   favoritePerformer(
     @Param('performerId') performerId: string,
-  ): Promise<{ favorited: true; alreadyFavorited: boolean }> {
-    return this.performersService.favoritePerformer(performerId);
+    @Body() body: ToggleFavoriteDto,
+  ): Promise<{ favorited: boolean; alreadyFavorited: boolean }> {
+    return this.performersService.favoritePerformer(performerId, body.favorite);
   }
 }

@@ -62,6 +62,7 @@ describe('ScenesService', () => {
     imageUrl: 'http://image',
     images: [],
     studioId: 'studio-1',
+    studioIsFavorite: false,
     studioName: 'Studio',
     studioImageUrl: 'http://studio-image',
     releaseDate: '2026-01-01',
@@ -410,14 +411,18 @@ describe('ScenesService', () => {
   });
 
   it('favorites studio by id', async () => {
-    await expect(service.favoriteStudio('studio-1')).resolves.toEqual({
+    await expect(service.favoriteStudio('studio-1', true)).resolves.toEqual({
       favorited: true,
       alreadyFavorited: false,
     });
 
-    expect(stashdbAdapter.favoriteStudio).toHaveBeenCalledWith('studio-1', {
-      baseUrl: stashdbIntegration.baseUrl,
-      apiKey: stashdbIntegration.apiKey,
-    });
+    expect(stashdbAdapter.favoriteStudio).toHaveBeenCalledWith(
+      'studio-1',
+      true,
+      {
+        baseUrl: stashdbIntegration.baseUrl,
+        apiKey: stashdbIntegration.apiKey,
+      },
+    );
   });
 });

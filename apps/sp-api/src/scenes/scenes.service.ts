@@ -174,6 +174,7 @@ export class ScenesService {
       imageUrl: scene.imageUrl,
       images: scene.images,
       studioId: scene.studioId,
+      studioIsFavorite: scene.studioIsFavorite,
       studio: scene.studioName,
       studioImageUrl: scene.studioImageUrl,
       studioUrl: this.resolveStudioUrl(scene.sourceUrls),
@@ -191,14 +192,19 @@ export class ScenesService {
 
   async favoriteStudio(
     studioId: string,
-  ): Promise<{ favorited: true; alreadyFavorited: boolean }> {
+    favorite: boolean,
+  ): Promise<{ favorited: boolean; alreadyFavorited: boolean }> {
     const normalizedStudioId = studioId.trim();
     if (!normalizedStudioId) {
       throw new BadRequestException('Studio id is required.');
     }
 
     const config = await this.getStashdbConfig();
-    return this.stashdbAdapter.favoriteStudio(normalizedStudioId, config);
+    return this.stashdbAdapter.favoriteStudio(
+      normalizedStudioId,
+      favorite,
+      config,
+    );
   }
 
   private async resolveStashAvailability(

@@ -227,23 +227,20 @@ export class PerformerPageComponent
     this.loadPerformer();
   }
 
-  protected canFavoritePerformer(performer: PerformerDetails): boolean {
-    return !performer.isFavorite && !this.favoritingPerformer();
+  protected canToggleFavoritePerformer(performer: PerformerDetails): boolean {
+    return performer.id.length > 0 && !this.favoritingPerformer();
   }
 
-  protected favoritePerformer(performer: PerformerDetails): void {
+  protected toggleFavoritePerformer(performer: PerformerDetails): void {
     if (this.favoritingPerformer()) {
       return;
     }
 
-    if (performer.isFavorite) {
-      this.notifications.info('Performer already favorited');
-      return;
-    }
+    const nextFavorite = !performer.isFavorite;
 
     this.favoritingPerformer.set(true);
     this.discoverService
-      .favoritePerformer(performer.id)
+      .favoritePerformer(performer.id, nextFavorite)
       .pipe(
         finalize(() => {
           this.favoritingPerformer.set(false);
@@ -252,18 +249,24 @@ export class PerformerPageComponent
       .subscribe({
         next: (result) => {
           this.performer.update((current) =>
-            current ? { ...current, isFavorite: true } : current,
+            current ? { ...current, isFavorite: nextFavorite } : current,
           );
 
-          if (result.alreadyFavorited) {
+          if (nextFavorite && result.alreadyFavorited) {
             this.notifications.info('Performer already favorited');
             return;
           }
 
-          this.notifications.success('Performer favorited');
+          this.notifications.success(
+            nextFavorite ? 'Performer favorited' : 'Performer unfavorited',
+          );
         },
         error: () => {
-          this.notifications.error('Failed to favorite performer');
+          this.notifications.error(
+            nextFavorite
+              ? 'Failed to favorite performer'
+              : 'Failed to unfavorite performer',
+          );
         },
       });
   }

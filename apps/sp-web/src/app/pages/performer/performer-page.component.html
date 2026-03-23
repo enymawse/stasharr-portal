@@ -70,10 +70,10 @@
               type="button"
               class="favorite-indicator"
               [class.active]="performer.isFavorite"
-              [disabled]="!canFavoritePerformer(performer)"
+              [disabled]="!canToggleFavoritePerformer(performer)"
               [attr.aria-busy]="favoritingPerformer()"
-              [attr.aria-label]="performer.isFavorite ? 'Favorite performer' : 'Not favorite performer'"
-              (click)="favoritePerformer(performer)"
+              [attr.aria-label]="performer.isFavorite ? 'Unfavorite performer' : 'Favorite performer'"
+              (click)="toggleFavoritePerformer(performer)"
             >
               {{ performer.isFavorite ? '★' : '☆' }}
             </button>

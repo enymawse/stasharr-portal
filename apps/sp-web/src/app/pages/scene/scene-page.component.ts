@@ -8,7 +8,11 @@ import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
-import { SceneDetails, SceneRequestContext } from '../../core/api/discover.types';
+import {
+  SceneDetails,
+  ScenePerformer,
+  SceneRequestContext,
+} from '../../core/api/discover.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
@@ -45,7 +49,7 @@ export class ScenePageComponent implements OnInit {
   protected readonly requestModalOpen = signal(false);
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
   protected readonly favoritingStudio = signal(false);
-  protected readonly studioFavoritedInSession = signal(false);
+  protected readonly performerFavoriteInFlightById = signal<Record<string, boolean>>({});
   protected readonly backLinkPath = signal('/discover');
   protected readonly backLinkQueryParams = signal<Params>({});
   protected readonly backLinkLabel = signal('Back to Discover');
@@ -167,15 +171,19 @@ export class ScenePageComponent implements OnInit {
     return scene.status.state === 'NOT_REQUESTED';
   }
 
-  protected canFavoriteStudio(scene: SceneDetails): boolean {
+  protected canToggleFavoriteStudio(scene: SceneDetails): boolean {
     if (!scene.studioId) {
       return false;
     }
 
-    return !this.studioFavoritedInSession() && !this.favoritingStudio();
+    return !this.favoritingStudio();
   }
 
-  protected favoriteStudio(scene: SceneDetails): void {
+  protected studioFavoriteLabel(scene: SceneDetails): string {
+    return scene.studioIsFavorite ? 'Unfavorite Studio' : 'Favorite Studio';
+  }
+
+  protected toggleFavoriteStudio(scene: SceneDetails): void {
     if (!scene.studioId) {
       this.notifications.info('Studio information is unavailable');
       return;
@@ -185,14 +193,11 @@ export class ScenePageComponent implements OnInit {
       return;
     }
 
-    if (this.studioFavoritedInSession()) {
-      this.notifications.info('Studio already favorited');
-      return;
-    }
+    const nextFavorite = !scene.studioIsFavorite;
 
     this.favoritingStudio.set(true);
     this.discoverService
-      .favoriteStudio(scene.studioId)
+      .favoriteStudio(scene.studioId, nextFavorite)
       .pipe(
         finalize(() => {
           this.favoritingStudio.set(false);
@@ -200,16 +205,85 @@ export class ScenePageComponent implements OnInit {
       )
       .subscribe({
         next: (result) => {
-          this.studioFavoritedInSession.set(true);
-          if (result.alreadyFavorited) {
+          this.scene.update((current) =>
+            current ? { ...current, studioIsFavorite: nextFavorite } : current,
+          );
+
+          if (nextFavorite && result.alreadyFavorited) {
             this.notifications.info('Studio already favorited');
             return;
           }
 
-          this.notifications.success('Studio favorited');
+          this.notifications.success(
+            nextFavorite ? 'Studio favorited' : 'Studio unfavorited',
+          );
         },
         error: () => {
-          this.notifications.error('Failed to favorite studio');
+          this.notifications.error(
+            nextFavorite ? 'Failed to favorite studio' : 'Failed to unfavorite studio',
+          );
+        },
+      });
+  }
+
+  protected performerFavoriteToggleBusy(performerId: string): boolean {
+    return this.performerFavoriteInFlightById()[performerId] === true;
+  }
+
+  protected performerFavoriteToggleLabel(isFavorite: boolean): string {
+    return isFavorite ? 'Unfavorite performer' : 'Favorite performer';
+  }
+
+  protected toggleScenePerformerFavorite(
+    event: Event,
+    performer: ScenePerformer,
+  ): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (this.performerFavoriteToggleBusy(performer.id)) {
+      return;
+    }
+
+    const nextFavorite = !performer.isFavorite;
+    this.setPerformerFavoriteBusy(performer.id, true);
+    this.discoverService
+      .favoritePerformer(performer.id, nextFavorite)
+      .pipe(
+        finalize(() => {
+          this.setPerformerFavoriteBusy(performer.id, false);
+        }),
+      )
+      .subscribe({
+        next: (result) => {
+          this.scene.update((current) =>
+            current
+              ? {
+                  ...current,
+                  performers: current.performers.map((currentPerformer) =>
+                    currentPerformer.id === performer.id
+                      ? { ...currentPerformer, isFavorite: nextFavorite }
+                      : currentPerformer,
+                  ),
+                }
+              : current,
+          );
+
+          if (nextFavorite && result.alreadyFavorited) {
+            this.notifications.info('Performer already favorited');
+            return;
+          }
+
+          this.notifications.success(
+            nextFavorite ? 'Performer favorited' : 'Performer unfavorited',
+          );
+        },
+        error: () => {
+          this.notifications.error(
+            nextFavorite
+              ? 'Failed to favorite performer'
+              : 'Failed to unfavorite performer',
+          );
         },
       });
   }
@@ -263,7 +337,7 @@ export class ScenePageComponent implements OnInit {
     this.descriptionExpanded.set(false);
     this.selectedStashCopyUrl.set(null);
     this.requestModalOpen.set(false);
-    this.studioFavoritedInSession.set(false);
+    this.performerFavoriteInFlightById.set({});
 
     this.discoverService
       .getSceneDetails(stashIdParam)
@@ -343,5 +417,20 @@ export class ScenePageComponent implements OnInit {
     }
 
     return fallbackLabel;
+  }
+
+  private setPerformerFavoriteBusy(performerId: string, busy: boolean): void {
+    this.performerFavoriteInFlightById.update((current) => {
+      if (busy) {
+        return {
+          ...current,
+          [performerId]: true,
+        };
+      }
+
+      const next = { ...current };
+      delete next[performerId];
+      return next;
+    });
   }
 }

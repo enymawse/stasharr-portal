@@ -785,7 +785,7 @@ describe('StashdbAdapter', () => {
     } as Response);
 
     await expect(
-      adapter.favoritePerformer('performer-1', {
+      adapter.favoritePerformer('performer-1', true, {
         baseUrl: 'http://stashdb.local/graphql',
       }),
     ).resolves.toEqual({
@@ -811,7 +811,7 @@ describe('StashdbAdapter', () => {
     } as Response);
 
     await expect(
-      adapter.favoritePerformer('performer-1', {
+      adapter.favoritePerformer('performer-1', true, {
         baseUrl: 'http://stashdb.local/graphql',
       }),
     ).resolves.toEqual({
@@ -832,7 +832,7 @@ describe('StashdbAdapter', () => {
     } as Response);
 
     await expect(
-      adapter.favoriteStudio('studio-1', {
+      adapter.favoriteStudio('studio-1', true, {
         baseUrl: 'http://stashdb.local/graphql',
       }),
     ).resolves.toEqual({
@@ -858,12 +858,54 @@ describe('StashdbAdapter', () => {
     } as Response);
 
     await expect(
-      adapter.favoriteStudio('studio-1', {
+      adapter.favoriteStudio('studio-1', true, {
         baseUrl: 'http://stashdb.local/graphql',
       }),
     ).resolves.toEqual({
       favorited: true,
       alreadyFavorited: true,
+    });
+  });
+
+  it('unfavorites performer successfully', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            favoritePerformer: true,
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.favoritePerformer('performer-1', false, {
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
+    ).resolves.toEqual({
+      favorited: false,
+      alreadyFavorited: false,
+    });
+  });
+
+  it('unfavorites studio successfully', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            favoriteStudio: true,
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.favoriteStudio('studio-1', false, {
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
+    ).resolves.toEqual({
+      favorited: false,
+      alreadyFavorited: false,
     });
   });
 });

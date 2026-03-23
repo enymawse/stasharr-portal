@@ -144,15 +144,33 @@ header p {
   top: 0.45rem;
   right: 0.5rem;
   z-index: 1;
+  width: 1.7rem;
+  height: 1.7rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgb(188 213 238 / 52%);
+  border-radius: 999px;
+  background: rgb(13 27 41 / 70%);
   font-size: 1rem;
   font-weight: 800;
   color: rgb(255 255 255 / 85%);
   text-shadow: 0 1px 3px rgb(0 0 0 / 55%);
-  pointer-events: none;
+  cursor: pointer;
 }
 
 .favorite-star.is-favorite {
   color: #ffcf4a;
+}
+
+.favorite-star:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.favorite-star:disabled {
+  opacity: 0.75;
+  cursor: wait;
 }
 
 .performer-image {

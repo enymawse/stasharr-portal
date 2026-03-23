@@ -97,11 +97,11 @@
                   pButton
                   type="button"
                   class="hero-action-button"
-                  [disabled]="!canFavoriteStudio(scene)"
+                  [disabled]="!canToggleFavoriteStudio(scene)"
                   [attr.aria-busy]="favoritingStudio()"
-                  (click)="favoriteStudio(scene)"
+                  (click)="toggleFavoriteStudio(scene)"
                 >
-                  {{ studioFavoritedInSession() ? 'Studio Favorited' : 'Favorite Studio' }}
+                  {{ studioFavoriteLabel(scene) }}
                 </button>
               }
 
@@ -200,6 +200,19 @@
                   [queryParams]="{ returnTo: currentRouteUrl() }"
                   [attr.aria-label]="'View performer ' + performer.name"
                 ></a>
+
+                <button
+                  type="button"
+                  class="performer-favorite"
+                  [class.is-favorite]="performer.isFavorite"
+                  [disabled]="performerFavoriteToggleBusy(performer.id)"
+                  [attr.aria-busy]="performerFavoriteToggleBusy(performer.id)"
+                  [attr.aria-label]="performerFavoriteToggleLabel(performer.isFavorite)"
+                  [title]="performerFavoriteToggleLabel(performer.isFavorite)"
+                  (click)="toggleScenePerformerFavorite($event, performer)"
+                >
+                  {{ performer.isFavorite ? '★' : '☆' }}
+                </button>
 
                 @if (performer.imageUrl) {
                   <img class="performer-image" [src]="performer.imageUrl" [alt]="performer.name" />

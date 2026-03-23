@@ -10,7 +10,7 @@ export interface StashdbAdapterBaseConfig {
 }
 
 export interface StashdbFavoriteResult {
-  favorited: true;
+  favorited: boolean;
   alreadyFavorited: boolean;
 }
 
@@ -199,6 +199,7 @@ export interface StashdbSceneDetails {
   imageUrl: string | null;
   images: StashdbSceneImage[];
   studioId: string | null;
+  studioIsFavorite: boolean;
   studioName: string | null;
   studioImageUrl: string | null;
   releaseDate: string | null;
@@ -785,11 +786,12 @@ export class StashdbAdapter {
 
   async favoritePerformer(
     performerId: string,
+    favorite: boolean,
     config: StashdbAdapterBaseConfig,
   ): Promise<StashdbFavoriteResult> {
     const query = `
       mutation FavoritePerformer($id: ID!) {
-        favoritePerformer(id: $id, favorite: true)
+        favoritePerformer(id: $id, favorite: ${favorite ? 'true' : 'false'})
       }
     `;
 
@@ -798,16 +800,18 @@ export class StashdbAdapter {
       payload,
       'favoritePerformer',
       'performer_favorites_unique_idx',
+      favorite,
     );
   }
 
   async favoriteStudio(
     studioId: string,
+    favorite: boolean,
     config: StashdbAdapterBaseConfig,
   ): Promise<StashdbFavoriteResult> {
     const query = `
       mutation FavoriteStudio($id: ID!) {
-        favoriteStudio(id: $id, favorite: true)
+        favoriteStudio(id: $id, favorite: ${favorite ? 'true' : 'false'})
       }
     `;
 
@@ -816,6 +820,7 @@ export class StashdbAdapter {
       payload,
       'favoriteStudio',
       'studio_favorites_unique_idx',
+      favorite,
     );
   }
 
@@ -1102,6 +1107,7 @@ export class StashdbAdapter {
         typeof scene.studio?.id === 'string' && scene.studio.id.length > 0
           ? scene.studio.id
           : null,
+      studioIsFavorite: scene.studio?.is_favorite === true,
       studioName:
         typeof scene.studio?.name === 'string' && scene.studio.name.length > 0
           ? scene.studio.name
@@ -1266,15 +1272,17 @@ export class StashdbAdapter {
     payload: StashdbGraphqlResponse,
     mutationField: 'favoritePerformer' | 'favoriteStudio',
     duplicateConstraint: string,
+    requestedFavorite: boolean,
   ): StashdbFavoriteResult {
-    if (payload.data?.[mutationField] === true) {
+    if (typeof payload.data?.[mutationField] === 'boolean') {
       return {
-        favorited: true,
+        favorited: requestedFavorite,
         alreadyFavorited: false,
       };
     }
 
     if (
+      requestedFavorite &&
       payload.errors?.some((error) =>
         this.isDuplicateFavoriteError(error, mutationField, duplicateConstraint),
       )

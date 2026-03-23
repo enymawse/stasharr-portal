@@ -195,14 +195,19 @@ export class PerformersService {
 
   async favoritePerformer(
     performerId: string,
-  ): Promise<{ favorited: true; alreadyFavorited: boolean }> {
+    favorite: boolean,
+  ): Promise<{ favorited: boolean; alreadyFavorited: boolean }> {
     const normalizedPerformerId = performerId.trim();
     if (!normalizedPerformerId) {
       throw new BadRequestException('Performer id is required.');
     }
 
     const config = await this.getStashdbConfig();
-    return this.stashdbAdapter.favoritePerformer(normalizedPerformerId, config);
+    return this.stashdbAdapter.favoritePerformer(
+      normalizedPerformerId,
+      favorite,
+      config,
+    );
   }
 
   private async getStashdbConfig(): Promise<{

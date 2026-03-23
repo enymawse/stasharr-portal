@@ -100,6 +100,7 @@ export interface SceneDetails {
   imageUrl: string | null;
   images: SceneImage[];
   studioId: string | null;
+  studioIsFavorite: boolean;
   studio: string | null;
   studioImageUrl: string | null;
   studioUrl: string | null;
@@ -161,7 +162,7 @@ export interface SubmitSceneRequestResponse {
 }
 
 export interface FavoriteMutationResponse {
-  favorited: true;
+  favorited: boolean;
   alreadyFavorited: boolean;
 }
 

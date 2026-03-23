@@ -52,6 +52,7 @@ export class SceneDetailsDto {
   imageUrl!: string | null;
   images!: SceneImageDto[];
   studioId!: string | null;
+  studioIsFavorite!: boolean;
   studio!: string | null;
   studioImageUrl!: string | null;
   studioUrl!: string | null;

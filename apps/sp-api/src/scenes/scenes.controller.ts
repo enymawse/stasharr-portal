@@ -1,9 +1,10 @@
-import { Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { DiscoverResponseDto } from '../discover/dto/discover-item.dto';
 import { SceneTagOptionDto } from './dto/scene-tag-option.dto';
 import { SceneDetailsDto } from './dto/scene-details.dto';
 import { ScenesQueryDto } from './dto/scenes-query.dto';
 import { ScenesTagsQueryDto } from './dto/scenes-tags-query.dto';
+import { ToggleFavoriteDto } from './dto/toggle-favorite.dto';
 import { ScenesService } from './scenes.service';
 
 @Controller('api/scenes')
@@ -33,8 +34,9 @@ export class ScenesController {
   @Post('studios/:studioId/favorite')
   favoriteStudio(
     @Param('studioId') studioId: string,
-  ): Promise<{ favorited: true; alreadyFavorited: boolean }> {
-    return this.scenesService.favoriteStudio(studioId);
+    @Body() body: ToggleFavoriteDto,
+  ): Promise<{ favorited: boolean; alreadyFavorited: boolean }> {
+    return this.scenesService.favoriteStudio(studioId, body.favorite);
   }
 
   @Get(':stashId')

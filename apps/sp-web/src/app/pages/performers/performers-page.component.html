@@ -89,15 +89,18 @@
             [attr.aria-label]="'View performer ' + item.name"
           ></a>
 
-          <div
+          <button
+            type="button"
             class="favorite-star"
             [class.is-favorite]="item.isFavorite"
-            role="img"
-            [attr.aria-label]="favoriteIndicatorLabel(item.isFavorite)"
-            [title]="favoriteIndicatorLabel(item.isFavorite)"
+            [disabled]="favoriteToggleBusy(item.id)"
+            [attr.aria-busy]="favoriteToggleBusy(item.id)"
+            [attr.aria-label]="favoriteToggleLabel(item.isFavorite)"
+            [title]="favoriteToggleLabel(item.isFavorite)"
+            (click)="togglePerformerFavorite($event, item)"
           >
             {{ item.isFavorite ? '★' : '☆' }}
-          </div>
+          </button>
 
           @if (item.imageUrl) {
             <img class="performer-image" [src]="item.imageUrl" [alt]="item.name" loading="lazy" />
