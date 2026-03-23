@@ -95,7 +95,14 @@
   </section>
 
   @if (loading()) {
-    <p-message severity="info" styleClass="app-page-message">Loading scenes feed...</p-message>
+    <div class="app-blocking-loader" role="status" aria-live="polite">
+      <p-progressspinner
+        styleClass="app-blocking-spinner"
+        strokeWidth="4"
+        [style]="{ width: '2.25rem', height: '2.25rem' }"
+      />
+      <p>Loading scenes feed...</p>
+    </div>
   } @else if (error()) {
     <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
     <button type="button" class="retry-button" (click)="retryInitialLoad()">Retry</button>

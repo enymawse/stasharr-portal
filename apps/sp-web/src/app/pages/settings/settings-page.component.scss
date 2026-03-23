@@ -179,25 +179,6 @@ input[type='text'],
   gap: 0.45rem;
 }
 
-:host ::ng-deep .settings-confirm-mask {
-  backdrop-filter: blur(4px);
-}
-
-:host ::ng-deep .settings-confirm-dialog {
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
-  overflow: hidden;
-}
-
-:host ::ng-deep .settings-confirm-dialog .p-dialog-content {
-  padding: 0.9rem;
-}
-
-.confirm-dialog-content {
-  display: grid;
-  gap: 0.7rem;
-}
-
 @media (max-width: 720px) {
   .panel-head {
     flex-direction: column;

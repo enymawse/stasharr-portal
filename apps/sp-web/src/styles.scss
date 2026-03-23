@@ -198,6 +198,17 @@ body {
   color: var(--text-muted);
 }
 
+.app-confirm-dialog .p-confirmdialog-content,
+.app-confirm-dialog .p-dialog-header,
+.app-confirm-dialog .p-dialog-footer {
+  background: color-mix(in srgb, var(--surface-1) 95%, #0e1a28);
+  color: var(--text-primary);
+}
+
+.app-confirm-dialog .p-dialog-footer {
+  border-top: 1px solid color-mix(in srgb, var(--border-subtle) 75%, transparent);
+}
+
 .app-page-message {
   margin-top: 0.85rem;
 }
@@ -228,4 +239,34 @@ body {
 .app-page-message .p-message-content,
 .app-banner-message .p-message-content {
   gap: 0.45rem;
+}
+
+.app-blocking-loader {
+  margin-top: 0.9rem;
+  min-height: 9.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+  display: grid;
+  place-items: center;
+  gap: 0.6rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.app-blocking-loader p {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.app-blocking-loader .app-blocking-spinner {
+  color: var(--focus-ring);
+}
+
+.app-blocking-loader--modal {
+  margin-top: 0;
+  min-height: 9rem;
+  border-color: color-mix(in srgb, var(--border-strong) 55%, transparent);
+  background: rgb(9 22 34 / 55%);
+  color: color-mix(in srgb, var(--text-muted) 80%, #deedff);
 }

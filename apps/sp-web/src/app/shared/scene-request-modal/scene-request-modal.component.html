@@ -42,9 +42,14 @@
 
       <div class="request-modal-body">
         @if (requestOptionsLoading()) {
-          <p-message severity="info" styleClass="app-inline-message">
-            Loading request options...
-          </p-message>
+          <div class="app-blocking-loader app-blocking-loader--modal" role="status" aria-live="polite">
+            <p-progressspinner
+              styleClass="app-blocking-spinner"
+              strokeWidth="4"
+              [style]="{ width: '2rem', height: '2rem' }"
+            />
+            <p>Loading request options...</p>
+          </div>
         } @else if (requestOptionsError()) {
           <p-message severity="error" styleClass="app-inline-message">
             {{ requestOptionsError() }}

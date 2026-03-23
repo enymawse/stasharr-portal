@@ -5,7 +5,14 @@
   </header>
 
   @if (loading()) {
-    <p-message severity="info" text="Loading settings..." styleClass="state-message" />
+    <div class="app-blocking-loader" role="status" aria-live="polite">
+      <p-progressspinner
+        styleClass="app-blocking-spinner"
+        strokeWidth="4"
+        [style]="{ width: '2.25rem', height: '2.25rem' }"
+      />
+      <p>Loading settings...</p>
+    </div>
   } @else if (loadError()) {
     <p-message severity="error" styleClass="state-message">{{ loadError() }}</p-message>
   } @else {
@@ -187,81 +194,5 @@
         Reset all integrations
       </button>
     </section>
-
-    <p-dialog
-      [visible]="confirmResetType() !== null"
-      (visibleChange)="onIntegrationResetDialogVisibleChange($event)"
-      [modal]="true"
-      [dismissableMask]="!isPendingIntegrationResetRunning()"
-      [closeOnEscape]="!isPendingIntegrationResetRunning()"
-      [draggable]="false"
-      [resizable]="false"
-      [blockScroll]="true"
-      [appendTo]="'body'"
-      styleClass="settings-confirm-dialog"
-      maskStyleClass="settings-confirm-mask"
-      [style]="{ width: 'min(520px, 94vw)' }"
-      [showHeader]="false"
-    >
-      <div class="confirm-dialog-content">
-        <h3>Reset {{ pendingResetLabel() }} Integration?</h3>
-        <p>Reset this integration and clear saved configuration?</p>
-        <div class="actions">
-          <button
-            pButton
-            type="button"
-            class="danger"
-            [disabled]="confirmResetType() === null || isPendingIntegrationResetRunning()"
-            (click)="confirmPendingIntegrationReset()"
-          >
-            {{ isPendingIntegrationResetRunning() ? 'Resetting...' : 'Confirm reset' }}
-          </button>
-          <button
-            pButton
-            type="button"
-            text
-            [disabled]="isPendingIntegrationResetRunning()"
-            (click)="cancelPendingIntegrationReset()"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </p-dialog>
-
-    <p-dialog
-      [visible]="confirmResetAll()"
-      (visibleChange)="onResetAllDialogVisibleChange($event)"
-      [modal]="true"
-      [dismissableMask]="!resettingAll()"
-      [closeOnEscape]="!resettingAll()"
-      [draggable]="false"
-      [resizable]="false"
-      [blockScroll]="true"
-      [appendTo]="'body'"
-      styleClass="settings-confirm-dialog"
-      maskStyleClass="settings-confirm-mask"
-      [style]="{ width: 'min(520px, 94vw)' }"
-      [showHeader]="false"
-    >
-      <div class="confirm-dialog-content">
-        <h3>Reset All Integrations?</h3>
-        <p>Resetting all integrations clears configuration for Stash, Whisparr, and StashDB.</p>
-        <div class="actions">
-          <button
-            pButton
-            type="button"
-            class="danger"
-            [disabled]="resettingAll()"
-            (click)="resetAllIntegrations()"
-          >
-            {{ resettingAll() ? 'Resetting...' : 'Confirm reset all' }}
-          </button>
-          <button pButton type="button" text [disabled]="resettingAll()" (click)="cancelResetAll()">
-            Cancel
-          </button>
-        </div>
-      </div>
-    </p-dialog>
   }
 </main>

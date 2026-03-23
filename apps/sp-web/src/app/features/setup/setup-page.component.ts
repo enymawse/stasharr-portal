@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { finalize, forkJoin, map, switchMap } from 'rxjs';
 import { Message } from 'primeng/message';
+import { ProgressSpinner } from 'primeng/progressspinner';
 import {
   IntegrationResponse,
   IntegrationType,
@@ -15,7 +16,7 @@ import { SetupStatusResponse } from '../../core/api/setup.types';
 
 @Component({
   selector: 'app-setup-page',
-  imports: [ReactiveFormsModule, Message],
+  imports: [ReactiveFormsModule, Message, ProgressSpinner],
   templateUrl: './setup-page.component.html',
   styleUrl: './setup-page.component.scss',
 })

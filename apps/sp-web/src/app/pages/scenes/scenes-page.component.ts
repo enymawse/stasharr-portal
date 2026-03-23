@@ -24,6 +24,7 @@ import {
 import { InputText } from 'primeng/inputtext';
 import { Message } from 'primeng/message';
 import { MultiSelect } from 'primeng/multiselect';
+import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
 import {
@@ -50,6 +51,7 @@ interface MultiSelectOption {
     FormsModule,
     Message,
     InputText,
+    ProgressSpinner,
     Select,
     MultiSelect,
     SceneStatusBadgeComponent,

@@ -1,10 +1,11 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { finalize, forkJoin } from 'rxjs';
+import { ConfirmationService } from 'primeng/api';
 import { ButtonDirective } from 'primeng/button';
-import { Dialog } from 'primeng/dialog';
 import { InputText } from 'primeng/inputtext';
 import { Message } from 'primeng/message';
+import { ProgressSpinner } from 'primeng/progressspinner';
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
 import { ToggleSwitch } from 'primeng/toggleswitch';
 import { HealthService } from '../../core/api/health.service';
@@ -33,7 +34,7 @@ type SettingsTab = ServiceTab | 'ABOUT';
     ToggleSwitch,
     ButtonDirective,
     Message,
-    Dialog,
+    ProgressSpinner,
   ],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.scss',
@@ -41,6 +42,7 @@ type SettingsTab = ServiceTab | 'ABOUT';
 export class SettingsPageComponent implements OnInit {
   private readonly integrationsService = inject(IntegrationsService);
   private readonly healthService = inject(HealthService);
+  private readonly confirmationService = inject(ConfirmationService);
   private readonly notifications = inject(AppNotificationsService);
 
   protected readonly loading = signal(true);
@@ -49,8 +51,6 @@ export class SettingsPageComponent implements OnInit {
   protected readonly healthError = signal<string | null>(null);
   protected readonly refreshingHealth = signal(false);
   protected readonly activeTab = signal<SettingsTab>('STASH');
-  protected readonly confirmResetType = signal<IntegrationType | null>(null);
-  protected readonly confirmResetAll = signal(false);
   protected readonly resettingAll = signal(false);
 
   protected readonly serviceTabs: ServiceTab[] = ['STASH', 'WHISPARR', 'STASHDB'];
@@ -158,65 +158,43 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected requestIntegrationReset(type: IntegrationType): void {
-    this.confirmResetType.set(type);
-  }
-
-  protected cancelIntegrationReset(type: IntegrationType): void {
-    if (this.confirmResetType() === type) {
-      this.confirmResetType.set(null);
+    if (this.isResetting(type) || this.resettingAll()) {
+      return;
     }
+
+    this.confirmationService.confirm({
+      key: 'app-destructive',
+      header: `Reset ${this.labelFor(type)} Integration?`,
+      message: 'Reset this integration and clear saved configuration?',
+      icon: 'pi pi-exclamation-triangle',
+      rejectLabel: 'Cancel',
+      rejectButtonStyleClass: 'p-button-text',
+      acceptLabel: 'Confirm reset',
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => {
+        this.resetIntegration(type);
+      },
+    });
   }
 
   protected requestResetAll(): void {
-    this.confirmResetAll.set(true);
-  }
-
-  protected onIntegrationResetDialogVisibleChange(visible: boolean): void {
-    if (visible) {
+    if (this.resettingAll()) {
       return;
     }
 
-    const resetType = this.confirmResetType();
-    if (resetType) {
-      this.cancelIntegrationReset(resetType);
-    }
-  }
-
-  protected onResetAllDialogVisibleChange(visible: boolean): void {
-    if (!visible) {
-      this.cancelResetAll();
-    }
-  }
-
-  protected confirmPendingIntegrationReset(): void {
-    const resetType = this.confirmResetType();
-    if (!resetType) {
-      return;
-    }
-
-    this.resetIntegration(resetType);
-  }
-
-  protected cancelPendingIntegrationReset(): void {
-    const resetType = this.confirmResetType();
-    if (!resetType) {
-      return;
-    }
-    this.cancelIntegrationReset(resetType);
-  }
-
-  protected isPendingIntegrationResetRunning(): boolean {
-    const resetType = this.confirmResetType();
-    return resetType ? this.isResetting(resetType) : false;
-  }
-
-  protected pendingResetLabel(): string {
-    const resetType = this.confirmResetType();
-    return resetType ? this.labelFor(resetType) : 'Integration';
-  }
-
-  protected cancelResetAll(): void {
-    this.confirmResetAll.set(false);
+    this.confirmationService.confirm({
+      key: 'app-destructive',
+      header: 'Reset All Integrations?',
+      message: 'Resetting all integrations clears configuration for Stash, Whisparr, and StashDB.',
+      icon: 'pi pi-exclamation-triangle',
+      rejectLabel: 'Cancel',
+      rejectButtonStyleClass: 'p-button-text',
+      acceptLabel: 'Confirm reset all',
+      acceptButtonStyleClass: 'p-button-danger',
+      accept: () => {
+        this.resetAllIntegrations();
+      },
+    });
   }
 
   protected saveIntegration(type: IntegrationType): void {
@@ -312,7 +290,6 @@ export class SettingsPageComponent implements OnInit {
             apiKey: '',
             enabled: integration.enabled,
           });
-          this.confirmResetType.set(null);
           this.notifications.info(`${this.labelFor(type)} integration reset`);
           this.patchActionState(this.resetState, type, {
             success: `${this.labelFor(type)} has been reset.`,
@@ -342,8 +319,6 @@ export class SettingsPageComponent implements OnInit {
       .subscribe({
         next: (integrations) => {
           this.applyIntegrations(integrations);
-          this.confirmResetAll.set(false);
-          this.confirmResetType.set(null);
           this.notifications.info('All integrations were reset to not configured');
         },
         error: () => {

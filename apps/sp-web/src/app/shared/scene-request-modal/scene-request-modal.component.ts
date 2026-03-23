@@ -16,6 +16,7 @@ import { ButtonDirective } from 'primeng/button';
 import { Dialog } from 'primeng/dialog';
 import { Message } from 'primeng/message';
 import { MultiSelect } from 'primeng/multiselect';
+import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { ToggleSwitch } from 'primeng/toggleswitch';
 import { DiscoverService } from '../../core/api/discover.service';
@@ -41,6 +42,7 @@ type NumberSelectOption = {
     Dialog,
     ButtonDirective,
     Message,
+    ProgressSpinner,
     Select,
     ToggleSwitch,
     MultiSelect,

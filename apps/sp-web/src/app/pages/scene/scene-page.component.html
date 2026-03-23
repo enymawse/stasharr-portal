@@ -2,7 +2,14 @@
   <a class="back-link" [routerLink]="['/discover']">Back to Discover</a>
 
   @if (loading()) {
-    <p-message severity="info" styleClass="app-page-message">Loading scene details...</p-message>
+    <div class="app-blocking-loader" role="status" aria-live="polite">
+      <p-progressspinner
+        styleClass="app-blocking-spinner"
+        strokeWidth="4"
+        [style]="{ width: '2.25rem', height: '2.25rem' }"
+      />
+      <p>Loading scene details...</p>
+    </div>
   } @else if (error()) {
     <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
     <button pButton type="button" (click)="retry()">Retry</button>
