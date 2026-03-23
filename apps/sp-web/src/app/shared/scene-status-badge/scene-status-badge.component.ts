@@ -13,25 +13,7 @@ import { SceneStatus } from '../../core/api/discover.types';
           [attr.aria-label]="badgeLabel()"
           [attr.title]="badgeLabel()"
         >
-          @switch (status().state) {
-            @case ('AVAILABLE') {
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M20.3 7.2 10.5 17l-4.8-4.8 1.6-1.6 3.2 3.2 8.2-8.2z" />
-              </svg>
-            }
-            @case ('DOWNLOADING') {
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 5a7 7 0 1 1-7 7h2a5 5 0 1 0 5-5z" />
-                <path d="M11 8h2v5h-2z" />
-                <path d="M12 12h4v2h-4z" />
-              </svg>
-            }
-            @case ('MISSING') {
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m7.4 6 4.6 4.6L16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6-4.6 4.6L6 16.6l4.6-4.6L6 7.4z" />
-              </svg>
-            }
-          }
+          <i [class]="statusIconClass()" aria-hidden="true"></i>
         </span>
       }
     } @else {
@@ -87,6 +69,20 @@ export class SceneStatusBadgeComponent {
       case 'NOT_REQUESTED':
       default:
         return 'icon not-requested';
+    }
+  });
+
+  protected readonly statusIconClass = computed(() => {
+    switch (this.status().state) {
+      case 'DOWNLOADING':
+        return 'pi pi-spinner pi-spin';
+      case 'AVAILABLE':
+        return 'pi pi-check-circle';
+      case 'MISSING':
+        return 'pi pi-times-circle';
+      case 'NOT_REQUESTED':
+      default:
+        return 'pi pi-circle';
     }
   });
 }

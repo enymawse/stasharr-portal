@@ -61,7 +61,7 @@
               [attr.title]="studioFavoriteTitle(scene)"
               (click)="toggleFavoriteStudio(scene)"
             >
-              {{ scene.studioIsFavorite ? '★' : '☆' }}
+              <i [class]="scene.studioIsFavorite ? 'pi pi-star-fill' : 'pi pi-star'" aria-hidden="true"></i>
             </button>
           }
         </div>
@@ -228,7 +228,10 @@
                   [title]="performerFavoriteToggleLabel(performer.isFavorite)"
                   (click)="toggleScenePerformerFavorite($event, performer)"
                 >
-                  {{ performer.isFavorite ? '★' : '☆' }}
+                  <i
+                    [class]="performer.isFavorite ? 'pi pi-star-fill' : 'pi pi-star'"
+                    aria-hidden="true"
+                  ></i>
                 </button>
 
                 @if (performer.imageUrl) {

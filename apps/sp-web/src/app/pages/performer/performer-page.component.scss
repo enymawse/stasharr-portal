@@ -182,9 +182,12 @@ main > button {
   border: 1px solid rgb(170 201 229 / 45%);
   border-radius: 999px;
   background: rgb(17 33 49 / 56%);
-  font-size: 1.5rem;
   color: rgb(255 255 255 / 78%);
   cursor: pointer;
+}
+
+.favorite-indicator i {
+  font-size: 1.25rem;
 }
 
 .favorite-indicator.active {

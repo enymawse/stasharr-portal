@@ -110,7 +110,7 @@
             [title]="favoriteToggleLabel(item.isFavorite)"
             (click)="togglePerformerFavorite($event, item)"
           >
-            {{ item.isFavorite ? '★' : '☆' }}
+            <i [class]="item.isFavorite ? 'pi pi-star-fill' : 'pi pi-star'" aria-hidden="true"></i>
           </button>
 
           @if (item.imageUrl) {

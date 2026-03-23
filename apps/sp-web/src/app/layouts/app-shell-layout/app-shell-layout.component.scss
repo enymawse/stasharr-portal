@@ -56,6 +56,12 @@
   width: 30px;
   height: 30px;
   cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.collapse-btn i {
+  font-size: 0.9rem;
 }
 
 .nav {
@@ -90,10 +96,8 @@
   color: var(--text-muted);
 }
 
-.icon svg {
-  width: 1.24rem;
-  height: 1.24rem;
-  fill: currentColor;
+.icon i {
+  font-size: 1.24rem;
 }
 
 .nav-item.active {

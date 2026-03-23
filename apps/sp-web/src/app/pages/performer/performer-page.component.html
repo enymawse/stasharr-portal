@@ -75,7 +75,10 @@
               [attr.aria-label]="performer.isFavorite ? 'Unfavorite performer' : 'Favorite performer'"
               (click)="toggleFavoritePerformer(performer)"
             >
-              {{ performer.isFavorite ? '★' : '☆' }}
+              <i
+                [class]="performer.isFavorite ? 'pi pi-star-fill' : 'pi pi-star'"
+                aria-hidden="true"
+              ></i>
             </button>
           </div>
 

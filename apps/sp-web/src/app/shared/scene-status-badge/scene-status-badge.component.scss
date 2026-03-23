@@ -22,10 +22,8 @@
   backdrop-filter: blur(4px);
 }
 
-.icon svg {
-  width: 1rem;
-  height: 1rem;
-  fill: currentColor;
+.icon i {
+  font-size: 1rem;
 }
 
 .not-requested {

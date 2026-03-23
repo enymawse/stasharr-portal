@@ -27,7 +27,9 @@
             <p-tab [value]="type">
               <span>{{ labelFor(type) }}</span>
               @if (configured(type)) {
-                <span class="check" aria-label="Configured">✓</span>
+                <span class="check" aria-label="Configured">
+                  <i class="pi pi-check-circle" aria-hidden="true"></i>
+                </span>
               }
             </p-tab>
           }

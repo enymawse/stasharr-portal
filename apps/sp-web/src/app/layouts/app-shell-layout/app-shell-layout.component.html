@@ -14,7 +14,10 @@
         [attr.aria-label]="collapsed() ? 'Expand navigation' : 'Collapse navigation'"
         [attr.aria-expanded]="!collapsed()"
       >
-        <span aria-hidden="true">{{ collapsed() ? '»' : '«' }}</span>
+        <i
+          [class]="collapsed() ? 'pi pi-angle-double-right' : 'pi pi-angle-double-left'"
+          aria-hidden="true"
+        ></i>
       </button>
     </div>
 
@@ -25,13 +28,7 @@
         [routerLinkActiveOptions]="{ exact: true }"
         class="nav-item"
       >
-        <span class="icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path
-              d="M10.5 3a7.5 7.5 0 0 1 6.02 11.97l4.25 4.24a1 1 0 0 1-1.42 1.42l-4.24-4.25A7.5 7.5 0 1 1 10.5 3Zm0 2a5.5 5.5 0 1 0 0 11a5.5 5.5 0 0 0 0-11Z"
-            />
-          </svg>
-        </span>
+        <span class="icon" aria-hidden="true"><i class="pi pi-search"></i></span>
         @if (!collapsed()) {
           <span>Discover</span>
         }
@@ -43,13 +40,7 @@
         [routerLinkActiveOptions]="{ exact: true }"
         class="nav-item"
       >
-        <span class="icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path
-              d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2v3h14V6H5Zm0 5v7h14v-7H5Zm2 1.25h3v4.5H7v-4.5Zm5 0h5v1.5h-5v-1.5Zm0 3h5v1.5h-5v-1.5Z"
-            />
-          </svg>
-        </span>
+        <span class="icon" aria-hidden="true"><i class="pi pi-video"></i></span>
         @if (!collapsed()) {
           <span>Scenes</span>
         }
@@ -61,13 +52,7 @@
         [routerLinkActiveOptions]="{ exact: true }"
         class="nav-item"
       >
-        <span class="icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path
-              d="M5 4h14a2 2 0 0 1 2 2v5.2a6 6 0 0 0-2-.95V6H5v12h4.25c.16.72.45 1.4.84 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm8 5h4v2h-4V9Zm0 3h4v2h-4v-2Zm-6 0h4v2H7v-2Zm0-3h4v2H7V9Zm9.5 5.5a4.5 4.5 0 1 1-3.66 7.12l-1.96 1.96-1.41-1.41 1.96-1.96A4.5 4.5 0 0 1 16.5 14.5Zm0 2a2.5 2.5 0 1 0 0 5a2.5 2.5 0 0 0 0-5Z"
-            />
-          </svg>
-        </span>
+        <span class="icon" aria-hidden="true"><i class="pi pi-inbox"></i></span>
         @if (!collapsed()) {
           <span>Requests</span>
         }
@@ -79,13 +64,7 @@
         [routerLinkActiveOptions]="{ exact: true }"
         class="nav-item"
       >
-        <span class="icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path
-              d="M12 3a4.25 4.25 0 1 1 0 8.5A4.25 4.25 0 0 1 12 3Zm-7.5 15a5.5 5.5 0 0 1 11 0v1.5H4.5V18Zm12.5-2.6A4.6 4.6 0 0 1 21 20v-.5a3.5 3.5 0 0 0-3.5-3.5h-1.3a6.78 6.78 0 0 0 .8-1.6ZM16 5.2a3.4 3.4 0 0 1 0 6.6a5.89 5.89 0 0 0 .2-6.6H16Z"
-            />
-          </svg>
-        </span>
+        <span class="icon" aria-hidden="true"><i class="pi pi-users"></i></span>
         @if (!collapsed()) {
           <span>Performers</span>
         }
@@ -97,13 +76,7 @@
         [routerLinkActiveOptions]="{ exact: true }"
         class="nav-item"
       >
-        <span class="icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false">
-            <path
-              d="M10.72 2.63a1 1 0 0 1 1.56 0l.66.82a1 1 0 0 0 .98.35l1.03-.2a1 1 0 0 1 1.2.98l.06 1.04a1 1 0 0 0 .62.83l.95.4a1 1 0 0 1 .56 1.46l-.48.93a1 1 0 0 0 .12 1.03l.66.82a1 1 0 0 1 0 1.24l-.66.82a1 1 0 0 0-.12 1.03l.48.93a1 1 0 0 1-.56 1.46l-.95.4a1 1 0 0 0-.62.83l-.06 1.04a1 1 0 0 1-1.2.98l-1.03-.2a1 1 0 0 0-.98.35l-.66.82a1 1 0 0 1-1.56 0l-.66-.82a1 1 0 0 0-.98-.35l-1.03.2a1 1 0 0 1-1.2-.98l-.06-1.04a1 1 0 0 0-.62-.83l-.95-.4a1 1 0 0 1-.56-1.46l.48-.93a1 1 0 0 0-.12-1.03l-.66-.82a1 1 0 0 1 0-1.24l.66-.82a1 1 0 0 0 .12-1.03l-.48-.93a1 1 0 0 1 .56-1.46l.95-.4a1 1 0 0 0 .62-.83l.06-1.04a1 1 0 0 1 1.2-.98l1.03.2a1 1 0 0 0 .98-.35l.66-.82ZM12 9.25a2.75 2.75 0 1 0 0 5.5a2.75 2.75 0 0 0 0-5.5Z"
-            />
-          </svg>
-        </span>
+        <span class="icon" aria-hidden="true"><i class="pi pi-cog"></i></span>
         @if (!collapsed()) {
           <span>Settings</span>
         }

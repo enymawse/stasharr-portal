@@ -126,11 +126,12 @@ a.studio-logo-overlay:focus-visible {
   border: 1px solid rgb(188 213 238 / 52%);
   border-radius: 999px;
   background: rgb(13 27 41 / 70%);
-  font-size: 1rem;
-  font-weight: 800;
   color: rgb(255 255 255 / 85%);
-  text-shadow: 0 1px 3px rgb(0 0 0 / 55%);
   cursor: pointer;
+}
+
+.studio-favorite-indicator i {
+  font-size: 0.95rem;
 }
 
 .studio-favorite-indicator.active {
@@ -408,11 +409,12 @@ button {
   border: 1px solid rgb(188 213 238 / 52%);
   border-radius: 999px;
   background: rgb(13 27 41 / 70%);
-  font-size: 1rem;
-  font-weight: 800;
   color: rgb(255 255 255 / 85%);
-  text-shadow: 0 1px 3px rgb(0 0 0 / 55%);
   cursor: pointer;
+}
+
+.performer-favorite i {
+  font-size: 0.95rem;
 }
 
 .performer-favorite.is-favorite {

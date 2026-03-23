@@ -33,8 +33,13 @@ p {
 
 .check {
   color: #1f8c48;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
   margin-left: 0.25rem;
+}
+
+.check i {
+  font-size: 0.9rem;
 }
 
 :host ::ng-deep .settings-tabs .p-tablist {
