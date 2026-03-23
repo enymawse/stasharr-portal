@@ -352,6 +352,10 @@ interface StashdbGraphqlResponse {
           width?: unknown;
           height?: unknown;
         }>;
+        parent?: {
+          id?: unknown;
+          name?: unknown;
+        } | null;
         child_studios?: Array<{
           id?: unknown;
           name?: unknown;
@@ -717,6 +721,10 @@ export class StashdbAdapter {
               width
               height
             }
+            parent {
+              id
+              name
+            }
             child_studios {
               id
               name
@@ -740,28 +748,6 @@ export class StashdbAdapter {
         ? payload.data.queryStudios.count
         : 0;
     const rawStudios = payload.data?.queryStudios?.studios ?? [];
-    const parentByChildId = new Map<string, { id: string; name: string }>();
-
-    rawStudios.forEach((studio) => {
-      if (typeof studio.id !== 'string' || typeof studio.name !== 'string') {
-        return;
-      }
-      const studioId = studio.id;
-      const studioName = studio.name;
-
-      (studio.child_studios ?? []).forEach((child) => {
-        if (typeof child.id !== 'string') {
-          return;
-        }
-
-        if (!parentByChildId.has(child.id)) {
-          parentByChildId.set(child.id, {
-            id: studioId,
-            name: studioName,
-          });
-        }
-      });
-    });
 
     const studios = rawStudios
       .map((studio): StashdbStudioFeedItem | null => {
@@ -790,7 +776,14 @@ export class StashdbAdapter {
           isFavorite: studio.is_favorite === true,
           imageUrl:
             this.selectPrimaryImage(this.normalizeImages(studio.images))?.url ?? null,
-          parentStudio: parentByChildId.get(studio.id) ?? null,
+          parentStudio:
+            typeof studio.parent?.id === 'string' &&
+            typeof studio.parent?.name === 'string'
+              ? {
+                  id: studio.parent.id,
+                  name: studio.parent.name,
+                }
+              : null,
           childStudios,
         };
       })

@@ -956,6 +956,10 @@ describe('StashdbAdapter', () => {
                   id: 'studio-1',
                   name: 'Studio One',
                   is_favorite: true,
+                  parent: {
+                    id: 'parent-1',
+                    name: 'Parent Studio',
+                  },
                   images: [
                     {
                       id: 'studio-img-small',
@@ -979,6 +983,7 @@ describe('StashdbAdapter', () => {
                   id: 'parent-1',
                   name: 'Parent Studio',
                   is_favorite: false,
+                  parent: null,
                   images: [],
                   child_studios: [{ id: 'studio-1', name: 'Studio One' }],
                 },
@@ -1030,6 +1035,7 @@ describe('StashdbAdapter', () => {
     expect(requestBody.query).toContain('queryStudios');
     expect(requestBody.query).toContain('sort: UPDATED_AT');
     expect(requestBody.query).toContain('direction: DESC');
+    expect(requestBody.query).toContain('parent {');
     expect(requestBody.query).toContain('is_favorite: true');
     expect(requestBody.variables).toEqual({
       page: 2,
