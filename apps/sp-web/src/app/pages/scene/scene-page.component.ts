@@ -1,6 +1,9 @@
 import { Component, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
+import { ButtonDirective } from 'primeng/button';
+import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
 import { SceneDetails, SceneRequestContext } from '../../core/api/discover.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
@@ -8,7 +11,14 @@ import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene
 
 @Component({
   selector: 'app-scene-page',
-  imports: [RouterLink, SceneStatusBadgeComponent, SceneRequestModalComponent],
+  imports: [
+    RouterLink,
+    FormsModule,
+    Select,
+    ButtonDirective,
+    SceneStatusBadgeComponent,
+    SceneRequestModalComponent,
+  ],
   templateUrl: './scene-page.component.html',
   styleUrl: './scene-page.component.scss',
 })
@@ -73,8 +83,8 @@ export class ScenePageComponent implements OnInit {
     );
   }
 
-  protected onStashCopySelected(viewUrl: string): void {
-    this.selectedStashCopyUrl.set(viewUrl);
+  protected onStashCopySelected(viewUrl: string | null | undefined): void {
+    this.selectedStashCopyUrl.set(viewUrl ?? null);
   }
 
   protected studioLogoAriaLabel(scene: SceneDetails): string {

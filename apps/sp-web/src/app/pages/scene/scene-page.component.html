@@ -5,7 +5,7 @@
     <p class="state">Loading scene details...</p>
   } @else if (error()) {
     <p class="state error">{{ error() }}</p>
-    <button type="button" (click)="retry()">Retry</button>
+    <button pButton type="button" (click)="retry()">Retry</button>
   } @else if (scene(); as scene) {
     <section class="hero-shell">
       @if (scene.imageUrl) {
@@ -76,23 +76,37 @@
                 @if (hasMultipleStashCopies(scene)) {
                   <label class="stash-copy-selector">
                     <span>Stash Copies</span>
-                    <select
-                      [value]="selectedStashViewUrl(scene)"
-                      (change)="onStashCopySelected($any($event.target).value)"
-                    >
-                      @for (copy of scene.stash!.copies; track copy.id) {
-                        <option [value]="copy.viewUrl">{{ copy.label }}</option>
-                      }
-                    </select>
+                    <p-select
+                      inputId="scene-stash-copy"
+                      [ngModel]="selectedStashViewUrl(scene)"
+                      (ngModelChange)="onStashCopySelected($event)"
+                      [options]="scene.stash!.copies"
+                      optionLabel="label"
+                      optionValue="viewUrl"
+                      [appendTo]="'body'"
+                      panelStyleClass="scene-action-select-panel"
+                    />
                   </label>
 
                   @if (selectedStashViewUrl(scene); as selectedViewUrl) {
-                    <a [href]="selectedViewUrl" target="_blank" rel="noopener noreferrer">
+                    <a
+                      pButton
+                      class="hero-action-button"
+                      [href]="selectedViewUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       View in Stash ({{ selectedStashLabel(scene) }})
                     </a>
                   }
                 } @else if (scene.stash!.copies[0]; as singleCopy) {
-                  <a [href]="singleCopy.viewUrl" target="_blank" rel="noopener noreferrer">
+                  <a
+                    pButton
+                    class="hero-action-button"
+                    [href]="singleCopy.viewUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     View in Stash
                   </a>
                 }
@@ -100,6 +114,8 @@
 
               @if (hasWhisparrLink(scene)) {
                 <a
+                  pButton
+                  class="hero-action-button"
                   [href]="scene.whisparr!.viewUrl"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -110,9 +126,10 @@
 
               @if (canRequestScene(scene)) {
                 <button
+                  pButton
                   #requestTriggerButton
                   type="button"
-                  class="request-button"
+                  class="hero-action-button request-button"
                   (click)="openRequestPanel(scene)"
                 >
                   Request in Whisparr

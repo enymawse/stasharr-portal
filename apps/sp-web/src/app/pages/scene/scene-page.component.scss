@@ -202,17 +202,69 @@ a.studio-logo-overlay:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 0.48rem;
+  align-items: center;
 }
 
-.hero-actions a {
+.hero-action-button {
+  text-decoration: none;
+}
+
+:host ::ng-deep .hero-actions .p-button,
+:host ::ng-deep .p-button.request-button {
   text-decoration: none;
   border-radius: 8px;
   border: 1px solid var(--border-strong);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
+  background: rgb(17 34 52 / 78%);
+  color: var(--text-on-media);
   font-size: 0.8rem;
   font-weight: 700;
-  padding: 0.34rem 0.62rem;
+  padding: 0.4rem 0.68rem;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 14%);
+}
+
+:host ::ng-deep .hero-actions .p-button:not(:disabled):hover,
+:host ::ng-deep .p-button.request-button:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--focus-ring) 62%, var(--border-strong));
+  background: rgb(25 49 75 / 82%);
+}
+
+:host ::ng-deep .hero-actions .p-button:focus-visible,
+:host ::ng-deep .p-button.request-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.stash-copy-selector {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  color: var(--text-on-media);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+:host ::ng-deep .stash-copy-selector .p-select {
+  min-width: 10.8rem;
+  border-radius: 8px;
+  border-color: color-mix(in srgb, var(--border-strong) 85%, transparent);
+  background: rgb(17 34 52 / 78%);
+  color: var(--text-on-media);
+}
+
+:host ::ng-deep .stash-copy-selector .p-select-label {
+  color: var(--text-on-media);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+:host ::ng-deep .stash-copy-selector .p-select-dropdown {
+  color: var(--text-on-media);
+}
+
+:host ::ng-deep .stash-copy-selector .p-select.p-focus {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus-ring) 44%, transparent);
 }
 
 .request-button {
@@ -220,22 +272,14 @@ a.studio-logo-overlay:focus-visible {
   font-weight: 700;
 }
 
-.stash-copy-selector {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  color: var(--text-on-media);
-  font-size: 0.76rem;
-  font-weight: 700;
-}
-
-.stash-copy-selector select {
+button {
+  width: fit-content;
+  padding: 0.42rem 0.72rem;
   border-radius: 7px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  font-size: 0.76rem;
-  padding: 0.25rem 0.36rem;
+  border: 1px solid var(--button-border);
+  background: var(--button-bg);
+  color: var(--button-text);
+  cursor: pointer;
 }
 
 .content-shell {
@@ -317,16 +361,6 @@ a.studio-logo-overlay:focus-visible {
   padding: 0.18rem 0.56rem;
   font-size: 0.88rem;
   color: var(--chip-text);
-}
-
-button {
-  width: fit-content;
-  padding: 0.42rem 0.72rem;
-  border-radius: 6px;
-  border: 1px solid var(--button-border);
-  background: var(--button-bg);
-  color: var(--button-text);
-  cursor: pointer;
 }
 
 @media (max-width: 880px) {
