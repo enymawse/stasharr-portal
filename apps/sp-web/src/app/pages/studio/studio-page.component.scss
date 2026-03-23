@@ -321,16 +321,45 @@ ul {
 .source-list {
   list-style: none;
   padding: 0;
-  display: grid;
-  gap: 0.42rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.source-list a {
+.source-link {
   color: var(--text-primary);
   text-decoration: none;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
+  justify-content: center;
+  min-width: 2.2rem;
+  min-height: 2.2rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
+  padding: 0.3rem;
+}
+
+.source-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.source-link-icon {
+  width: auto;
+  height: 1.25rem;
+  max-width: 5.5rem;
+  object-fit: contain;
+  display: block;
+}
+
+.source-link-fallback {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .controls-shell {

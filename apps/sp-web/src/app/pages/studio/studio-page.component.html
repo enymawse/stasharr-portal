@@ -166,9 +166,26 @@
           <ul class="source-list">
             @for (entry of studio.urls; track entry.url) {
               <li>
-                <a [href]="entry.url" target="_blank" rel="noopener noreferrer">
-                  {{ entry.siteName ?? entry.type ?? 'Studio Link' }}
-                  <i class="pi pi-external-link" aria-hidden="true"></i>
+                <a
+                  class="source-link"
+                  [href]="entry.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  [attr.aria-label]="'Open ' + (entry.siteName ?? entry.type ?? 'source link') + ' in a new tab'"
+                  [title]="entry.siteName ?? entry.type ?? 'Source link'"
+                >
+                  @if (entry.siteIcon) {
+                    <img
+                      class="source-link-icon"
+                      [src]="entry.siteIcon"
+                      [alt]="(entry.siteName ?? entry.type ?? 'Source') + ' logo'"
+                      loading="lazy"
+                    />
+                  } @else {
+                    <span class="source-link-fallback">
+                      {{ entry.siteName ?? entry.type ?? 'Source' }}
+                    </span>
+                  }
                 </a>
               </li>
             }
