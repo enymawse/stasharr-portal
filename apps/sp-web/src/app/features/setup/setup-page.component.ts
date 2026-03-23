@@ -8,6 +8,7 @@ import {
   UpdateIntegrationPayload,
 } from '../../core/api/integrations.types';
 import { IntegrationsService } from '../../core/api/integrations.service';
+import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import { SetupService } from '../../core/api/setup.service';
 import { SetupStatusResponse } from '../../core/api/setup.types';
 
@@ -20,11 +21,11 @@ import { SetupStatusResponse } from '../../core/api/setup.types';
 export class SetupPageComponent implements OnInit {
   private readonly setupService = inject(SetupService);
   private readonly integrationsService = inject(IntegrationsService);
+  private readonly notifications = inject(AppNotificationsService);
   private readonly router = inject(Router);
 
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
-  protected readonly setupMessage = signal<string | null>(null);
   protected readonly status = signal<SetupStatusResponse | null>(null);
 
   protected readonly integrationTypes: IntegrationType[] = [
@@ -106,14 +107,6 @@ export class SetupPageComponent implements OnInit {
     return this.saveState()[type].saving;
   }
 
-  protected saveSuccess(type: IntegrationType): string | null {
-    return this.saveState()[type].success;
-  }
-
-  protected saveError(type: IntegrationType): string | null {
-    return this.saveState()[type].error;
-  }
-
   protected saveIntegration(type: IntegrationType): void {
     const formValue = this.forms[type].getRawValue();
     const payload: UpdateIntegrationPayload = {
@@ -155,17 +148,18 @@ export class SetupPageComponent implements OnInit {
           this.forms[type].patchValue({
             apiKey: '',
           });
+          this.notifications.success(`${this.labelFor(type)} saved successfully`);
           this.patchSaveState(type, {
             success: `${this.labelFor(type)} saved successfully.`,
             error: null,
           });
-          this.setupMessage.set('Integration updated.');
 
           if (setupStatus.setupComplete) {
             void this.router.navigateByUrl('/discover');
           }
         },
         error: () => {
+          this.notifications.error(`Failed to save ${this.labelFor(type)}`);
           this.patchSaveState(type, {
             success: null,
             error: `Failed to save ${this.labelFor(type)}.`,

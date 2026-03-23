@@ -9,10 +9,6 @@
   } @else if (loadError()) {
     <p-message severity="error" styleClass="state-message">{{ loadError() }}</p-message>
   } @else {
-    @if (globalMessage()) {
-      <p-message severity="info" styleClass="state-message">{{ globalMessage() }}</p-message>
-    }
-
     <section class="tabs-shell">
       <p-tabs
         [value]="activeTab()"
@@ -94,26 +90,6 @@
                   </button>
                 </div>
 
-                @if (saveSuccess(type)) {
-                  <p-message severity="success" styleClass="inline-message">
-                    {{ saveSuccess(type) }}
-                  </p-message>
-                }
-                @if (saveError(type)) {
-                  <p-message severity="error" styleClass="inline-message">
-                    {{ saveError(type) }}
-                  </p-message>
-                }
-                @if (testSuccess(type)) {
-                  <p-message severity="success" styleClass="inline-message">
-                    {{ testSuccess(type) }}
-                  </p-message>
-                }
-                @if (testError(type)) {
-                  <p-message severity="error" styleClass="inline-message">
-                    {{ testError(type) }}
-                  </p-message>
-                }
               </form>
 
               <div class="health-card">
@@ -137,16 +113,6 @@
                   Reset {{ labelFor(type) }} Integration
                 </button>
 
-                @if (resetSuccess(type)) {
-                  <p-message severity="success" styleClass="inline-message">
-                    {{ resetSuccess(type) }}
-                  </p-message>
-                }
-                @if (resetError(type)) {
-                  <p-message severity="error" styleClass="inline-message">
-                    {{ resetError(type) }}
-                  </p-message>
-                }
               </div>
             </section>
             </p-tabpanel>

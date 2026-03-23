@@ -19,10 +19,6 @@
       </p>
     }
 
-    @if (setupMessage()) {
-      <p class="state">{{ setupMessage() }}</p>
-    }
-
     <section class="cards">
       @for (type of integrationTypes; track type) {
         <article class="card">
@@ -62,12 +58,6 @@
               </button>
             </div>
 
-            @if (saveSuccess(type)) {
-              <p class="state success">{{ saveSuccess(type) }}</p>
-            }
-            @if (saveError(type)) {
-              <p class="state error">{{ saveError(type) }}</p>
-            }
           </form>
         </article>
       }

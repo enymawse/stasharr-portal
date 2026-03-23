@@ -10,6 +10,7 @@ import { ToggleSwitch } from 'primeng/toggleswitch';
 import { HealthService } from '../../core/api/health.service';
 import { HealthStatusResponse } from '../../core/api/health.types';
 import { IntegrationsService } from '../../core/api/integrations.service';
+import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import {
   IntegrationResponse,
   IntegrationType,
@@ -40,10 +41,10 @@ type SettingsTab = ServiceTab | 'ABOUT';
 export class SettingsPageComponent implements OnInit {
   private readonly integrationsService = inject(IntegrationsService);
   private readonly healthService = inject(HealthService);
+  private readonly notifications = inject(AppNotificationsService);
 
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
-  protected readonly globalMessage = signal<string | null>(null);
   protected readonly health = signal<HealthStatusResponse | null>(null);
   protected readonly healthError = signal<string | null>(null);
   protected readonly refreshingHealth = signal(false);
@@ -148,44 +149,15 @@ export class SettingsPageComponent implements OnInit {
     return this.saveState()[type].running;
   }
 
-  protected saveSuccess(type: IntegrationType): string | null {
-    return this.saveState()[type].success;
-  }
-
-  protected saveError(type: IntegrationType): string | null {
-    return this.saveState()[type].error;
-  }
-
   protected isTesting(type: IntegrationType): boolean {
     return this.testState()[type].running;
-  }
-
-  protected testSuccess(type: IntegrationType): string | null {
-    return this.testState()[type].success;
-  }
-
-  protected testError(type: IntegrationType): string | null {
-    return this.testState()[type].error;
   }
 
   protected isResetting(type: IntegrationType): boolean {
     return this.resetState()[type].running;
   }
 
-  protected resetSuccess(type: IntegrationType): string | null {
-    return this.resetState()[type].success;
-  }
-
-  protected resetError(type: IntegrationType): string | null {
-    return this.resetState()[type].error;
-  }
-
-  protected shouldConfirmReset(type: IntegrationType): boolean {
-    return this.confirmResetType() === type;
-  }
-
   protected requestIntegrationReset(type: IntegrationType): void {
-    this.globalMessage.set(null);
     this.confirmResetType.set(type);
   }
 
@@ -196,7 +168,6 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected requestResetAll(): void {
-    this.globalMessage.set(null);
     this.confirmResetAll.set(true);
   }
 
@@ -268,12 +239,14 @@ export class SettingsPageComponent implements OnInit {
         next: (integration) => {
           this.updateIntegration(type, integration);
           this.forms[type].patchValue({ apiKey: '' });
+          this.notifications.success(`${this.labelFor(type)} settings saved`);
           this.patchActionState(this.saveState, type, {
             success: `${this.labelFor(type)} settings saved.`,
             error: null,
           });
         },
         error: () => {
+          this.notifications.error(`Failed to save ${this.labelFor(type)} settings`);
           this.patchActionState(this.saveState, type, {
             success: null,
             error: `Failed to save ${this.labelFor(type)} settings.`,
@@ -300,12 +273,14 @@ export class SettingsPageComponent implements OnInit {
       .subscribe({
         next: (integration) => {
           this.updateIntegration(type, integration);
+          this.notifications.success(`${this.labelFor(type)} test passed`);
           this.patchActionState(this.testState, type, {
             success: `${this.labelFor(type)} test passed.`,
             error: null,
           });
         },
         error: () => {
+          this.notifications.error(`${this.labelFor(type)} test failed`);
           this.patchActionState(this.testState, type, {
             success: null,
             error: `${this.labelFor(type)} test failed.`,
@@ -338,12 +313,14 @@ export class SettingsPageComponent implements OnInit {
             enabled: integration.enabled,
           });
           this.confirmResetType.set(null);
+          this.notifications.info(`${this.labelFor(type)} integration reset`);
           this.patchActionState(this.resetState, type, {
             success: `${this.labelFor(type)} has been reset.`,
             error: null,
           });
         },
         error: () => {
+          this.notifications.error(`Failed to reset ${this.labelFor(type)}`);
           this.patchActionState(this.resetState, type, {
             success: null,
             error: `Failed to reset ${this.labelFor(type)}.`,
@@ -354,7 +331,6 @@ export class SettingsPageComponent implements OnInit {
 
   protected resetAllIntegrations(): void {
     this.resettingAll.set(true);
-    this.globalMessage.set(null);
 
     this.integrationsService
       .resetAllIntegrations()
@@ -368,10 +344,10 @@ export class SettingsPageComponent implements OnInit {
           this.applyIntegrations(integrations);
           this.confirmResetAll.set(false);
           this.confirmResetType.set(null);
-          this.globalMessage.set('All integrations were reset to not configured.');
+          this.notifications.info('All integrations were reset to not configured');
         },
         error: () => {
-          this.globalMessage.set('Failed to reset all integrations.');
+          this.notifications.error('Failed to reset all integrations');
         },
       });
   }

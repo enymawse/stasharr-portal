@@ -1,4 +1,10 @@
 <div class="app-shell">
   <app-theme-toggle class="global-theme-toggle" />
   <router-outlet></router-outlet>
+  <p-toast
+    key="global"
+    position="bottom-right"
+    styleClass="app-toast"
+    [baseZIndex]="1200"
+  />
 </div>

@@ -18,6 +18,7 @@ import { MultiSelect } from 'primeng/multiselect';
 import { Select } from 'primeng/select';
 import { ToggleSwitch } from 'primeng/toggleswitch';
 import { DiscoverService } from '../../core/api/discover.service';
+import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import { SceneRequestOptions } from '../../core/api/discover.types';
 
 type StringSelectOption = {
@@ -47,6 +48,7 @@ type NumberSelectOption = {
 })
 export class SceneRequestModalComponent implements OnChanges, OnDestroy {
   private readonly discoverService = inject(DiscoverService);
+  private readonly notifications = inject(AppNotificationsService);
   private loadedForSceneId: string | null = null;
   private loadingSceneId: string | null = null;
   private optionsLoadSub: Subscription | null = null;
@@ -203,6 +205,7 @@ export class SceneRequestModalComponent implements OnChanges, OnDestroy {
       )
       .subscribe({
         next: () => {
+          this.notifications.success('Scene request submitted to Whisparr');
           this.submitted.emit(currentSceneId);
           this.closed.emit();
         },

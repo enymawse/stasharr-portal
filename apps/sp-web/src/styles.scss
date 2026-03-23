@@ -178,3 +178,22 @@ body {
 .scene-action-select-panel .p-select-empty-message {
   font-size: 0.82rem;
 }
+
+.app-toast .p-toast-message {
+  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 94%, #0e1a28);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.app-toast .p-toast-message-content {
+  gap: 0.5rem;
+}
+
+.app-toast .p-toast-summary {
+  font-weight: 700;
+}
+
+.app-toast .p-toast-detail {
+  color: var(--text-muted);
+}
