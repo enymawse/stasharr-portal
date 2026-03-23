@@ -23,6 +23,7 @@ import { Message } from 'primeng/message';
 import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { ToggleSwitch } from 'primeng/toggleswitch';
+import { ActivatedRoute, Router } from '@angular/router';
 import { DiscoverService } from '../../core/api/discover.service';
 import {
   PerformerFeedItem,
@@ -50,6 +51,8 @@ type GenderOption = PerformerGender | 'NONE';
 export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly PAGE_SIZE = 50;
   private static readonly NAME_FILTER_DEBOUNCE_MS = 300;
+  private static readonly DEFAULT_SORT: PerformerSort = 'NAME';
+  private static readonly DEFAULT_GENDER: GenderOption = 'NONE';
 
   protected static readonly SORT_OPTIONS: Array<{
     value: PerformerSort;
@@ -80,13 +83,17 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
   ];
 
   private readonly discoverService = inject(DiscoverService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly nameFilterTerms = new Subject<string>();
   private nameFilterSubscription: Subscription | null = null;
+  private queryParamSubscription: Subscription | null = null;
   private observer: IntersectionObserver | null = null;
   private sentinelElement: HTMLDivElement | null = null;
   private sentinelIntersecting = false;
   private feedVersion = 0;
   private pendingReload = false;
+  private hasHydratedFromUrl = false;
 
   @ViewChild('loadMoreSentinel')
   set loadMoreSentinel(elementRef: ElementRef<HTMLDivElement> | undefined) {
@@ -116,15 +123,15 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
   protected readonly inFlight = signal(false);
   protected readonly items = signal<PerformerFeedItem[]>([]);
   protected readonly nameFilter = signal('');
-  protected readonly selectedGender = signal<GenderOption>('NONE');
-  protected readonly selectedSort = signal<PerformerSort>('NAME');
+  protected readonly selectedGender = signal<GenderOption>(PerformersPageComponent.DEFAULT_GENDER);
+  protected readonly selectedSort = signal<PerformerSort>(PerformersPageComponent.DEFAULT_SORT);
   protected readonly favoritesOnly = signal(false);
   protected readonly sortOptions = PerformersPageComponent.SORT_OPTIONS;
   protected readonly genderOptions = PerformersPageComponent.GENDER_OPTIONS;
 
   ngOnInit(): void {
     this.setupNameFilterDebounce();
-    this.loadNextPage();
+    this.setupUrlStateSync();
   }
 
   ngAfterViewInit(): void {
@@ -137,6 +144,7 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
     this.observer?.disconnect();
     this.nameFilterSubscription?.unsubscribe();
+    this.queryParamSubscription?.unsubscribe();
   }
 
   protected hasItems(): boolean {
@@ -163,6 +171,7 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
 
   protected onNameFilterChanged(nextValue: string): void {
     this.nameFilter.set(nextValue);
+    this.syncUrlWithCurrentFilters(true);
     this.nameFilterTerms.next(nextValue);
   }
 
@@ -182,6 +191,7 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
       }
 
       this.selectedGender.set(nextValue);
+      this.syncUrlWithCurrentFilters(false);
       this.resetFeedAndReload();
     }
   }
@@ -202,6 +212,7 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
       }
 
       this.selectedSort.set(nextValue);
+      this.syncUrlWithCurrentFilters(false);
       this.resetFeedAndReload();
     }
   }
@@ -212,6 +223,7 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
 
     this.favoritesOnly.set(nextValue);
+    this.syncUrlWithCurrentFilters(false);
     this.resetFeedAndReload();
   }
 
@@ -317,6 +329,121 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
   private selectedGenderFilter(): PerformerGender | undefined {
     const gender = this.selectedGender();
     return gender === 'NONE' ? undefined : gender;
+  }
+
+  private setupUrlStateSync(): void {
+    this.queryParamSubscription = this.route.queryParamMap.subscribe((queryParamMap) => {
+      const urlState = this.readUrlState(queryParamMap);
+      const changed = this.applyUrlState(urlState);
+      if (!this.hasHydratedFromUrl || changed) {
+        this.hasHydratedFromUrl = true;
+        this.resetFeedAndReload();
+        return;
+      }
+
+      this.hasHydratedFromUrl = true;
+    });
+  }
+
+  private readUrlState(queryParamMap: import('@angular/router').ParamMap): {
+    name: string;
+    gender: GenderOption;
+    sort: PerformerSort;
+    favoritesOnly: boolean;
+  } {
+    const name = (queryParamMap.get('q') ?? '').trim();
+
+    const genderParam = queryParamMap.get('gender');
+    const gender: GenderOption =
+      genderParam === 'NONE' ||
+      genderParam === 'MALE' ||
+      genderParam === 'FEMALE' ||
+      genderParam === 'UNKNOWN' ||
+      genderParam === 'TRANSGENDER_MALE' ||
+      genderParam === 'TRANSGENDER_FEMALE' ||
+      genderParam === 'INTERSEX' ||
+      genderParam === 'NON_BINARY'
+        ? genderParam
+        : PerformersPageComponent.DEFAULT_GENDER;
+
+    const sortParam = queryParamMap.get('sort');
+    const sort: PerformerSort =
+      sortParam === 'NAME' ||
+      sortParam === 'BIRTHDATE' ||
+      sortParam === 'SCENE_COUNT' ||
+      sortParam === 'CAREER_START_YEAR' ||
+      sortParam === 'DEBUT' ||
+      sortParam === 'LAST_SCENE' ||
+      sortParam === 'CREATED_AT' ||
+      sortParam === 'UPDATED_AT'
+        ? sortParam
+        : PerformersPageComponent.DEFAULT_SORT;
+
+    const favoritesOnlyParam = queryParamMap.get('fav');
+    const favoritesOnly = favoritesOnlyParam === '1' || favoritesOnlyParam === 'true';
+
+    return {
+      name,
+      gender,
+      sort,
+      favoritesOnly,
+    };
+  }
+
+  private applyUrlState(state: {
+    name: string;
+    gender: GenderOption;
+    sort: PerformerSort;
+    favoritesOnly: boolean;
+  }): boolean {
+    const changed =
+      this.nameFilter() !== state.name ||
+      this.selectedGender() !== state.gender ||
+      this.selectedSort() !== state.sort ||
+      this.favoritesOnly() !== state.favoritesOnly;
+
+    if (!changed) {
+      return false;
+    }
+
+    this.nameFilter.set(state.name);
+    this.selectedGender.set(state.gender);
+    this.selectedSort.set(state.sort);
+    this.favoritesOnly.set(state.favoritesOnly);
+    return true;
+  }
+
+  private syncUrlWithCurrentFilters(replaceUrl: boolean): void {
+    const normalizedName = this.nameFilter().trim();
+    const next = {
+      q: normalizedName.length > 0 ? normalizedName : null,
+      gender:
+        this.selectedGender() === PerformersPageComponent.DEFAULT_GENDER
+          ? null
+          : this.selectedGender(),
+      sort:
+        this.selectedSort() === PerformersPageComponent.DEFAULT_SORT
+          ? null
+          : this.selectedSort(),
+      fav: this.favoritesOnly() ? '1' : null,
+    };
+
+    const current = this.route.snapshot.queryParamMap;
+    if (
+      (current.get('q') ?? null) === next.q &&
+      (current.get('gender') ?? null) === next.gender &&
+      (current.get('sort') ?? null) === next.sort &&
+      (current.get('fav') ?? null) === next.fav
+    ) {
+      return;
+    }
+
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: next,
+      queryParamsHandling: 'merge',
+      replaceUrl,
+    });
   }
 
   private resetFeedAndReload(): void {

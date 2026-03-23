@@ -9,8 +9,9 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
+  combineLatest,
   Subject,
   Subscription,
   catchError,
@@ -77,6 +78,7 @@ export class PerformerPageComponent
 {
   private static readonly SCENES_PAGE_SIZE = 25;
   private static readonly SEARCH_DEBOUNCE_MS = 250;
+  private static readonly DEFAULT_SORT: SceneFeedSort = 'DATE';
 
   protected static readonly SCENE_SORT_OPTIONS: Array<{
     value: SceneFeedSort;
@@ -91,6 +93,7 @@ export class PerformerPageComponent
 
   private readonly discoverService = inject(DiscoverService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   private readonly studioSearchTerms = new Subject<string>();
   private readonly tagSearchTerms = new Subject<string>();
@@ -102,6 +105,7 @@ export class PerformerPageComponent
   private sentinelIntersecting = false;
   private scenesFeedVersion = 0;
   private pendingScenesReload = false;
+  private hasHydratedFilterState = false;
 
   @ViewChild('loadMoreSentinel')
   set loadMoreSentinel(elementRef: ElementRef<HTMLDivElement> | undefined) {
@@ -127,7 +131,7 @@ export class PerformerPageComponent
   protected readonly performerError = signal<string | null>(null);
   protected readonly activeImageIndex = signal(0);
 
-  protected readonly sceneSort = signal<SceneFeedSort>('DATE');
+  protected readonly sceneSort = signal<SceneFeedSort>(PerformerPageComponent.DEFAULT_SORT);
   protected readonly onlyFavoriteStudios = signal(false);
   protected readonly studioSearchTerm = signal('');
   protected readonly selectedStudios = signal<SelectedStudioChip[]>([]);
@@ -161,7 +165,10 @@ export class PerformerPageComponent
   ngOnInit(): void {
     this.setupStudioSearch();
     this.setupTagSearch();
-    this.routeSubscription = this.route.paramMap.subscribe((params) => {
+    this.routeSubscription = combineLatest([
+      this.route.paramMap,
+      this.route.queryParamMap,
+    ]).subscribe(([params, queryParamMap]) => {
       const nextPerformerId = params.get('performerId')?.trim() ?? '';
       if (!nextPerformerId) {
         this.performerId.set(null);
@@ -170,9 +177,20 @@ export class PerformerPageComponent
         return;
       }
 
+      const performerChanged = this.performerId() !== nextPerformerId;
       this.performerId.set(nextPerformerId);
-      this.loadPerformer();
-      this.resetScenesAndReload();
+      if (performerChanged) {
+        this.loadPerformer();
+      }
+
+      const changedByUrl = this.applyUrlFilterState(this.readUrlFilterState(queryParamMap));
+      if (!this.hasHydratedFilterState || performerChanged || changedByUrl) {
+        this.hasHydratedFilterState = true;
+        this.resetScenesAndReload();
+        return;
+      }
+
+      this.hasHydratedFilterState = true;
     });
   }
 
@@ -266,6 +284,7 @@ export class PerformerPageComponent
       }
 
       this.sceneSort.set(nextValue);
+      this.syncUrlWithCurrentFilters(false);
       this.resetScenesAndReload();
     }
   }
@@ -276,6 +295,7 @@ export class PerformerPageComponent
     }
 
     this.onlyFavoriteStudios.set(nextValue);
+    this.syncUrlWithCurrentFilters(false);
     this.resetScenesAndReload();
   }
 
@@ -306,6 +326,7 @@ export class PerformerPageComponent
         label: currentLabels.get(id) ?? previousLabels.get(id) ?? id,
       })),
     );
+    this.syncUrlWithCurrentFilters(false);
     this.resetScenesAndReload();
   }
 
@@ -324,6 +345,7 @@ export class PerformerPageComponent
 
     this.selectedTags.set(next);
     this.rebuildTagSelectOptions(this.tagOptions());
+    this.syncUrlWithCurrentFilters(false);
 
     if (!changed) {
       return;
@@ -614,6 +636,137 @@ export class PerformerPageComponent
       });
   }
 
+  private readUrlFilterState(queryParamMap: import('@angular/router').ParamMap): {
+    sort: SceneFeedSort;
+    onlyFavoriteStudios: boolean;
+    studioIds: string[];
+    tagIds: string[];
+  } {
+    const sortParam = queryParamMap.get('sort');
+    const sort: SceneFeedSort =
+      sortParam === 'DATE' ||
+      sortParam === 'TITLE' ||
+      sortParam === 'TRENDING' ||
+      sortParam === 'CREATED_AT' ||
+      sortParam === 'UPDATED_AT'
+        ? sortParam
+        : PerformerPageComponent.DEFAULT_SORT;
+
+    const onlyFavoriteStudiosParam = queryParamMap.get('favStudios');
+    const onlyFavoriteStudios =
+      onlyFavoriteStudiosParam === '1' || onlyFavoriteStudiosParam === 'true';
+
+    const studioIds = this.dedupeStrings(
+      (queryParamMap.get('studios') ?? '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0),
+    );
+
+    const tagIds = this.dedupeStrings(
+      (queryParamMap.get('tags') ?? '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0),
+    );
+
+    return {
+      sort,
+      onlyFavoriteStudios,
+      studioIds,
+      tagIds,
+    };
+  }
+
+  private applyUrlFilterState(state: {
+    sort: SceneFeedSort;
+    onlyFavoriteStudios: boolean;
+    studioIds: string[];
+    tagIds: string[];
+  }): boolean {
+    const currentStudioIds = this.selectedStudiosIds();
+    const currentTagIds = this.selectedTags().map((tag) => tag.id);
+    const studiosChanged = !this.areStringArraysEqual(currentStudioIds, state.studioIds);
+    const tagsChanged = !this.areStringArraysEqual(currentTagIds, state.tagIds);
+    const changed =
+      this.sceneSort() !== state.sort ||
+      this.onlyFavoriteStudios() !== state.onlyFavoriteStudios ||
+      studiosChanged ||
+      tagsChanged;
+
+    if (!changed) {
+      return false;
+    }
+
+    this.sceneSort.set(state.sort);
+    this.onlyFavoriteStudios.set(state.onlyFavoriteStudios);
+
+    if (studiosChanged) {
+      const previousLabels = new Map(
+        this.selectedStudios().map((studio) => [studio.id, studio.label]),
+      );
+      this.selectedStudios.set(
+        state.studioIds.map((id) => ({
+          id,
+          label: previousLabels.get(id) ?? id,
+        })),
+      );
+      this.studioSelectedIds.set(state.studioIds);
+    }
+
+    if (tagsChanged) {
+      const previousTags = new Map(this.selectedTags().map((tag) => [tag.id, tag]));
+      this.selectedTags.set(
+        state.tagIds.map((id) => {
+          const existing = previousTags.get(id);
+          if (existing) {
+            return existing;
+          }
+
+          return {
+            id,
+            name: id,
+            description: null,
+            aliases: [],
+          } satisfies SceneTagOption;
+        }),
+      );
+      this.tagSelectedIds.set(state.tagIds);
+    }
+
+    this.rebuildTagSelectOptions(this.tagOptions());
+    return true;
+  }
+
+  private syncUrlWithCurrentFilters(replaceUrl: boolean): void {
+    const next = {
+      sort:
+        this.sceneSort() === PerformerPageComponent.DEFAULT_SORT
+          ? null
+          : this.sceneSort(),
+      favStudios: this.onlyFavoriteStudios() ? '1' : null,
+      studios: this.selectedStudiosIds().length > 0 ? this.selectedStudiosIds().join(',') : null,
+      tags: this.selectedTags().length > 0 ? this.selectedTags().map((tag) => tag.id).join(',') : null,
+    };
+
+    const current = this.route.snapshot.queryParamMap;
+    if (
+      (current.get('sort') ?? null) === next.sort &&
+      (current.get('favStudios') ?? null) === next.favStudios &&
+      (current.get('studios') ?? null) === next.studios &&
+      (current.get('tags') ?? null) === next.tags
+    ) {
+      return;
+    }
+
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: next,
+      queryParamsHandling: 'merge',
+      replaceUrl,
+    });
+  }
+
   private setupTagSearch(): void {
     this.tagSearchSubscription = this.tagSearchTerms
       .pipe(
@@ -666,6 +819,20 @@ export class PerformerPageComponent
       deduped.add(value);
     }
     return [...deduped];
+  }
+
+  private areStringArraysEqual(left: string[], right: string[]): boolean {
+    if (left.length !== right.length) {
+      return false;
+    }
+
+    for (let i = 0; i < left.length; i += 1) {
+      if (left[i] !== right[i]) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   private rebuildTagSelectOptions(searchResults: SceneTagOption[]): void {

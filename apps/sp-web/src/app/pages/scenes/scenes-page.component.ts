@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   Subject,
   Subscription,
@@ -62,6 +62,9 @@ interface MultiSelectOption {
 })
 export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly PAGE_SIZE = 50;
+  private static readonly DEFAULT_SORT: SceneFeedSort = 'DATE';
+  private static readonly DEFAULT_FAVORITES: FavoritesFilterOption = 'NONE';
+  private static readonly DEFAULT_TAG_MODE: SceneTagMatchMode = 'OR';
   protected static readonly SORT_OPTIONS: Array<{
     value: SceneFeedSort;
     label: string;
@@ -90,13 +93,17 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   ];
 
   private readonly discoverService = inject(DiscoverService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly tagSearchTerms = new Subject<string>();
   private tagSearchSubscription: Subscription | null = null;
+  private queryParamSubscription: Subscription | null = null;
   private observer: IntersectionObserver | null = null;
   private sentinelElement: HTMLDivElement | null = null;
   private sentinelIntersecting = false;
   private feedVersion = 0;
   private pendingReload = false;
+  private hasHydratedFromUrl = false;
 
   @ViewChild('loadMoreSentinel')
   set loadMoreSentinel(elementRef: ElementRef<HTMLDivElement> | undefined) {
@@ -127,10 +134,14 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly items = signal<DiscoverItem[]>([]);
   protected readonly requestModalOpen = signal(false);
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
-  protected readonly selectedSort = signal<SceneFeedSort>('DATE');
-  protected readonly selectedFavorites = signal<FavoritesFilterOption>('NONE');
+  protected readonly selectedSort = signal<SceneFeedSort>(ScenesPageComponent.DEFAULT_SORT);
+  protected readonly selectedFavorites = signal<FavoritesFilterOption>(
+    ScenesPageComponent.DEFAULT_FAVORITES,
+  );
   protected readonly tagSearchTerm = signal('');
-  protected readonly selectedTagMode = signal<SceneTagMatchMode>('OR');
+  protected readonly selectedTagMode = signal<SceneTagMatchMode>(
+    ScenesPageComponent.DEFAULT_TAG_MODE,
+  );
   protected readonly selectedTags = signal<SceneTagOption[]>([]);
   protected readonly selectedTagIdsModel = signal<string[]>([]);
   protected readonly tagOptions = signal<SceneTagOption[]>([]);
@@ -143,7 +154,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit(): void {
     this.setupTagSearch();
-    this.loadNextPage();
+    this.setupUrlStateSync();
   }
 
   ngAfterViewInit(): void {
@@ -156,6 +167,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     this.observer?.disconnect();
     this.tagSearchSubscription?.unsubscribe();
+    this.queryParamSubscription?.unsubscribe();
   }
 
   protected hasItems(): boolean {
@@ -210,6 +222,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       this.selectedSort.set(nextValue);
+      this.syncUrlWithCurrentFilters(false);
       this.resetFeedAndReload();
     }
   }
@@ -226,6 +239,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       }
 
       this.selectedFavorites.set(nextValue);
+      this.syncUrlWithCurrentFilters(false);
       this.resetFeedAndReload();
     }
   }
@@ -251,6 +265,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.selectedTags.set(nextSelected);
     this.rebuildTagSelectOptions(this.tagOptions());
+    this.syncUrlWithCurrentFilters(false);
 
     if (!changed) {
       return;
@@ -268,6 +283,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.selectedTagMode.set(nextValue);
+    this.syncUrlWithCurrentFilters(false);
     if (this.selectedTags().length > 0) {
       this.resetFeedAndReload();
     }
@@ -399,6 +415,150 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return selectedFavorites === 'NONE' ? undefined : selectedFavorites;
   }
 
+  private setupUrlStateSync(): void {
+    this.queryParamSubscription = this.route.queryParamMap.subscribe((queryParamMap) => {
+      const urlState = this.readUrlState(queryParamMap);
+      const changed = this.applyUrlState(urlState);
+      if (!this.hasHydratedFromUrl || changed) {
+        this.hasHydratedFromUrl = true;
+        this.resetFeedAndReload();
+        return;
+      }
+
+      this.hasHydratedFromUrl = true;
+    });
+  }
+
+  private readUrlState(queryParamMap: import('@angular/router').ParamMap): {
+    sort: SceneFeedSort;
+    favorites: FavoritesFilterOption;
+    mode: SceneTagMatchMode;
+    tagIds: string[];
+  } {
+    const sortParam = queryParamMap.get('sort');
+    const sort: SceneFeedSort =
+      sortParam === 'DATE' ||
+      sortParam === 'TITLE' ||
+      sortParam === 'TRENDING' ||
+      sortParam === 'CREATED_AT' ||
+      sortParam === 'UPDATED_AT'
+        ? sortParam
+        : ScenesPageComponent.DEFAULT_SORT;
+
+    const favoritesParam = queryParamMap.get('fav');
+    const favorites: FavoritesFilterOption =
+      favoritesParam === 'NONE' ||
+      favoritesParam === 'ALL' ||
+      favoritesParam === 'PERFORMER' ||
+      favoritesParam === 'STUDIO'
+        ? favoritesParam
+        : ScenesPageComponent.DEFAULT_FAVORITES;
+
+    const modeParam = queryParamMap.get('mode');
+    const mode: SceneTagMatchMode =
+      modeParam === 'OR' || modeParam === 'AND'
+        ? modeParam
+        : ScenesPageComponent.DEFAULT_TAG_MODE;
+
+    const tagIds = this.dedupeStrings(
+      (queryParamMap.get('tags') ?? '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0),
+    );
+
+    return {
+      sort,
+      favorites,
+      mode,
+      tagIds,
+    };
+  }
+
+  private applyUrlState(state: {
+    sort: SceneFeedSort;
+    favorites: FavoritesFilterOption;
+    mode: SceneTagMatchMode;
+    tagIds: string[];
+  }): boolean {
+    const currentSelectedIds = this.selectedTagIds();
+    const tagsChanged = !this.areStringArraysEqual(currentSelectedIds, state.tagIds);
+    const changed =
+      this.selectedSort() !== state.sort ||
+      this.selectedFavorites() !== state.favorites ||
+      this.selectedTagMode() !== state.mode ||
+      tagsChanged;
+
+    if (!changed) {
+      return false;
+    }
+
+    this.selectedSort.set(state.sort);
+    this.selectedFavorites.set(state.favorites);
+    this.selectedTagMode.set(state.mode);
+    this.selectedTagIdsModel.set(state.tagIds);
+
+    if (tagsChanged) {
+      const previousTags = new Map(this.selectedTags().map((tag) => [tag.id, tag]));
+      const nextSelectedTags = state.tagIds.map((id) => {
+        const existing = previousTags.get(id);
+        if (existing) {
+          return existing;
+        }
+
+        return {
+          id,
+          name: id,
+          description: null,
+          aliases: [],
+        } satisfies SceneTagOption;
+      });
+      this.selectedTags.set(nextSelectedTags);
+    }
+
+    this.rebuildTagSelectOptions(this.tagOptions());
+    return true;
+  }
+
+  private syncUrlWithCurrentFilters(replaceUrl: boolean): void {
+    const next = {
+      sort:
+        this.selectedSort() === ScenesPageComponent.DEFAULT_SORT
+          ? null
+          : this.selectedSort(),
+      fav:
+        this.selectedFavorites() === ScenesPageComponent.DEFAULT_FAVORITES
+          ? null
+          : this.selectedFavorites(),
+      mode:
+        this.selectedTagMode() === ScenesPageComponent.DEFAULT_TAG_MODE
+          ? null
+          : this.selectedTagMode(),
+      tags: this.selectedTagIds().length > 0 ? this.selectedTagIds().join(',') : null,
+    };
+
+    const current = this.route.snapshot.queryParamMap;
+    const currentSort = current.get('sort');
+    const currentFav = current.get('fav');
+    const currentMode = current.get('mode');
+    const currentTags = current.get('tags');
+    if (
+      (currentSort ?? null) === next.sort &&
+      (currentFav ?? null) === next.fav &&
+      (currentMode ?? null) === next.mode &&
+      (currentTags ?? null) === next.tags
+    ) {
+      return;
+    }
+
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: next,
+      queryParamsHandling: 'merge',
+      replaceUrl,
+    });
+  }
+
   private setupTagSearch(): void {
     this.tagSearchSubscription = this.tagSearchTerms
       .pipe(
@@ -466,6 +626,20 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       deduped.add(value);
     }
     return [...deduped];
+  }
+
+  private areStringArraysEqual(left: string[], right: string[]): boolean {
+    if (left.length !== right.length) {
+      return false;
+    }
+
+    for (let i = 0; i < left.length; i += 1) {
+      if (left[i] !== right[i]) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   private setupIntersectionObserver(): void {
