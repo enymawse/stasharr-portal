@@ -9,9 +9,26 @@
   min-height: 100dvh;
 }
 
-.global-theme-toggle {
+.global-controls {
   position: fixed;
   top: 0.7rem;
   right: 0.8rem;
+  display: flex;
+  flex-direction: row;
+  gap: 0.45rem;
   z-index: 1000;
+  align-items: center;
+}
+
+.global-theme-toggle,
+.global-image-obscuration-toggle {
+  display: block;
+}
+
+@media (max-width: 700px) {
+  .global-controls {
+    top: 0.55rem;
+    right: 0.55rem;
+    gap: 0.35rem;
+  }
 }

@@ -1,0 +1,15 @@
+<button
+  type="button"
+  class="image-obscuration-toggle"
+  [attr.aria-label]="label()"
+  [attr.aria-pressed]="isObscured()"
+  [title]="label()"
+  (click)="toggle()"
+>
+  <i
+    class="pi"
+    [class.pi-eye-slash]="isObscured()"
+    [class.pi-eye]="!isObscured()"
+    aria-hidden="true"
+  ></i>
+</button>

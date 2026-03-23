@@ -282,3 +282,14 @@ body {
   background: rgb(9 22 34 / 55%);
   color: color-mix(in srgb, var(--text-muted) 80%, #deedff);
 }
+
+:root[data-images='obscured'] img,
+:root[data-images='obscured'] .hero-backdrop,
+:root[data-images='obscured'] .request-modal-art {
+  filter: blur(18px) saturate(0.35) brightness(0.78);
+  pointer-events: none;
+}
+
+:root[data-images='obscured'] img {
+  transform: scale(1.02);
+}
