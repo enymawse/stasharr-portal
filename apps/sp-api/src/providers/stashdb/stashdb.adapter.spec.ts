@@ -729,6 +729,184 @@ describe('StashdbAdapter', () => {
     });
   });
 
+  it('normalizes findStudio response for studio details', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findStudio: {
+              id: 'studio-1',
+              name: 'Studio One',
+              aliases: ['Alias One'],
+              deleted: false,
+              is_favorite: true,
+              created: '2024-01-01',
+              updated: '2024-02-01',
+              urls: [
+                {
+                  url: 'https://stashdb.org/studios/studio-1',
+                  type: 'DETAILS',
+                  site: {
+                    name: 'StashDB',
+                    url: 'https://stashdb.org',
+                    icon: 'https://stashdb.org/icon.png',
+                  },
+                },
+              ],
+              parent: {
+                id: 'parent-1',
+                name: 'Parent Studio',
+                aliases: ['Parent Alias'],
+                is_favorite: false,
+                urls: [
+                  {
+                    url: 'https://stashdb.org/studios/parent-1',
+                    type: 'DETAILS',
+                    site: {
+                      name: 'StashDB',
+                      url: 'https://stashdb.org',
+                      icon: null,
+                    },
+                  },
+                ],
+              },
+              child_studios: [
+                {
+                  id: 'child-1',
+                  name: 'Child Studio',
+                  aliases: [],
+                  deleted: false,
+                  is_favorite: false,
+                  created: '2024-03-01',
+                  updated: '2024-03-02',
+                  urls: [],
+                  images: [
+                    {
+                      id: 'child-img-1',
+                      url: 'https://child-small.jpg',
+                      width: 128,
+                      height: 128,
+                    },
+                    {
+                      id: 'child-img-2',
+                      url: 'https://child-large.jpg',
+                      width: 512,
+                      height: 256,
+                    },
+                  ],
+                },
+              ],
+              images: [
+                {
+                  id: 'studio-img-1',
+                  url: 'https://studio-small.jpg',
+                  width: 64,
+                  height: 64,
+                },
+                {
+                  id: 'studio-img-2',
+                  url: 'https://studio-large.jpg',
+                  width: 720,
+                  height: 400,
+                },
+              ],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.getStudioById('studio-1', {
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
+    ).resolves.toEqual({
+      id: 'studio-1',
+      name: 'Studio One',
+      aliases: ['Alias One'],
+      deleted: false,
+      isFavorite: true,
+      createdAt: '2024-01-01',
+      updatedAt: '2024-02-01',
+      imageUrl: 'https://studio-large.jpg',
+      images: [
+        {
+          id: 'studio-img-1',
+          url: 'https://studio-small.jpg',
+          width: 64,
+          height: 64,
+        },
+        {
+          id: 'studio-img-2',
+          url: 'https://studio-large.jpg',
+          width: 720,
+          height: 400,
+        },
+      ],
+      urls: [
+        {
+          url: 'https://stashdb.org/studios/studio-1',
+          type: 'DETAILS',
+          siteName: 'StashDB',
+          siteUrl: 'https://stashdb.org',
+          siteIcon: 'https://stashdb.org/icon.png',
+        },
+      ],
+      parentStudio: {
+        id: 'parent-1',
+        name: 'Parent Studio',
+        aliases: ['Parent Alias'],
+        isFavorite: false,
+        urls: [
+          {
+            url: 'https://stashdb.org/studios/parent-1',
+            type: 'DETAILS',
+            siteName: 'StashDB',
+            siteUrl: 'https://stashdb.org',
+            siteIcon: null,
+          },
+        ],
+      },
+      childStudios: [
+        {
+          id: 'child-1',
+          name: 'Child Studio',
+          aliases: [],
+          deleted: false,
+          isFavorite: false,
+          createdAt: '2024-03-01',
+          updatedAt: '2024-03-02',
+          imageUrl: 'https://child-large.jpg',
+        },
+      ],
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string; variables: { id: string } };
+
+    expect(requestBody.query).toContain('findStudio');
+    expect(requestBody.variables.id).toBe('studio-1');
+  });
+
+  it('throws NotFoundException when findStudio returns null', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findStudio: null,
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.getStudioById('studio-404', {
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
+    ).rejects.toThrow('Studio studio-404 not found in StashDB.');
+  });
+
   it('normalizes studio search with child studios', async () => {
     fetchMock.mockResolvedValue({
       ok: true,

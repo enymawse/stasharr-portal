@@ -1,4 +1,5 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
+import { StudioDetailsDto } from './dto/studio-details.dto';
 import { StudioFeedResponseDto } from './dto/studio-feed-response.dto';
 import { StudiosQueryDto } from './dto/studios-query.dto';
 import { StudiosService } from './studios.service';
@@ -17,5 +18,12 @@ export class StudiosController {
       direction: query.direction,
       favoritesOnly: query.favoritesOnly,
     });
+  }
+
+  @Get(':studioId')
+  getStudioById(
+    @Param('studioId') studioId: string,
+  ): Promise<StudioDetailsDto> {
+    return this.studiosService.getStudioById(studioId);
   }
 }

@@ -150,6 +150,48 @@ export interface StashdbStudiosFeedResult {
   studios: StashdbStudioFeedItem[];
 }
 
+export interface StashdbStudioUrl {
+  url: string;
+  type: string | null;
+  siteName: string | null;
+  siteUrl: string | null;
+  siteIcon: string | null;
+}
+
+export interface StashdbStudioParentSummary {
+  id: string;
+  name: string;
+  aliases: string[];
+  isFavorite: boolean;
+  urls: StashdbStudioUrl[];
+}
+
+export interface StashdbStudioChildSummary {
+  id: string;
+  name: string;
+  aliases: string[];
+  deleted: boolean;
+  isFavorite: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+  imageUrl: string | null;
+}
+
+export interface StashdbStudioDetails {
+  id: string;
+  name: string;
+  aliases: string[];
+  deleted: boolean;
+  isFavorite: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+  imageUrl: string | null;
+  images: StashdbSceneImage[];
+  urls: StashdbStudioUrl[];
+  parentStudio: StashdbStudioParentSummary | null;
+  childStudios: StashdbStudioChildSummary[];
+}
+
 export interface StashdbPerformerScenesConfig extends StashdbAdapterBaseConfig {
   performerId: string;
   page: number;
@@ -343,6 +385,69 @@ interface StashdbGraphqlResponse {
       is_favorite?: unknown;
       created?: unknown;
       updated?: unknown;
+      images?: Array<{
+        id?: unknown;
+        url?: unknown;
+        width?: unknown;
+        height?: unknown;
+      }>;
+    } | null;
+    findStudio?: {
+      id?: unknown;
+      name?: unknown;
+      aliases?: unknown;
+      deleted?: unknown;
+      is_favorite?: unknown;
+      created?: unknown;
+      updated?: unknown;
+      urls?: Array<{
+        url?: unknown;
+        type?: unknown;
+        site?: {
+          name?: unknown;
+          url?: unknown;
+          icon?: unknown;
+        } | null;
+      }>;
+      parent?: {
+        id?: unknown;
+        name?: unknown;
+        aliases?: unknown;
+        is_favorite?: unknown;
+        urls?: Array<{
+          url?: unknown;
+          type?: unknown;
+          site?: {
+            name?: unknown;
+            url?: unknown;
+            icon?: unknown;
+          } | null;
+        }>;
+      } | null;
+      child_studios?: Array<{
+        id?: unknown;
+        name?: unknown;
+        aliases?: unknown;
+        deleted?: unknown;
+        is_favorite?: unknown;
+        created?: unknown;
+        updated?: unknown;
+        urls?: Array<{
+          url?: unknown;
+          type?: unknown;
+          site?: {
+            name?: unknown;
+            url?: unknown;
+            icon?: unknown;
+          } | null;
+        }>;
+        images?: Array<{
+          id?: unknown;
+          url?: unknown;
+          width?: unknown;
+          height?: unknown;
+        }>;
+      }>;
       images?: Array<{
         id?: unknown;
         url?: unknown;
@@ -805,6 +910,130 @@ export class StashdbAdapter {
       updatedAt: this.normalizeOptionalString(performer.updated),
       imageUrl: primaryImage?.url ?? null,
       images,
+    };
+  }
+
+  async getStudioById(
+    studioId: string,
+    config: StashdbAdapterBaseConfig,
+  ): Promise<StashdbStudioDetails> {
+    const query = `
+      query FindStudio($id: ID!) {
+        findStudio(id: $id) {
+          id
+          name
+          aliases
+          deleted
+          is_favorite
+          created
+          updated
+          urls {
+            url
+            type
+            site {
+              name
+              url
+              icon
+            }
+          }
+          parent {
+            id
+            name
+            aliases
+            is_favorite
+            urls {
+              url
+              type
+              site {
+                name
+                url
+                icon
+              }
+            }
+          }
+          child_studios {
+            id
+            name
+            aliases
+            deleted
+            is_favorite
+            created
+            updated
+            urls {
+              url
+              type
+              site {
+                name
+                url
+                icon
+              }
+            }
+            images {
+              id
+              url
+              width
+              height
+            }
+          }
+          images {
+            id
+            url
+            width
+            height
+          }
+        }
+      }
+    `;
+
+    const payload = await this.executeQuery(config, query, { id: studioId });
+    const studio = payload.data?.findStudio;
+
+    if (!studio) {
+      throw new NotFoundException(`Studio ${studioId} not found in StashDB.`);
+    }
+
+    if (typeof studio.id !== 'string' || typeof studio.name !== 'string') {
+      throw new BadGatewayException(
+        'StashDB studio response is missing required fields.',
+      );
+    }
+
+    const images = this.normalizeImages(studio.images);
+    const primaryImage = this.selectPrimaryImage(images);
+
+    return {
+      id: studio.id,
+      name: studio.name,
+      aliases: this.normalizeStringArray(studio.aliases),
+      deleted: studio.deleted === true,
+      isFavorite: studio.is_favorite === true,
+      createdAt: this.normalizeOptionalString(studio.created),
+      updatedAt: this.normalizeOptionalString(studio.updated),
+      imageUrl: primaryImage?.url ?? null,
+      images,
+      urls: this.normalizeStudioUrls(studio.urls),
+      parentStudio: this.normalizeStudioParent(studio.parent),
+      childStudios: (studio.child_studios ?? [])
+        .map((child): StashdbStudioChildSummary | null => {
+          if (typeof child.id !== 'string' || typeof child.name !== 'string') {
+            return null;
+          }
+
+          return {
+            id: child.id,
+            name: child.name,
+            aliases: this.normalizeStringArray(child.aliases),
+            deleted: child.deleted === true,
+            isFavorite: child.is_favorite === true,
+            createdAt: this.normalizeOptionalString(child.created),
+            updatedAt: this.normalizeOptionalString(child.updated),
+            imageUrl:
+              this.selectPrimaryImage(this.normalizeImages(child.images))?.url ?? null,
+          };
+        })
+        .filter(
+          (child): child is StashdbStudioChildSummary => child !== null,
+        ),
     };
   }
 
@@ -1436,6 +1665,82 @@ export class StashdbAdapter {
 
     const normalized = value.trim();
     return normalized.length > 0 ? normalized : null;
+  }
+
+  private normalizeStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value.filter((entry): entry is string => typeof entry === 'string');
+  }
+
+  private normalizeStudioUrls(
+    rawUrls:
+      | Array<{
+          url?: unknown;
+          type?: unknown;
+          site?: {
+            name?: unknown;
+            url?: unknown;
+            icon?: unknown;
+          } | null;
+        }>
+      | null
+      | undefined,
+  ): StashdbStudioUrl[] {
+    return (rawUrls ?? [])
+      .map((rawUrl): StashdbStudioUrl | null => {
+        if (typeof rawUrl.url !== 'string') {
+          return null;
+        }
+
+        return {
+          url: rawUrl.url,
+          type: this.normalizeOptionalString(rawUrl.type),
+          siteName: this.normalizeOptionalString(rawUrl.site?.name),
+          siteUrl: this.normalizeOptionalString(rawUrl.site?.url),
+          siteIcon: this.normalizeOptionalString(rawUrl.site?.icon),
+        };
+      })
+      .filter((url): url is StashdbStudioUrl => url !== null);
+  }
+
+  private normalizeStudioParent(
+    rawParent:
+      | {
+          id?: unknown;
+          name?: unknown;
+          aliases?: unknown;
+          is_favorite?: unknown;
+          urls?: Array<{
+            url?: unknown;
+            type?: unknown;
+            site?: {
+              name?: unknown;
+              url?: unknown;
+              icon?: unknown;
+            } | null;
+          }>;
+        }
+      | null
+      | undefined,
+  ): StashdbStudioParentSummary | null {
+    if (!rawParent) {
+      return null;
+    }
+
+    if (typeof rawParent.id !== 'string' || typeof rawParent.name !== 'string') {
+      return null;
+    }
+
+    return {
+      id: rawParent.id,
+      name: rawParent.name,
+      aliases: this.normalizeStringArray(rawParent.aliases),
+      isFavorite: rawParent.is_favorite === true,
+      urls: this.normalizeStudioUrls(rawParent.urls),
+    };
   }
 
   private normalizeFavoriteMutationResult(

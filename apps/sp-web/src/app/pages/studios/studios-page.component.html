@@ -81,9 +81,9 @@
         <article class="studio-card">
           <a
             class="studio-link-stretch"
-            [routerLink]="['/scenes']"
-            [queryParams]="studioScenesQueryParams(item)"
-            [attr.aria-label]="'Open scenes for studio ' + item.name"
+            [routerLink]="['/studio', item.id]"
+            [queryParams]="{ returnTo: currentRouteUrl() }"
+            [attr.aria-label]="'View studio ' + item.name"
           ></a>
 
           <button

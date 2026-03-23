@@ -8,6 +8,7 @@ import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashdbSortDirection } from '../providers/stashdb/stashdb.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
+import { StudioDetailsDto } from './dto/studio-details.dto';
 import { StudioFeedResponseDto } from './dto/studio-feed-response.dto';
 import { StudioSort } from './dto/studios-query.dto';
 
@@ -33,25 +34,11 @@ export class StudiosService {
       favoritesOnly?: boolean;
     },
   ): Promise<StudioFeedResponseDto> {
-    const integration = await this.getStashdbIntegration();
-
-    if (!integration.enabled) {
-      throw new ConflictException('STASHDB integration is disabled.');
-    }
-
-    if (integration.status !== IntegrationStatus.CONFIGURED) {
-      throw new ConflictException('STASHDB integration is not configured.');
-    }
-
-    if (!integration.baseUrl) {
-      throw new BadRequestException(
-        'STASHDB integration is missing a base URL.',
-      );
-    }
+    const config = await this.getStashdbConfig();
 
     const studios = await this.stashdbAdapter.getStudiosFeed({
-      baseUrl: integration.baseUrl,
-      apiKey: integration.apiKey,
+      baseUrl: config.baseUrl,
+      apiKey: config.apiKey,
       page,
       perPage,
       name: filters?.name,
@@ -75,6 +62,61 @@ export class StudiosService {
         parentStudio: studio.parentStudio,
         childStudios: studio.childStudios,
       })),
+    };
+  }
+
+  async getStudioById(studioId: string): Promise<StudioDetailsDto> {
+    const normalizedStudioId = studioId.trim();
+    if (!normalizedStudioId) {
+      throw new BadRequestException('Studio id is required.');
+    }
+
+    const config = await this.getStashdbConfig();
+    const studio = await this.stashdbAdapter.getStudioById(
+      normalizedStudioId,
+      config,
+    );
+
+    return {
+      id: studio.id,
+      name: studio.name,
+      aliases: studio.aliases,
+      deleted: studio.deleted,
+      isFavorite: studio.isFavorite,
+      createdAt: studio.createdAt,
+      updatedAt: studio.updatedAt,
+      imageUrl: studio.imageUrl,
+      images: studio.images,
+      urls: studio.urls,
+      parentStudio: studio.parentStudio,
+      childStudios: studio.childStudios,
+    };
+  }
+
+  private async getStashdbConfig(): Promise<{
+    baseUrl: string;
+    apiKey: string | null;
+  }> {
+    const integration = await this.getStashdbIntegration();
+
+    if (!integration.enabled) {
+      throw new ConflictException('STASHDB integration is disabled.');
+    }
+
+    if (integration.status !== IntegrationStatus.CONFIGURED) {
+      throw new ConflictException('STASHDB integration is not configured.');
+    }
+
+    const baseUrl = integration.baseUrl?.trim();
+    if (!baseUrl) {
+      throw new BadRequestException(
+        'STASHDB integration is missing a base URL.',
+      );
+    }
+
+    return {
+      baseUrl,
+      apiKey: integration.apiKey,
     };
   }
 

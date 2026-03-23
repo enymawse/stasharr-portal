@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
@@ -10,6 +11,7 @@ describe('StudiosService', () => {
 
   const stashdbAdapter = {
     getStudiosFeed: jest.fn(),
+    getStudioById: jest.fn(),
   } as unknown as StashdbAdapter;
 
   const stashdbIntegration = {
@@ -45,6 +47,52 @@ describe('StudiosService', () => {
           imageUrl: 'http://studio-image',
           parentStudio: null,
           childStudios: [{ id: 'child-1', name: 'Studio Child' }],
+        },
+      ],
+    });
+    stashdbAdapter.getStudioById = jest.fn().mockResolvedValue({
+      id: 'studio-1',
+      name: 'Studio One',
+      aliases: ['Alias One'],
+      deleted: false,
+      isFavorite: true,
+      createdAt: '2024-01-01',
+      updatedAt: '2024-02-01',
+      imageUrl: 'http://studio-image',
+      images: [
+        {
+          id: 'img-1',
+          url: 'http://studio-image',
+          width: 400,
+          height: 220,
+        },
+      ],
+      urls: [
+        {
+          url: 'https://stashdb.org/studios/studio-1',
+          type: 'DETAILS',
+          siteName: 'StashDB',
+          siteUrl: 'https://stashdb.org',
+          siteIcon: null,
+        },
+      ],
+      parentStudio: {
+        id: 'parent-1',
+        name: 'Parent Studio',
+        aliases: ['Parent Alias'],
+        isFavorite: false,
+        urls: [],
+      },
+      childStudios: [
+        {
+          id: 'child-1',
+          name: 'Child Studio',
+          aliases: [],
+          deleted: false,
+          isFavorite: false,
+          createdAt: null,
+          updatedAt: null,
+          imageUrl: null,
         },
       ],
     });
@@ -115,5 +163,75 @@ describe('StudiosService', () => {
       direction: 'DESC',
       favoritesOnly: false,
     });
+  });
+
+  it('returns normalized studio details by id', async () => {
+    await expect(service.getStudioById('studio-1')).resolves.toEqual({
+      id: 'studio-1',
+      name: 'Studio One',
+      aliases: ['Alias One'],
+      deleted: false,
+      isFavorite: true,
+      createdAt: '2024-01-01',
+      updatedAt: '2024-02-01',
+      imageUrl: 'http://studio-image',
+      images: [
+        {
+          id: 'img-1',
+          url: 'http://studio-image',
+          width: 400,
+          height: 220,
+        },
+      ],
+      urls: [
+        {
+          url: 'https://stashdb.org/studios/studio-1',
+          type: 'DETAILS',
+          siteName: 'StashDB',
+          siteUrl: 'https://stashdb.org',
+          siteIcon: null,
+        },
+      ],
+      parentStudio: {
+        id: 'parent-1',
+        name: 'Parent Studio',
+        aliases: ['Parent Alias'],
+        isFavorite: false,
+        urls: [],
+      },
+      childStudios: [
+        {
+          id: 'child-1',
+          name: 'Child Studio',
+          aliases: [],
+          deleted: false,
+          isFavorite: false,
+          createdAt: null,
+          updatedAt: null,
+          imageUrl: null,
+        },
+      ],
+    });
+
+    expect(stashdbAdapter.getStudioById).toHaveBeenCalledWith('studio-1', {
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
+    });
+  });
+
+  it('rejects studio details fetch when id is empty', async () => {
+    await expect(service.getStudioById('   ')).rejects.toThrow(
+      'Studio id is required.',
+    );
+  });
+
+  it('propagates not-found when studio details are missing', async () => {
+    stashdbAdapter.getStudioById = jest
+      .fn()
+      .mockRejectedValue(new NotFoundException('missing'));
+
+    await expect(service.getStudioById('studio-404')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 });

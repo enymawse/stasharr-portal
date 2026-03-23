@@ -272,11 +272,8 @@ export class StudiosPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return overflow > 0 ? overflow : 0;
   }
 
-  protected studioScenesQueryParams(item: StudioFeedItem): Record<string, string> {
-    return {
-      studios: item.id,
-      studioNames: item.name,
-    };
+  protected currentRouteUrl(): string {
+    return this.router.url;
   }
 
   private loadNextPage(): void {

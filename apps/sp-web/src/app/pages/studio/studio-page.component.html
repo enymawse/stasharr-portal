@@ -1,0 +1,376 @@
+<main>
+  <a
+    class="back-link"
+    [routerLink]="backLinkPath()"
+    [queryParams]="backLinkQueryParams()"
+  >
+    {{ backLinkLabel() }}
+  </a>
+
+  @if (loadingStudio()) {
+    <div class="app-blocking-loader" role="status" aria-live="polite">
+      <p-progressspinner
+        styleClass="app-blocking-spinner"
+        strokeWidth="4"
+        [style]="{ width: '2.25rem', height: '2.25rem' }"
+      />
+      <p>Loading studio details...</p>
+    </div>
+  } @else if (studioError()) {
+    <p-message severity="error" styleClass="app-page-message">{{ studioError() }}</p-message>
+    <button pButton type="button" (click)="retryStudioLoad()">Retry</button>
+  } @else if (studio(); as studio) {
+    <section class="hero-shell">
+      @if (activeStudioImageUrl(); as backdropImage) {
+        <div
+          class="hero-backdrop"
+          [style.background-image]="'url(' + backdropImage + ')'"
+          aria-hidden="true"
+        ></div>
+      }
+      <div class="hero-shade" aria-hidden="true"></div>
+
+      <div class="hero-layout">
+        <div class="media-column">
+          <div class="carousel-main">
+            @if (activeStudioImageUrl(); as activeImage) {
+              <img [src]="activeImage" [alt]="studio.name" />
+            } @else {
+              <div class="carousel-placeholder" aria-hidden="true">
+                {{ childInitial(studio.name) }}
+              </div>
+            }
+          </div>
+
+          @if (studio.images.length > 1) {
+            <div class="carousel-controls">
+              <button type="button" (click)="previousImage()">Previous</button>
+              <button type="button" (click)="nextImage()">Next</button>
+            </div>
+
+            <div class="carousel-thumbs">
+              @for (image of studio.images; track image.id; let i = $index) {
+                <button
+                  type="button"
+                  class="thumb"
+                  [class.active]="activeImageIndex() === i"
+                  (click)="setActiveImage(i)"
+                >
+                  <img [src]="image.url" [alt]="studio.name + ' image ' + (i + 1)" />
+                </button>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="hero-info">
+          <div class="title-row">
+            <h1>{{ studio.name }}</h1>
+            <button
+              type="button"
+              class="favorite-indicator"
+              [class.active]="studio.isFavorite"
+              [disabled]="!canToggleFavoriteStudio(studio)"
+              [attr.aria-busy]="favoritingStudio()"
+              [attr.aria-label]="studioFavoriteLabel(studio)"
+              [title]="studioFavoriteLabel(studio)"
+              (click)="toggleFavoriteStudio(studio)"
+            >
+              <i
+                [class]="studio.isFavorite ? 'pi pi-star-fill' : 'pi pi-star'"
+                aria-hidden="true"
+              ></i>
+            </button>
+          </div>
+
+          @if (studio.aliases.length > 0) {
+            <p class="aliases">Also known as: {{ studio.aliases.join(', ') }}</p>
+          }
+
+          @if (studio.deleted) {
+            <div class="meta-flags">
+              <span class="meta-chip warning">Marked Deleted</span>
+            </div>
+          }
+
+          @if (metadataRows(studio).length > 0) {
+            <div class="metadata-grid">
+              @for (row of metadataRows(studio); track row.label) {
+                <div class="metadata-item">
+                  <span class="label">{{ row.label }}</span>
+                  <span class="value">{{ row.value }}</span>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </section>
+
+    <div class="content-shell">
+      @if (studio.parentStudio; as parentStudio) {
+        <section class="section">
+          <h2>Parent Studio</h2>
+          <article class="hierarchy-card">
+            <a
+              class="hierarchy-link-stretch"
+              [routerLink]="['/studio', parentStudio.id]"
+              [queryParams]="{ returnTo: currentRouteUrl() }"
+              [attr.aria-label]="'View studio ' + parentStudio.name"
+            ></a>
+            <p class="hierarchy-name">{{ parentStudio.name }}</p>
+            @if (parentStudio.aliases.length > 0) {
+              <p class="hierarchy-meta">Aliases: {{ parentStudio.aliases.join(', ') }}</p>
+            }
+          </article>
+        </section>
+      }
+
+      @if (studio.childStudios.length > 0) {
+        <section class="section">
+          <h2>Child Studios</h2>
+          <div class="child-grid">
+            @for (child of studio.childStudios; track child.id) {
+              <article class="child-card">
+                <a
+                  class="hierarchy-link-stretch"
+                  [routerLink]="['/studio', child.id]"
+                  [queryParams]="{ returnTo: currentRouteUrl() }"
+                  [attr.aria-label]="'View studio ' + child.name"
+                ></a>
+                @if (child.imageUrl) {
+                  <img class="child-image" [src]="child.imageUrl" [alt]="child.name + ' logo'" loading="lazy" />
+                } @else {
+                  <div class="child-image placeholder" aria-hidden="true">
+                    {{ childInitial(child.name) }}
+                  </div>
+                }
+                <div class="child-meta">
+                  <p class="child-name">{{ child.name }}</p>
+                  @if (child.aliases.length > 0) {
+                    <p class="child-aliases">{{ child.aliases.join(', ') }}</p>
+                  }
+                  @if (child.deleted) {
+                    <span class="meta-chip warning">Deleted</span>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+        </section>
+      }
+
+      @if (studio.urls.length > 0) {
+        <section class="section">
+          <h2>Source Links</h2>
+          <ul class="source-list">
+            @for (entry of studio.urls; track entry.url) {
+              <li>
+                <a [href]="entry.url" target="_blank" rel="noopener noreferrer">
+                  {{ entry.siteName ?? entry.type ?? 'Studio Link' }}
+                  <i class="pi pi-external-link" aria-hidden="true"></i>
+                </a>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    </div>
+
+    <section class="section controls-shell" aria-label="Studio scene filters">
+      <h2>Scenes</h2>
+      <div class="controls-row">
+        <div class="control-field">
+          <span>Sort</span>
+          <div class="sort-with-direction">
+            <p-select
+              inputId="studio-scenes-sort"
+              [ngModel]="sceneSort()"
+              (ngModelChange)="onSceneSortChanged($event)"
+              [options]="sceneSortOptions"
+              optionLabel="label"
+              optionValue="value"
+              [appendTo]="'body'"
+              panelStyleClass="performer-filter-select-panel"
+            />
+            <button
+              type="button"
+              class="sort-direction-toggle"
+              [attr.aria-label]="sceneSortDirectionToggleLabel()"
+              [attr.title]="sceneSortDirectionToggleLabel()"
+              (click)="toggleSceneSortDirection()"
+            >
+              <i [class]="sceneSortDirectionIconClass()" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+
+        <label class="control-field">
+          <span>Favorites</span>
+          <p-select
+            inputId="studio-scenes-favorites"
+            [ngModel]="selectedFavorites()"
+            (ngModelChange)="onFavoritesChanged($event)"
+            [options]="favoritesOptions"
+            optionLabel="label"
+            optionValue="value"
+            [appendTo]="'body'"
+            panelStyleClass="performer-filter-select-panel"
+          />
+        </label>
+      </div>
+
+      <div class="filter-grid">
+        <div class="filter-panel">
+          <label class="control-field">
+            <span>Tags</span>
+            <div class="tag-input-row">
+              <p-multiselect
+                inputId="studio-scenes-tags"
+                [ngModel]="tagSelectedIdsModel()"
+                (ngModelChange)="onTagSelectionChanged($event)"
+                (onFilter)="onTagFilterChanged($event.filter)"
+                (onPanelHide)="onTagFilterPanelHide()"
+                [filter]="true"
+                [filterValue]="tagSearchTerm()"
+                filterPlaceHolder="Search scene tags"
+                [loading]="tagSearchLoading()"
+                [options]="tagSelectOptions()"
+                optionLabel="label"
+                optionValue="value"
+                [showToggleAll]="false"
+                display="chip"
+                [emptyMessage]="tagSelectEmptyMessage()"
+                [emptyFilterMessage]="tagSelectEmptyMessage()"
+                [resetFilterOnHide]="true"
+                [appendTo]="'body'"
+                panelStyleClass="performer-filter-tag-panel"
+                placeholder="Select tags"
+                scrollHeight="16rem"
+              />
+              <p-select
+                class="tag-mode-select"
+                inputId="studio-scenes-tag-mode"
+                [ngModel]="selectedTagMode()"
+                (ngModelChange)="onTagMatchModeChanged($event)"
+                [options]="tagMatchOptions"
+                optionLabel="label"
+                optionValue="value"
+                [appendTo]="'body'"
+                panelStyleClass="performer-filter-select-panel"
+              />
+            </div>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    @if (loadingScenes()) {
+      <div class="app-blocking-loader" role="status" aria-live="polite">
+        <p-progressspinner
+          styleClass="app-blocking-spinner"
+          strokeWidth="4"
+          [style]="{ width: '2rem', height: '2rem' }"
+        />
+        <p>Loading studio scenes...</p>
+      </div>
+    } @else if (scenesError()) {
+      <p-message severity="error" styleClass="app-page-message">{{ scenesError() }}</p-message>
+      <button pButton type="button" (click)="retryInitialScenesLoad()">Retry</button>
+    } @else if (!hasScenes()) {
+      <p class="state">No scenes found for this studio and filters.</p>
+    } @else {
+      <section class="grid">
+        @for (item of scenes(); track item.id) {
+          <article class="card" [class.requestable]="isRequestable(item)">
+            <div class="media">
+              <a
+                class="media-link-stretch"
+                [routerLink]="['/scene', item.id]"
+                [queryParams]="{ returnTo: currentRouteUrl() }"
+                [attr.aria-label]="item.title"
+              ></a>
+
+              @if (item.imageUrl) {
+                <img class="thumbnail" [src]="item.imageUrl" [alt]="item.title" loading="lazy" />
+              } @else {
+                <div class="thumbnail placeholder" aria-hidden="true"></div>
+              }
+
+              <div class="media-top">
+                @if (item.studioImageUrl) {
+                  @if (studioBadgeQueryParams(item); as studioParams) {
+                    <a
+                      class="studio-badge-link"
+                      [routerLink]="['/scenes']"
+                      [queryParams]="studioParams"
+                      [attr.aria-label]="'Filter scenes by studio ' + (item.studio ?? 'Unknown')"
+                    >
+                      <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                        <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
+                      </div>
+                    </a>
+                  } @else {
+                    <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                      <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
+                    </div>
+                  }
+                } @else if (item.studio) {
+                  @if (studioBadgeQueryParams(item); as studioParams) {
+                    <a
+                      class="studio-badge-link"
+                      [routerLink]="['/scenes']"
+                      [queryParams]="studioParams"
+                      [attr.aria-label]="'Filter scenes by studio ' + item.studio"
+                    >
+                      <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                    </a>
+                  } @else {
+                    <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                  }
+                }
+
+                @if (item.status.state !== 'NOT_REQUESTED') {
+                  <app-scene-status-badge class="status-icon" [status]="item.status" mode="icon" />
+                }
+              </div>
+
+              <div class="media-bottom">
+                <h2 class="media-title">{{ item.title }}</h2>
+                @if (isRequestable(item)) {
+                  <button type="button" class="request-cta" (click)="openRequestModal(item)">
+                    Request
+                  </button>
+                }
+              </div>
+            </div>
+          </article>
+        }
+      </section>
+
+      <div #loadMoreSentinel class="load-sentinel"></div>
+
+      @if (loadingMoreScenes()) {
+        <p class="state">Loading more studio scenes...</p>
+      }
+
+      @if (loadMoreScenesError()) {
+        <div class="load-more-error">
+          <p-message severity="error" styleClass="app-inline-message">
+            {{ loadMoreScenesError() }}
+          </p-message>
+          <button pButton type="button" (click)="retryLoadMoreScenes()">Retry</button>
+        </div>
+      }
+    }
+  }
+
+  <app-scene-request-modal
+    [open]="requestModalOpen()"
+    [sceneId]="requestContext()?.id ?? null"
+    [sceneTitle]="requestContext()?.title ?? null"
+    [sceneImageUrl]="requestContext()?.imageUrl ?? null"
+    (closed)="onRequestModalClosed()"
+    (submitted)="onRequestSubmitted($event)"
+  />
+</main>

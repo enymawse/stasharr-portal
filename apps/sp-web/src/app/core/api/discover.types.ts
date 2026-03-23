@@ -279,3 +279,52 @@ export interface StudioFeedResponse {
   hasMore: boolean;
   items: StudioFeedItem[];
 }
+
+export interface StudioDetailsImage {
+  id: string;
+  url: string;
+  width: number | null;
+  height: number | null;
+}
+
+export interface StudioDetailsUrl {
+  url: string;
+  type: string | null;
+  siteName: string | null;
+  siteUrl: string | null;
+  siteIcon: string | null;
+}
+
+export interface StudioDetailsParent {
+  id: string;
+  name: string;
+  aliases: string[];
+  isFavorite: boolean;
+  urls: StudioDetailsUrl[];
+}
+
+export interface StudioDetailsChild {
+  id: string;
+  name: string;
+  aliases: string[];
+  deleted: boolean;
+  isFavorite: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+  imageUrl: string | null;
+}
+
+export interface StudioDetails {
+  id: string;
+  name: string;
+  aliases: string[];
+  deleted: boolean;
+  isFavorite: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+  imageUrl: string | null;
+  images: StudioDetailsImage[];
+  urls: StudioDetailsUrl[];
+  parentStudio: StudioDetailsParent | null;
+  childStudios: StudioDetailsChild[];
+}

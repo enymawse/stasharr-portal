@@ -20,6 +20,7 @@ import {
   SceneRequestOptions,
   SubmitSceneRequestPayload,
   SubmitSceneRequestResponse,
+  StudioDetails,
 } from './discover.types';
 
 @Injectable({
@@ -237,5 +238,11 @@ export class DiscoverService {
     }
 
     return this.http.get<StudioFeedResponse>('/api/studios', { params });
+  }
+
+  getStudioDetails(studioId: string): Observable<StudioDetails> {
+    return this.http.get<StudioDetails>(
+      `/api/studios/${encodeURIComponent(studioId)}`,
+    );
   }
 }
