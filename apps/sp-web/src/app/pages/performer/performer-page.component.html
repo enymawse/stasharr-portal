@@ -264,11 +264,35 @@
 
               <div class="media-top">
                 @if (item.studioImageUrl) {
-                  <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
-                    <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
-                  </div>
+                  @if (studioBadgeQueryParams(item); as studioParams) {
+                    <a
+                      class="studio-badge-link"
+                      [routerLink]="['/scenes']"
+                      [queryParams]="studioParams"
+                      [attr.aria-label]="'Filter scenes by studio ' + (item.studio ?? 'Unknown')"
+                    >
+                      <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                        <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
+                      </div>
+                    </a>
+                  } @else {
+                    <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                      <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
+                    </div>
+                  }
                 } @else if (item.studio) {
-                  <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                  @if (studioBadgeQueryParams(item); as studioParams) {
+                    <a
+                      class="studio-badge-link"
+                      [routerLink]="['/scenes']"
+                      [queryParams]="studioParams"
+                      [attr.aria-label]="'Filter scenes by studio ' + item.studio"
+                    >
+                      <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                    </a>
+                  } @else {
+                    <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                  }
                 }
 
                 @if (item.status.state !== 'NOT_REQUESTED') {

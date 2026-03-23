@@ -60,6 +60,7 @@ describe('ScenesService', () => {
     details: 'Description',
     imageUrl: 'http://image',
     images: [],
+    studioId: 'studio-1',
     studioName: 'Studio',
     studioImageUrl: 'http://studio-image',
     releaseDate: '2026-01-01',
@@ -108,6 +109,7 @@ describe('ScenesService', () => {
           title: 'Scene',
           details: 'Description',
           imageUrl: 'http://image',
+          studioId: 'studio-1',
           studioName: 'Studio',
           studioImageUrl: 'http://studio-image',
           date: '2026-01-01',
@@ -179,6 +181,7 @@ describe('ScenesService', () => {
           title: 'Scene',
           description: 'Description',
           imageUrl: 'http://image',
+          studioId: 'studio-1',
           studio: 'Studio',
           studioImageUrl: 'http://studio-image',
           releaseDate: '2026-01-02',
@@ -198,6 +201,7 @@ describe('ScenesService', () => {
       sort: 'DATE',
       favorites: undefined,
       tagFilter: undefined,
+      studioIds: [],
     });
   });
 
@@ -212,6 +216,7 @@ describe('ScenesService', () => {
       sort: 'TITLE',
       favorites: undefined,
       tagFilter: undefined,
+      studioIds: [],
     });
   });
 
@@ -226,6 +231,7 @@ describe('ScenesService', () => {
       sort: 'DATE',
       favorites: 'ALL',
       tagFilter: undefined,
+      studioIds: [],
     });
   });
 
@@ -240,6 +246,7 @@ describe('ScenesService', () => {
       sort: 'DATE',
       favorites: 'PERFORMER',
       tagFilter: undefined,
+      studioIds: [],
     });
   });
 
@@ -254,6 +261,7 @@ describe('ScenesService', () => {
       sort: 'DATE',
       favorites: 'STUDIO',
       tagFilter: undefined,
+      studioIds: [],
     });
   });
 
@@ -278,6 +286,30 @@ describe('ScenesService', () => {
         tagIds: ['t-1', 't-2'],
         mode: 'AND',
       },
+      studioIds: [],
+    });
+  });
+
+  it('forwards normalized studioIds to stashdb adapter', async () => {
+    await service.getScenesFeed(
+      1,
+      25,
+      'DATE',
+      [],
+      'OR',
+      undefined,
+      ['studio-1', 'studio-1', 'studio-2'],
+    );
+
+    expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      favorites: undefined,
+      tagFilter: undefined,
+      studioIds: ['studio-1', 'studio-2'],
     });
   });
 

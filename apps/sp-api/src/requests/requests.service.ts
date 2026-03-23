@@ -374,6 +374,7 @@ export class RequestsService {
       title: scene.title,
       description: scene.details,
       imageUrl: scene.imageUrl,
+      studioId: scene.studioId,
       studio: scene.studioName,
       studioImageUrl: scene.studioImageUrl,
       releaseDate: scene.releaseDate,

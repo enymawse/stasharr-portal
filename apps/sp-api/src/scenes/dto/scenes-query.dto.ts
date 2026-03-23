@@ -46,6 +46,24 @@ export class ScenesQueryDto extends DiscoverQueryDto {
   tagIds?: string[];
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null) {
+      return [];
+    }
+
+    const segments = Array.isArray(value) ? value : [value];
+    return segments
+      .flatMap((entry) =>
+        typeof entry === 'string' ? entry.split(',') : [String(entry)],
+      )
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  })
+  @IsArray()
+  @IsString({ each: true })
+  studioIds?: string[];
+
+  @IsOptional()
   @IsIn(SCENE_TAG_MATCH_MODE_VALUES)
   tagMode?: SceneTagMatchMode;
 

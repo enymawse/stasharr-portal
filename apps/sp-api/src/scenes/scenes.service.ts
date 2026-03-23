@@ -43,6 +43,7 @@ export class ScenesService {
     tagIds: string[] = [],
     tagMode: SceneTagMatchMode = 'OR',
     favorites?: SceneFavoritesFilter,
+    studioIds: string[] = [],
   ): Promise<DiscoverResponseDto> {
     const integration = await this.getStashdbIntegration();
 
@@ -61,6 +62,7 @@ export class ScenesService {
     }
 
     const normalizedTagIds = this.normalizeTagIds(tagIds);
+    const normalizedStudioIds = this.normalizeStudioIds(studioIds);
 
     const scenes = await this.stashdbAdapter.getScenesBySort({
       baseUrl: integration.baseUrl,
@@ -69,6 +71,7 @@ export class ScenesService {
       perPage,
       sort,
       favorites,
+      studioIds: normalizedStudioIds,
       tagFilter:
         normalizedTagIds.length > 0
           ? {
@@ -93,6 +96,7 @@ export class ScenesService {
         title: scene.title,
         description: scene.details,
         imageUrl: scene.imageUrl,
+        studioId: scene.studioId,
         studio: scene.studioName,
         studioImageUrl: scene.studioImageUrl,
         releaseDate: scene.releaseDate ?? scene.productionDate ?? scene.date,
@@ -235,6 +239,10 @@ export class ScenesService {
 
   private normalizeTagIds(tagIds: string[]): string[] {
     return [...new Set(tagIds.map((tagId) => tagId.trim()).filter(Boolean))];
+  }
+
+  private normalizeStudioIds(studioIds: string[]): string[] {
+    return [...new Set(studioIds.map((studioId) => studioId.trim()).filter(Boolean))];
   }
 
   private resolveStudioUrl(

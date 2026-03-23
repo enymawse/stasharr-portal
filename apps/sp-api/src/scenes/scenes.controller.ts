@@ -21,6 +21,7 @@ export class ScenesController {
       query.tagIds,
       query.tagMode,
       query.favorites,
+      query.studioIds,
     );
   }
 

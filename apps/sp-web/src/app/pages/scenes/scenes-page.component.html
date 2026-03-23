@@ -10,6 +10,48 @@
   <section class="controls-shell" aria-label="Scenes controls">
     <div class="controls-row">
       <label class="control-field">
+        <span>Studio Filter</span>
+        <div class="studio-picker-shell">
+          <input
+            pInputText
+            [value]="studioSearchTerm()"
+            placeholder="Search studio networks"
+            (input)="onStudioSearchChanged($any($event.target).value)"
+          />
+
+          <p-multiselect
+            inputId="scenes-studios"
+            [ngModel]="studioSelectedIdsModel()"
+            (ngModelChange)="onStudioSelectionChanged($event)"
+            [fluid]="true"
+            [options]="studioSelectOptions()"
+            [group]="true"
+            optionGroupLabel="label"
+            optionGroupChildren="items"
+            optionLabel="label"
+            optionValue="value"
+            [showToggleAll]="false"
+            [showHeader]="false"
+            display="chip"
+            [appendTo]="'body'"
+            panelStyleClass="scenes-filter-studio-panel"
+            placeholder="Choose studio networks or child studios"
+            scrollHeight="16rem"
+          />
+
+          @if (studioSearchLoading()) {
+            <p class="tag-state">Searching studios...</p>
+          } @else if (studioSearchError()) {
+            <p-message severity="error" styleClass="app-control-message">
+              {{ studioSearchError() }}
+            </p-message>
+          } @else if (studioSearchTerm().trim().length > 0 && studioOptions().length === 0) {
+            <p class="tag-state">No matching studios.</p>
+          }
+        </div>
+      </label>
+
+      <label class="control-field">
         <span>Tag Filter</span>
         <div class="tag-picker-shell">
           <div class="tag-input-row">
@@ -90,7 +132,7 @@
     </div>
 
     <p class="controls-note">
-      Sort, tags, and favorites are live.
+      Studio, tags, sort, and favorites are live.
     </p>
   </section>
 
@@ -128,11 +170,35 @@
 
             <div class="media-top">
               @if (item.studioImageUrl) {
-                <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
-                  <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
-                </div>
+                @if (studioBadgeQueryParams(item); as studioParams) {
+                  <a
+                    class="studio-badge-link"
+                    [routerLink]="['/scenes']"
+                    [queryParams]="studioParams"
+                    [attr.aria-label]="'Filter scenes by studio ' + (item.studio ?? 'Unknown')"
+                  >
+                    <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                      <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
+                    </div>
+                  </a>
+                } @else {
+                  <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                    <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
+                  </div>
+                }
               } @else if (item.studio) {
-                <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                @if (studioBadgeQueryParams(item); as studioParams) {
+                  <a
+                    class="studio-badge-link"
+                    [routerLink]="['/scenes']"
+                    [queryParams]="studioParams"
+                    [attr.aria-label]="'Filter scenes by studio ' + item.studio"
+                  >
+                    <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                  </a>
+                } @else {
+                  <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                }
               }
 
               @if (item.status.state !== 'NOT_REQUESTED') {

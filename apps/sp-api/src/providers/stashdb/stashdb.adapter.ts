@@ -26,6 +26,7 @@ export interface StashdbAdapterSceneFeedConfig
   sort: StashdbSceneFeedSort;
   favorites?: StashdbSceneFeedFavorites;
   tagFilter?: StashdbSceneTagFilter;
+  studioIds?: string[];
 }
 
 export type StashdbSceneFeedFavorites = 'PERFORMER' | 'STUDIO' | 'ALL';
@@ -125,6 +126,7 @@ export interface StashdbScene {
   title: string;
   details: string | null;
   imageUrl: string | null;
+  studioId: string | null;
   studioName: string | null;
   studioImageUrl: string | null;
   date: string | null;
@@ -191,6 +193,7 @@ export interface StashdbSceneDetails {
   details: string | null;
   imageUrl: string | null;
   images: StashdbSceneImage[];
+  studioId: string | null;
   studioName: string | null;
   studioImageUrl: string | null;
   releaseDate: string | null;
@@ -782,16 +785,26 @@ export class StashdbAdapter {
       config.tagFilter.tagIds.length > 0
         ? config.tagFilter
         : null;
+    const studioIds =
+      'studioIds' in config && config.studioIds
+        ? [...new Set(config.studioIds.map((id) => id.trim()).filter(Boolean))]
+        : [];
     const tagModifier =
       tagFilter?.mode === 'AND' ? 'INCLUDES_ALL' : 'INCLUDES';
     const tagVariableDeclaration = tagFilter ? ', $tagIds: [ID!]!' : '';
+    const studioVariableDeclaration =
+      studioIds.length > 0 ? ', $studioIds: [ID!]!' : '';
     const favoritesInput = favorites ? `, favorites: ${favorites}` : '';
     const tagInput = tagFilter
       ? `, tags: { value: $tagIds, modifier: ${tagModifier} }`
       : '';
+    const studioInput =
+      studioIds.length > 0
+        ? ', studios: { value: $studioIds, modifier: INCLUDES }'
+        : '';
     const query = `
-      query QueryScenes($page: Int!, $perPage: Int!${tagVariableDeclaration}) {
-        queryScenes(input: { sort: ${sort}, direction: DESC, page: $page, per_page: $perPage${favoritesInput}${tagInput} }) {
+      query QueryScenes($page: Int!, $perPage: Int!${tagVariableDeclaration}${studioVariableDeclaration}) {
+        queryScenes(input: { sort: ${sort}, direction: DESC, page: $page, per_page: $perPage${favoritesInput}${tagInput}${studioInput} }) {
           count
           scenes {
             id
@@ -829,6 +842,9 @@ export class StashdbAdapter {
     };
     if (tagFilter) {
       variables.tagIds = tagFilter.tagIds;
+    }
+    if (studioIds.length > 0) {
+      variables.studioIds = studioIds;
     }
 
     const payload = await this.executeQuery(config, query, variables);
@@ -1036,6 +1052,10 @@ export class StashdbAdapter {
           : null,
       imageUrl: primaryImage?.url ?? null,
       images,
+      studioId:
+        typeof scene.studio?.id === 'string' && scene.studio.id.length > 0
+          ? scene.studio.id
+          : null,
       studioName:
         typeof scene.studio?.name === 'string' && scene.studio.name.length > 0
           ? scene.studio.name
@@ -1156,6 +1176,11 @@ export class StashdbAdapter {
               ? scene.details
               : null,
           imageUrl: sceneImageUrl ?? null,
+          studioId:
+            typeof scene.studio?.id === 'string' &&
+            scene.studio.id.length > 0
+              ? scene.studio.id
+              : null,
           studioName:
             typeof scene.studio?.name === 'string' &&
             scene.studio.name.length > 0

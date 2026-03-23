@@ -5,6 +5,7 @@ export class DiscoverItemDto {
   title!: string;
   description!: string | null;
   imageUrl!: string | null;
+  studioId!: string | null;
   studio!: string | null;
   studioImageUrl!: string | null;
   releaseDate!: string | null;

@@ -29,6 +29,7 @@ import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
 import {
   DiscoverItem,
+  PerformerStudioOption,
   SceneFavoritesFilter,
   SceneFeedSort,
   SceneRequestContext,
@@ -42,6 +43,16 @@ type FavoritesFilterOption = 'NONE' | SceneFavoritesFilter;
 interface MultiSelectOption {
   label: string;
   value: string;
+}
+
+interface MultiSelectGroup {
+  label: string;
+  items: MultiSelectOption[];
+}
+
+interface SelectedStudioChip {
+  id: string;
+  label: string;
 }
 
 @Component({
@@ -62,6 +73,7 @@ interface MultiSelectOption {
 })
 export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly PAGE_SIZE = 50;
+  private static readonly SEARCH_DEBOUNCE_MS = 250;
   private static readonly DEFAULT_SORT: SceneFeedSort = 'DATE';
   private static readonly DEFAULT_FAVORITES: FavoritesFilterOption = 'NONE';
   private static readonly DEFAULT_TAG_MODE: SceneTagMatchMode = 'OR';
@@ -95,7 +107,9 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly discoverService = inject(DiscoverService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly studioSearchTerms = new Subject<string>();
   private readonly tagSearchTerms = new Subject<string>();
+  private studioSearchSubscription: Subscription | null = null;
   private tagSearchSubscription: Subscription | null = null;
   private queryParamSubscription: Subscription | null = null;
   private observer: IntersectionObserver | null = null;
@@ -146,6 +160,13 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly selectedTagIdsModel = signal<string[]>([]);
   protected readonly tagOptions = signal<SceneTagOption[]>([]);
   protected readonly tagSelectOptions = signal<MultiSelectOption[]>([]);
+  protected readonly studioSearchTerm = signal('');
+  protected readonly selectedStudios = signal<SelectedStudioChip[]>([]);
+  protected readonly studioSelectedIdsModel = signal<string[]>([]);
+  protected readonly studioOptions = signal<PerformerStudioOption[]>([]);
+  protected readonly studioSelectOptions = signal<MultiSelectGroup[]>([]);
+  protected readonly studioSearchLoading = signal(false);
+  protected readonly studioSearchError = signal<string | null>(null);
   protected readonly tagSearchLoading = signal(false);
   protected readonly tagSearchError = signal<string | null>(null);
   protected readonly sortOptions = ScenesPageComponent.SORT_OPTIONS;
@@ -153,6 +174,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly tagMatchOptions = ScenesPageComponent.TAG_MATCH_OPTIONS;
 
   ngOnInit(): void {
+    this.setupStudioSearch();
     this.setupTagSearch();
     this.setupUrlStateSync();
   }
@@ -166,6 +188,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.observer.unobserve(this.sentinelElement);
     }
     this.observer?.disconnect();
+    this.studioSearchSubscription?.unsubscribe();
     this.tagSearchSubscription?.unsubscribe();
     this.queryParamSubscription?.unsubscribe();
   }
@@ -249,6 +272,35 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.tagSearchTerms.next(nextValue);
   }
 
+  protected onStudioSearchChanged(nextValue: string): void {
+    this.studioSearchTerm.set(nextValue);
+    this.studioSearchTerms.next(nextValue);
+  }
+
+  protected onStudioSelectionChanged(nextValue: string[] | null): void {
+    const nextIds = this.dedupeStrings(nextValue ?? []);
+    this.studioSelectedIdsModel.set(nextIds);
+
+    const changed = !this.areStringArraysEqual(this.selectedStudioIds(), nextIds);
+    if (!changed) {
+      return;
+    }
+
+    const previousLabels = new Map(
+      this.selectedStudios().map((studio) => [studio.id, studio.label]),
+    );
+    const currentLabels = this.studioLabelMap();
+    this.selectedStudios.set(
+      nextIds.map((id) => ({
+        id,
+        label: currentLabels.get(id) ?? previousLabels.get(id) ?? id,
+      })),
+    );
+    this.rebuildStudioSelectOptions(this.studioOptions());
+    this.syncUrlWithCurrentFilters(false);
+    this.resetFeedAndReload();
+  }
+
   protected onTagSelectionChanged(nextValue: string[] | null): void {
     const nextIds = this.dedupeStrings(nextValue ?? []);
     this.selectedTagIdsModel.set(nextIds);
@@ -314,6 +366,17 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.router.url;
   }
 
+  protected studioBadgeQueryParams(item: DiscoverItem): Record<string, string> | null {
+    if (!item.studioId || !item.studio) {
+      return null;
+    }
+
+    return {
+      studios: item.studioId,
+      studioNames: item.studio,
+    };
+  }
+
   private loadNextPage(): void {
     if (this.inFlight() || !this.hasMore()) {
       return;
@@ -340,6 +403,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
         this.selectedTagIds(),
         this.selectedTagMode(),
         this.selectedFavoritesFilter(),
+        this.selectedStudioIds(),
       )
       .pipe(
         finalize(() => {
@@ -414,6 +478,10 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.selectedTags().map((tag) => tag.id);
   }
 
+  private selectedStudioIds(): string[] {
+    return this.selectedStudios().map((studio) => studio.id);
+  }
+
   private selectedFavoritesFilter(): SceneFavoritesFilter | undefined {
     const selectedFavorites = this.selectedFavorites();
     return selectedFavorites === 'NONE' ? undefined : selectedFavorites;
@@ -439,6 +507,8 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     mode: SceneTagMatchMode;
     tagIds: string[];
     tagNamesById: Map<string, string>;
+    studioIds: string[];
+    studioNamesById: Map<string, string>;
   } {
     const sortParam = queryParamMap.get('sort');
     const sort: SceneFeedSort =
@@ -482,6 +552,21 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     });
 
     const tagIds = this.dedupeStrings(rawTagIds);
+    const rawStudioIds = (queryParamMap.get('studios') ?? '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+    const rawStudioNames = (queryParamMap.get('studioNames') ?? '')
+      .split(',')
+      .map((value) => value.trim());
+    const studioNamesById = new Map<string, string>();
+    rawStudioIds.forEach((id, index) => {
+      const name = rawStudioNames[index];
+      if (name) {
+        studioNamesById.set(id, name);
+      }
+    });
+    const studioIds = this.dedupeStrings(rawStudioIds);
 
     return {
       sort,
@@ -489,6 +574,8 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       mode,
       tagIds,
       tagNamesById,
+      studioIds,
+      studioNamesById,
     };
   }
 
@@ -498,14 +585,22 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     mode: SceneTagMatchMode;
     tagIds: string[];
     tagNamesById: Map<string, string>;
+    studioIds: string[];
+    studioNamesById: Map<string, string>;
   }): boolean {
     const currentSelectedIds = this.selectedTagIds();
+    const currentSelectedStudioIds = this.selectedStudioIds();
     const tagsChanged = !this.areStringArraysEqual(currentSelectedIds, state.tagIds);
+    const studiosChanged = !this.areStringArraysEqual(
+      currentSelectedStudioIds,
+      state.studioIds,
+    );
     const changed =
       this.selectedSort() !== state.sort ||
       this.selectedFavorites() !== state.favorites ||
       this.selectedTagMode() !== state.mode ||
-      tagsChanged;
+      tagsChanged ||
+      studiosChanged;
 
     if (!changed) {
       return false;
@@ -534,7 +629,21 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.selectedTags.set(nextSelectedTags);
     }
 
+    if (studiosChanged) {
+      const previousStudios = new Map(
+        this.selectedStudios().map((studio) => [studio.id, studio.label]),
+      );
+      this.selectedStudios.set(
+        state.studioIds.map((id) => ({
+          id,
+          label: state.studioNamesById.get(id) ?? previousStudios.get(id) ?? id,
+        })),
+      );
+      this.studioSelectedIdsModel.set(state.studioIds);
+    }
+
     this.rebuildTagSelectOptions(this.tagOptions());
+    this.rebuildStudioSelectOptions(this.studioOptions());
     return true;
   }
 
@@ -559,6 +668,14 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
               .map((tag) => tag.name.trim())
               .join(',')
           : null,
+      studios:
+        this.selectedStudioIds().length > 0 ? this.selectedStudioIds().join(',') : null,
+      studioNames:
+        this.selectedStudios().length > 0
+          ? this.selectedStudios()
+              .map((studio) => studio.label.trim())
+              .join(',')
+          : null,
     };
 
     const current = this.route.snapshot.queryParamMap;
@@ -567,12 +684,16 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const currentMode = current.get('mode');
     const currentTags = current.get('tags');
     const currentTagNames = current.get('tagNames');
+    const currentStudios = current.get('studios');
+    const currentStudioNames = current.get('studioNames');
     if (
       (currentSort ?? null) === next.sort &&
       (currentFav ?? null) === next.fav &&
       (currentMode ?? null) === next.mode &&
       (currentTags ?? null) === next.tags &&
-      (currentTagNames ?? null) === next.tagNames
+      (currentTagNames ?? null) === next.tagNames &&
+      (currentStudios ?? null) === next.studios &&
+      (currentStudioNames ?? null) === next.studioNames
     ) {
       return;
     }
@@ -619,6 +740,40 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       });
   }
 
+  private setupStudioSearch(): void {
+    this.studioSearchSubscription = this.studioSearchTerms
+      .pipe(
+        map((value) => value.trim()),
+        debounceTime(ScenesPageComponent.SEARCH_DEBOUNCE_MS),
+        distinctUntilChanged(),
+        switchMap((query) => {
+          if (!query) {
+            this.studioOptions.set([]);
+            this.rebuildStudioSelectOptions([]);
+            this.studioSearchError.set(null);
+            return of<PerformerStudioOption[]>([]);
+          }
+
+          this.studioSearchLoading.set(true);
+          this.studioSearchError.set(null);
+
+          return this.discoverService.searchPerformerStudios(query).pipe(
+            catchError(() => {
+              this.studioSearchError.set('Failed to load studio options.');
+              return of<PerformerStudioOption[]>([]);
+            }),
+            finalize(() => {
+              this.studioSearchLoading.set(false);
+            }),
+          );
+        }),
+      )
+      .subscribe((options) => {
+        this.studioOptions.set(options);
+        this.rebuildStudioSelectOptions(options);
+      });
+  }
+
   private selectedTagsToSelectOptions(): MultiSelectOption[] {
     return this.selectedTags().map((tag) => ({
       label: tag.name,
@@ -644,6 +799,59 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.tagSelectOptions.set([...merged.values()]);
+  }
+
+  private rebuildStudioSelectOptions(options: PerformerStudioOption[]): void {
+    const selectedLabels = new Map(
+      this.selectedStudios().map((studio) => [studio.id, studio.label]),
+    );
+    const grouped = options.map((network) => {
+      const groupItems: MultiSelectOption[] = [
+        {
+          label: `${network.name} (Network)`,
+          value: network.id,
+        },
+        ...network.childStudios.map((child) => ({
+          label: child.name,
+          value: child.id,
+        })),
+      ];
+
+      return {
+        label: network.name,
+        items: groupItems,
+      } satisfies MultiSelectGroup;
+    });
+
+    const seen = new Set(grouped.flatMap((group) => group.items.map((item) => item.value)));
+    const selectedOnlyItems = this.selectedStudioIds()
+      .filter((studioId) => !seen.has(studioId))
+      .map((studioId) => ({
+        label: selectedLabels.get(studioId) ?? studioId,
+        value: studioId,
+      }));
+
+    if (selectedOnlyItems.length > 0) {
+      grouped.unshift({
+        label: 'Selected',
+        items: selectedOnlyItems,
+      });
+    }
+
+    this.studioSelectOptions.set(grouped);
+  }
+
+  private studioLabelMap(): Map<string, string> {
+    const labels = new Map<string, string>();
+
+    for (const option of this.studioOptions()) {
+      labels.set(option.id, option.name);
+      for (const child of option.childStudios) {
+        labels.set(child.id, child.name);
+      }
+    }
+
+    return labels;
   }
 
   private dedupeStrings(values: string[]): string[] {

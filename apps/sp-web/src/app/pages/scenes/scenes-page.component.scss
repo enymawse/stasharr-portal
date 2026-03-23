@@ -41,7 +41,7 @@ header p {
 
 .controls-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1.55fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
   gap: 0.6rem;
   align-items: start;
 }
@@ -73,6 +73,12 @@ header p {
 }
 
 .tag-picker-shell {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.studio-picker-shell {
   display: grid;
   gap: 0.35rem;
   min-width: 0;
@@ -111,6 +117,25 @@ header p {
 :host ::ng-deep .controls-shell .p-multiselect.p-focus {
   border-color: var(--focus-ring);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus-ring) 44%, transparent);
+}
+
+:host ::ng-deep .studio-picker-shell .p-multiselect {
+  width: 100% !important;
+  max-width: 100%;
+  min-width: 0;
+}
+
+:host ::ng-deep .studio-picker-shell .p-multiselect-label-container {
+  min-width: 0;
+  width: 100%;
+}
+
+:host ::ng-deep .studio-picker-shell .p-multiselect-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tag-state {
@@ -196,6 +221,18 @@ header p {
     0 4px 12px rgb(12 22 33 / 26%),
     inset 0 1px 0 rgb(255 255 255 / 25%);
   backdrop-filter: blur(7px);
+}
+
+.studio-badge-link {
+  display: inline-flex;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.studio-badge-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 0.55rem;
 }
 
 .logo-plaque {

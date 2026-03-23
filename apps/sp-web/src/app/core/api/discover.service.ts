@@ -38,6 +38,7 @@ export class DiscoverService {
     tagIds?: string[],
     tagMode?: SceneTagMatchMode,
     favorites?: SceneFavoritesFilter,
+    studioIds?: string[],
   ): Observable<DiscoverResponse> {
     let params = new HttpParams()
       .set('page', page.toString())
@@ -54,6 +55,9 @@ export class DiscoverService {
     }
     if (favorites) {
       params = params.set('favorites', favorites);
+    }
+    if (studioIds && studioIds.length > 0) {
+      params = params.set('studioIds', studioIds.join(','));
     }
 
     return this.http.get<DiscoverResponse>('/api/scenes', { params });

@@ -140,6 +140,17 @@ export class RequestsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.router.url;
   }
 
+  protected studioBadgeQueryParams(item: DiscoverItem): Record<string, string> | null {
+    if (!item.studioId || !item.studio) {
+      return null;
+    }
+
+    return {
+      studios: item.studioId,
+      studioNames: item.studio,
+    };
+  }
+
   private loadNextPage(): void {
     if (this.inFlight() || !this.hasMore()) {
       return;
