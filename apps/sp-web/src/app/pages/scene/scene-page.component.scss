@@ -258,8 +258,7 @@ a.studio-logo-overlay:focus-visible {
   text-decoration: none;
 }
 
-:host ::ng-deep .hero-actions .p-button,
-:host ::ng-deep .p-button.request-button {
+:host ::ng-deep .hero-actions .p-button {
   text-decoration: none;
   border-radius: 8px;
   border: 1px solid var(--border-strong);
@@ -271,16 +270,33 @@ a.studio-logo-overlay:focus-visible {
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 14%);
 }
 
-:host ::ng-deep .hero-actions .p-button:not(:disabled):hover,
-:host ::ng-deep .p-button.request-button:not(:disabled):hover {
+:host ::ng-deep .hero-actions .p-button:not(:disabled):hover {
   border-color: color-mix(in srgb, var(--focus-ring) 62%, var(--border-strong));
   background: rgb(25 49 75 / 82%);
 }
 
-:host ::ng-deep .hero-actions .p-button:focus-visible,
-:host ::ng-deep .p-button.request-button:focus-visible {
+:host ::ng-deep .hero-actions .p-button:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+:host ::ng-deep .hero-actions .p-button.external-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-color: color-mix(in srgb, var(--focus-ring) 30%, var(--border-strong));
+  background: rgb(15 37 58 / 82%);
+}
+
+:host ::ng-deep .hero-actions .p-button.external-action:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--focus-ring) 72%, var(--border-strong));
+  background: rgb(21 48 74 / 88%);
+}
+
+.external-action-icon {
+  font-size: 0.9em;
+  font-weight: 700;
+  opacity: 0.9;
 }
 
 .stash-copy-selector {

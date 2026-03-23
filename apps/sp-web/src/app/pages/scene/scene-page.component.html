@@ -130,23 +130,31 @@
                   @if (selectedStashViewUrl(scene); as selectedViewUrl) {
                     <a
                       pButton
-                      class="hero-action-button"
+                      class="hero-action-button external-action"
                       [href]="selectedViewUrl"
                       target="_blank"
                       rel="noopener noreferrer"
+                      [attr.aria-label]="'View in Stash (' + selectedStashLabel(scene) + ') in a new tab'"
+                      [attr.title]="'View in Stash (' + selectedStashLabel(scene) + ') in a new tab'"
                     >
-                      View in Stash ({{ selectedStashLabel(scene) }})
+                      <span class="external-action-label">
+                        View in Stash ({{ selectedStashLabel(scene) }})
+                      </span>
+                      <i class="pi pi-external-link external-action-icon" aria-hidden="true"></i>
                     </a>
                   }
                 } @else if (scene.stash!.copies[0]; as singleCopy) {
                   <a
                     pButton
-                    class="hero-action-button"
+                    class="hero-action-button external-action"
                     [href]="singleCopy.viewUrl"
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label="View in Stash in a new tab"
+                    title="View in Stash in a new tab"
                   >
-                    View in Stash
+                    <span class="external-action-label">View in Stash</span>
+                    <i class="pi pi-external-link external-action-icon" aria-hidden="true"></i>
                   </a>
                 }
               }
@@ -154,12 +162,15 @@
               @if (hasWhisparrLink(scene)) {
                 <a
                   pButton
-                  class="hero-action-button"
+                  class="hero-action-button external-action"
                   [href]="scene.whisparr!.viewUrl"
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label="View in Whisparr in a new tab"
+                  title="View in Whisparr in a new tab"
                 >
-                  View in Whisparr
+                  <span class="external-action-label">View in Whisparr</span>
+                  <i class="pi pi-external-link external-action-icon" aria-hidden="true"></i>
                 </a>
               }
 
