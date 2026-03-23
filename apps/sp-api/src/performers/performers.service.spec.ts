@@ -151,6 +151,7 @@ describe('PerformersService', () => {
       name: undefined,
       gender: undefined,
       sort: 'NAME',
+      direction: 'ASC',
       favoritesOnly: false,
     });
   });
@@ -171,7 +172,27 @@ describe('PerformersService', () => {
       name: 'aj',
       gender: 'FEMALE',
       sort: 'SCENE_COUNT',
+      direction: 'ASC',
       favoritesOnly: true,
+    });
+  });
+
+  it('forwards explicit performer feed sort direction', async () => {
+    await service.getPerformersFeed(1, 50, {
+      sort: 'NAME',
+      direction: 'DESC',
+    });
+
+    expect(stashdbAdapter.getPerformersFeed).toHaveBeenCalledWith({
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
+      page: 1,
+      perPage: 50,
+      name: undefined,
+      gender: undefined,
+      sort: 'NAME',
+      direction: 'DESC',
+      favoritesOnly: false,
     });
   });
 
@@ -215,6 +236,7 @@ describe('PerformersService', () => {
       page: 1,
       perPage: 25,
       sort: 'DATE',
+      direction: 'DESC',
       studioIds: [],
       tagIds: [],
       onlyFavoriteStudios: false,
@@ -236,9 +258,30 @@ describe('PerformersService', () => {
       page: 2,
       perPage: 20,
       sort: 'UPDATED_AT',
+      direction: 'DESC',
       studioIds: ['studio-1'],
       tagIds: ['tag-1'],
       onlyFavoriteStudios: true,
+    });
+  });
+
+  it('forwards explicit performer-scenes sort direction', async () => {
+    await service.getPerformerScenes('p-1', 1, 25, {
+      sort: 'DATE',
+      direction: 'ASC',
+    });
+
+    expect(stashdbAdapter.getScenesForPerformer).toHaveBeenCalledWith({
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
+      performerId: 'p-1',
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      direction: 'ASC',
+      studioIds: [],
+      tagIds: [],
+      onlyFavoriteStudios: false,
     });
   });
 

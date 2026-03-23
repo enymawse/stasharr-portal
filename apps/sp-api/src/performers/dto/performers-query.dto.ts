@@ -22,6 +22,8 @@ export const PERFORMER_SORT_VALUES = [
   'UPDATED_AT',
 ] as const;
 export type PerformerSort = (typeof PERFORMER_SORT_VALUES)[number];
+export const SORT_DIRECTION_VALUES = ['ASC', 'DESC'] as const;
+export type SortDirection = (typeof SORT_DIRECTION_VALUES)[number];
 
 export const PERFORMER_GENDER_VALUES = [
   'MALE',
@@ -60,6 +62,10 @@ export class PerformersQueryDto {
   @IsOptional()
   @IsIn(PERFORMER_SORT_VALUES)
   sort?: PerformerSort;
+
+  @IsOptional()
+  @IsIn(SORT_DIRECTION_VALUES)
+  direction?: SortDirection;
 
   @IsOptional()
   @Transform(({ value }) => {

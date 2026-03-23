@@ -120,16 +120,27 @@
       <div class="controls-row">
         <label class="control-field">
           <span>Sort</span>
-          <p-select
-            inputId="performer-sort"
-            [ngModel]="sceneSort()"
-            (ngModelChange)="onSceneSortChanged($event)"
-            [options]="sceneSortOptions"
-            optionLabel="label"
-            optionValue="value"
-            [appendTo]="'body'"
-            panelStyleClass="performer-filter-select-panel"
-          />
+          <div class="sort-with-direction">
+            <p-select
+              inputId="performer-sort"
+              [ngModel]="sceneSort()"
+              (ngModelChange)="onSceneSortChanged($event)"
+              [options]="sceneSortOptions"
+              optionLabel="label"
+              optionValue="value"
+              [appendTo]="'body'"
+              panelStyleClass="performer-filter-select-panel"
+            />
+            <button
+              type="button"
+              class="sort-direction-toggle"
+              [attr.aria-label]="sceneSortDirectionToggleLabel()"
+              [attr.title]="sceneSortDirectionToggleLabel()"
+              (click)="toggleSceneSortDirection()"
+            >
+              <i [class]="sceneSortDirectionIconClass()" aria-hidden="true"></i>
+            </button>
+          </div>
         </label>
 
         <label class="control-field checkbox-field">

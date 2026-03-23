@@ -111,6 +111,36 @@ header p {
   cursor: pointer;
 }
 
+.sort-direction-toggle {
+  width: 2.5rem;
+  min-width: 2.5rem;
+  height: var(--performers-filter-control-height);
+  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.sort-direction-toggle i {
+  font-size: 1rem;
+}
+
+.sort-direction-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.sort-with-direction {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem;
+  align-items: center;
+  min-width: 0;
+}
+
 .performer-grid {
   margin-top: 0.9rem;
   display: grid;

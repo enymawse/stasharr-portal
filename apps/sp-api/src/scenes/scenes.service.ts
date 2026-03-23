@@ -20,6 +20,7 @@ import {
 import {
   SceneFavoritesFilter,
   SceneFeedSort,
+  SortDirection,
   SceneTagMatchMode,
 } from './dto/scenes-query.dto';
 
@@ -40,6 +41,7 @@ export class ScenesService {
     page = ScenesService.DEFAULT_PAGE,
     perPage = ScenesService.DEFAULT_PER_PAGE,
     sort: SceneFeedSort = 'DATE',
+    direction: SortDirection = 'DESC',
     tagIds: string[] = [],
     tagMode: SceneTagMatchMode = 'OR',
     favorites?: SceneFavoritesFilter,
@@ -70,6 +72,7 @@ export class ScenesService {
       page,
       perPage,
       sort,
+      direction,
       favorites,
       studioIds: normalizedStudioIds,
       tagFilter:

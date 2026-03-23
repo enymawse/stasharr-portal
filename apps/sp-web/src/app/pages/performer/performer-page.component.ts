@@ -37,6 +37,7 @@ import {
   PerformerStudioOption,
   SceneFeedSort,
   SceneRequestContext,
+  SortDirection,
   SceneTagOption,
 } from '../../core/api/discover.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
@@ -80,6 +81,7 @@ export class PerformerPageComponent
   private static readonly SCENES_PAGE_SIZE = 25;
   private static readonly SEARCH_DEBOUNCE_MS = 250;
   private static readonly DEFAULT_SORT: SceneFeedSort = 'DATE';
+  private static readonly DEFAULT_DIRECTION: SortDirection = 'DESC';
 
   protected static readonly SCENE_SORT_OPTIONS: Array<{
     value: SceneFeedSort;
@@ -135,6 +137,9 @@ export class PerformerPageComponent
   protected readonly favoritingPerformer = signal(false);
 
   protected readonly sceneSort = signal<SceneFeedSort>(PerformerPageComponent.DEFAULT_SORT);
+  protected readonly sceneSortDirection = signal<SortDirection>(
+    PerformerPageComponent.DEFAULT_DIRECTION,
+  );
   protected readonly onlyFavoriteStudios = signal(false);
   protected readonly studioSearchTerm = signal('');
   protected readonly selectedStudios = signal<SelectedStudioChip[]>([]);
@@ -342,6 +347,38 @@ export class PerformerPageComponent
       this.syncUrlWithCurrentFilters(false);
       this.resetScenesAndReload();
     }
+  }
+
+  protected onSceneSortDirectionChanged(nextValue: string): void {
+    if (nextValue !== 'ASC' && nextValue !== 'DESC') {
+      return;
+    }
+
+    if (this.sceneSortDirection() === nextValue) {
+      return;
+    }
+
+    this.sceneSortDirection.set(nextValue);
+    this.syncUrlWithCurrentFilters(false);
+    this.resetScenesAndReload();
+  }
+
+  protected toggleSceneSortDirection(): void {
+    this.onSceneSortDirectionChanged(
+      this.sceneSortDirection() === 'ASC' ? 'DESC' : 'ASC',
+    );
+  }
+
+  protected sceneSortDirectionIconClass(): string {
+    return this.sceneSortDirection() === 'ASC'
+      ? 'pi pi-sort-amount-up-alt'
+      : 'pi pi-sort-amount-down-alt';
+  }
+
+  protected sceneSortDirectionToggleLabel(): string {
+    return this.sceneSortDirection() === 'ASC'
+      ? 'Sort direction: ascending. Toggle to descending.'
+      : 'Sort direction: descending. Toggle to ascending.';
   }
 
   protected onOnlyFavoriteStudiosChanged(nextValue: boolean): void {
@@ -583,6 +620,7 @@ export class PerformerPageComponent
         PerformerPageComponent.SCENES_PAGE_SIZE,
         {
           sort: this.sceneSort(),
+          direction: this.sceneSortDirection(),
           studioIds: this.selectedStudiosIds(),
           tagIds: this.selectedTags().map((tag) => tag.id),
           onlyFavoriteStudios: this.onlyFavoriteStudios(),
@@ -708,6 +746,7 @@ export class PerformerPageComponent
 
   private readUrlFilterState(queryParamMap: import('@angular/router').ParamMap): {
     sort: SceneFeedSort;
+    direction: SortDirection;
     onlyFavoriteStudios: boolean;
     studioIds: string[];
     tagIds: string[];
@@ -721,6 +760,11 @@ export class PerformerPageComponent
       sortParam === 'UPDATED_AT'
         ? sortParam
         : PerformerPageComponent.DEFAULT_SORT;
+    const directionParam = queryParamMap.get('dir');
+    const direction: SortDirection =
+      directionParam === 'ASC' || directionParam === 'DESC'
+        ? directionParam
+        : PerformerPageComponent.DEFAULT_DIRECTION;
 
     const onlyFavoriteStudiosParam = queryParamMap.get('favStudios');
     const onlyFavoriteStudios =
@@ -742,6 +786,7 @@ export class PerformerPageComponent
 
     return {
       sort,
+      direction,
       onlyFavoriteStudios,
       studioIds,
       tagIds,
@@ -750,6 +795,7 @@ export class PerformerPageComponent
 
   private applyUrlFilterState(state: {
     sort: SceneFeedSort;
+    direction: SortDirection;
     onlyFavoriteStudios: boolean;
     studioIds: string[];
     tagIds: string[];
@@ -760,6 +806,7 @@ export class PerformerPageComponent
     const tagsChanged = !this.areStringArraysEqual(currentTagIds, state.tagIds);
     const changed =
       this.sceneSort() !== state.sort ||
+      this.sceneSortDirection() !== state.direction ||
       this.onlyFavoriteStudios() !== state.onlyFavoriteStudios ||
       studiosChanged ||
       tagsChanged;
@@ -769,6 +816,7 @@ export class PerformerPageComponent
     }
 
     this.sceneSort.set(state.sort);
+    this.sceneSortDirection.set(state.direction);
     this.onlyFavoriteStudios.set(state.onlyFavoriteStudios);
 
     if (studiosChanged) {
@@ -814,6 +862,10 @@ export class PerformerPageComponent
         this.sceneSort() === PerformerPageComponent.DEFAULT_SORT
           ? null
           : this.sceneSort(),
+      dir:
+        this.sceneSortDirection() === PerformerPageComponent.DEFAULT_DIRECTION
+          ? null
+          : this.sceneSortDirection(),
       favStudios: this.onlyFavoriteStudios() ? '1' : null,
       studios: this.selectedStudiosIds().length > 0 ? this.selectedStudiosIds().join(',') : null,
       tags: this.selectedTags().length > 0 ? this.selectedTags().map((tag) => tag.id).join(',') : null,
@@ -822,6 +874,7 @@ export class PerformerPageComponent
     const current = this.route.snapshot.queryParamMap;
     if (
       (current.get('sort') ?? null) === next.sort &&
+      (current.get('dir') ?? null) === next.dir &&
       (current.get('favStudios') ?? null) === next.favStudios &&
       (current.get('studios') ?? null) === next.studios &&
       (current.get('tags') ?? null) === next.tags

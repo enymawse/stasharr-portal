@@ -10,6 +10,8 @@ export const PERFORMER_SCENES_SORT_VALUES = [
 ] as const;
 
 export type PerformerScenesSort = (typeof PERFORMER_SCENES_SORT_VALUES)[number];
+export const SORT_DIRECTION_VALUES = ['ASC', 'DESC'] as const;
+export type SortDirection = (typeof SORT_DIRECTION_VALUES)[number];
 
 export class PerformerScenesQueryDto {
   @IsOptional()
@@ -28,6 +30,10 @@ export class PerformerScenesQueryDto {
   @IsOptional()
   @IsIn(PERFORMER_SCENES_SORT_VALUES)
   sort?: PerformerScenesSort;
+
+  @IsOptional()
+  @IsIn(SORT_DIRECTION_VALUES)
+  direction?: SortDirection;
 
   @IsOptional()
   @Transform(({ value }) => {

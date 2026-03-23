@@ -13,15 +13,24 @@ import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { SceneStatusService } from '../scene-status/scene-status.service';
 import { PerformerDetailsDto } from './dto/performer-details.dto';
 import { PerformerFeedResponseDto } from './dto/performer-feed-response.dto';
-import { PerformerScenesSort } from './dto/performer-scenes-query.dto';
+import {
+  PerformerScenesSort,
+  SortDirection as PerformerScenesSortDirection,
+} from './dto/performer-scenes-query.dto';
 import { PerformerStudioOptionDto } from './dto/performer-studio-option.dto';
-import { PerformerGender, PerformerSort } from './dto/performers-query.dto';
+import {
+  PerformerGender,
+  PerformerSort,
+  SortDirection as PerformerSortDirection,
+} from './dto/performers-query.dto';
 
 @Injectable()
 export class PerformersService {
   private static readonly DEFAULT_PAGE = 1;
   private static readonly DEFAULT_PER_PAGE = 50;
   private static readonly DEFAULT_SCENES_PER_PAGE = 25;
+  private static readonly DEFAULT_PERFORMERS_SORT_DIRECTION: PerformerSortDirection = 'ASC';
+  private static readonly DEFAULT_SCENES_SORT_DIRECTION: PerformerScenesSortDirection = 'DESC';
 
   constructor(
     private readonly integrationsService: IntegrationsService,
@@ -36,6 +45,7 @@ export class PerformersService {
       name?: string;
       gender?: PerformerGender;
       sort?: PerformerSort;
+      direction?: PerformerSortDirection;
       favoritesOnly?: boolean;
     },
   ): Promise<PerformerFeedResponseDto> {
@@ -63,6 +73,8 @@ export class PerformersService {
       name: filters?.name,
       gender: filters?.gender,
       sort: filters?.sort ?? 'NAME',
+      direction:
+        filters?.direction ?? PerformersService.DEFAULT_PERFORMERS_SORT_DIRECTION,
       favoritesOnly: filters?.favoritesOnly === true,
     });
 
@@ -136,6 +148,7 @@ export class PerformersService {
       studioIds?: string[];
       tagIds?: string[];
       sort?: PerformerScenesSort;
+      direction?: PerformerScenesSortDirection;
       onlyFavoriteStudios?: boolean;
     },
   ): Promise<DiscoverResponseDto> {
@@ -151,6 +164,7 @@ export class PerformersService {
       page,
       perPage,
       sort: filters?.sort ?? 'DATE',
+      direction: filters?.direction ?? PerformersService.DEFAULT_SCENES_SORT_DIRECTION,
       studioIds: this.normalizeIds(filters?.studioIds ?? []),
       tagIds: this.normalizeIds(filters?.tagIds ?? []),
       onlyFavoriteStudios: filters?.onlyFavoriteStudios === true,

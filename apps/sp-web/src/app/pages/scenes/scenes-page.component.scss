@@ -41,7 +41,11 @@ header p {
 
 .controls-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1.55fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
+  grid-template-columns:
+    minmax(0, 1.5fr)
+    minmax(0, 1.5fr)
+    minmax(0, 0.86fr)
+    minmax(0, 0.86fr);
   gap: 0.6rem;
   align-items: start;
 }
@@ -70,6 +74,36 @@ header p {
   color: var(--text-primary);
   font-size: 0.85rem;
   padding: 0.38rem 0.44rem;
+}
+
+.sort-direction-toggle {
+  width: 2.5rem;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.sort-direction-toggle i {
+  font-size: 1rem;
+}
+
+.sort-direction-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.sort-with-direction {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem;
+  align-items: center;
+  min-width: 0;
 }
 
 .tag-picker-shell {

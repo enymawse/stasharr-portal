@@ -37,6 +37,7 @@ export type SceneFeedSort =
   | 'TITLE'
   | 'CREATED_AT'
   | 'UPDATED_AT';
+export type SortDirection = 'ASC' | 'DESC';
 
 export type SceneTagMatchMode = 'OR' | 'AND';
 export type SceneFavoritesFilter = 'ALL' | 'PERFORMER' | 'STUDIO';

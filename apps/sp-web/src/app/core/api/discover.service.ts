@@ -11,6 +11,7 @@ import {
   FavoriteMutationResponse,
   SceneFavoritesFilter,
   SceneFeedSort,
+  SortDirection,
   SceneTagMatchMode,
   SceneTagOption,
   SceneDetails,
@@ -36,6 +37,7 @@ export class DiscoverService {
     page: number,
     perPage: number,
     sort?: SceneFeedSort,
+    direction?: SortDirection,
     tagIds?: string[],
     tagMode?: SceneTagMatchMode,
     favorites?: SceneFavoritesFilter,
@@ -47,6 +49,9 @@ export class DiscoverService {
 
     if (sort) {
       params = params.set('sort', sort);
+    }
+    if (direction) {
+      params = params.set('direction', direction);
     }
     if (tagIds && tagIds.length > 0) {
       params = params.set('tagIds', tagIds.join(','));
@@ -105,6 +110,7 @@ export class DiscoverService {
       name?: string;
       gender?: PerformerGender;
       sort?: PerformerSort;
+      direction?: SortDirection;
       favoritesOnly?: boolean;
     },
   ): Observable<PerformerFeedResponse> {
@@ -120,6 +126,9 @@ export class DiscoverService {
     }
     if (filters?.sort) {
       params = params.set('sort', filters.sort);
+    }
+    if (filters?.direction) {
+      params = params.set('direction', filters.direction);
     }
     if (filters?.favoritesOnly) {
       params = params.set('favoritesOnly', 'true');
@@ -139,6 +148,7 @@ export class DiscoverService {
     perPage: number,
     filters?: {
       sort?: SceneFeedSort;
+      direction?: SortDirection;
       studioIds?: string[];
       tagIds?: string[];
       onlyFavoriteStudios?: boolean;
@@ -150,6 +160,9 @@ export class DiscoverService {
 
     if (filters?.sort) {
       params = params.set('sort', filters.sort);
+    }
+    if (filters?.direction) {
+      params = params.set('direction', filters.direction);
     }
     if (filters?.studioIds && filters.studioIds.length > 0) {
       params = params.set('studioIds', filters.studioIds.join(','));

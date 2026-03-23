@@ -21,6 +21,7 @@ export class PerformersController {
       name: query.name,
       gender: query.gender,
       sort: query.sort,
+      direction: query.direction,
       favoritesOnly: query.favoritesOnly,
     });
   }
@@ -43,6 +44,7 @@ export class PerformersController {
       query.perPage,
       {
         sort: query.sort,
+        direction: query.direction,
         studioIds: query.studioIds,
         tagIds: query.tagIds,
         onlyFavoriteStudios: query.onlyFavoriteStudios,

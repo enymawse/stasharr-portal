@@ -205,6 +205,7 @@ describe('ScenesService', () => {
       page: 1,
       perPage: 25,
       sort: 'DATE',
+      direction: 'DESC',
       favorites: undefined,
       tagFilter: undefined,
       studioIds: [],
@@ -220,6 +221,7 @@ describe('ScenesService', () => {
       page: 2,
       perPage: 10,
       sort: 'TITLE',
+      direction: 'DESC',
       favorites: undefined,
       tagFilter: undefined,
       studioIds: [],
@@ -227,7 +229,7 @@ describe('ScenesService', () => {
   });
 
   it('forwards ALL favorites filter to stashdb adapter', async () => {
-    await service.getScenesFeed(1, 25, 'DATE', [], 'OR', 'ALL');
+    await service.getScenesFeed(1, 25, 'DATE', undefined, [], 'OR', 'ALL');
 
     expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
       baseUrl: stashdbIntegration.baseUrl,
@@ -235,6 +237,7 @@ describe('ScenesService', () => {
       page: 1,
       perPage: 25,
       sort: 'DATE',
+      direction: 'DESC',
       favorites: 'ALL',
       tagFilter: undefined,
       studioIds: [],
@@ -242,7 +245,7 @@ describe('ScenesService', () => {
   });
 
   it('forwards PERFORMER favorites filter to stashdb adapter', async () => {
-    await service.getScenesFeed(1, 25, 'DATE', [], 'OR', 'PERFORMER');
+    await service.getScenesFeed(1, 25, 'DATE', undefined, [], 'OR', 'PERFORMER');
 
     expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
       baseUrl: stashdbIntegration.baseUrl,
@@ -250,6 +253,7 @@ describe('ScenesService', () => {
       page: 1,
       perPage: 25,
       sort: 'DATE',
+      direction: 'DESC',
       favorites: 'PERFORMER',
       tagFilter: undefined,
       studioIds: [],
@@ -257,7 +261,7 @@ describe('ScenesService', () => {
   });
 
   it('forwards STUDIO favorites filter to stashdb adapter', async () => {
-    await service.getScenesFeed(1, 25, 'DATE', [], 'OR', 'STUDIO');
+    await service.getScenesFeed(1, 25, 'DATE', undefined, [], 'OR', 'STUDIO');
 
     expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
       baseUrl: stashdbIntegration.baseUrl,
@@ -265,6 +269,7 @@ describe('ScenesService', () => {
       page: 1,
       perPage: 25,
       sort: 'DATE',
+      direction: 'DESC',
       favorites: 'STUDIO',
       tagFilter: undefined,
       studioIds: [],
@@ -276,6 +281,7 @@ describe('ScenesService', () => {
       1,
       25,
       'DATE',
+      undefined,
       ['t-1', 't-2', 't-1'],
       'AND',
       'PERFORMER',
@@ -287,6 +293,7 @@ describe('ScenesService', () => {
       page: 1,
       perPage: 25,
       sort: 'DATE',
+      direction: 'DESC',
       favorites: 'PERFORMER',
       tagFilter: {
         tagIds: ['t-1', 't-2'],
@@ -301,6 +308,7 @@ describe('ScenesService', () => {
       1,
       25,
       'DATE',
+      undefined,
       [],
       'OR',
       undefined,
@@ -313,9 +321,26 @@ describe('ScenesService', () => {
       page: 1,
       perPage: 25,
       sort: 'DATE',
+      direction: 'DESC',
       favorites: undefined,
       tagFilter: undefined,
       studioIds: ['studio-1', 'studio-2'],
+    });
+  });
+
+  it('forwards explicit sort direction to stashdb adapter', async () => {
+    await service.getScenesFeed(1, 25, 'DATE', 'ASC');
+
+    expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      direction: 'ASC',
+      favorites: undefined,
+      tagFilter: undefined,
+      studioIds: [],
     });
   });
 

@@ -11,6 +11,8 @@ export const SCENE_FEED_SORT_VALUES = [
 ] as const;
 
 export type SceneFeedSort = (typeof SCENE_FEED_SORT_VALUES)[number];
+export const SORT_DIRECTION_VALUES = ['ASC', 'DESC'] as const;
+export type SortDirection = (typeof SORT_DIRECTION_VALUES)[number];
 
 export const SCENE_TAG_MATCH_MODE_VALUES = ['OR', 'AND'] as const;
 export type SceneTagMatchMode = (typeof SCENE_TAG_MATCH_MODE_VALUES)[number];
@@ -26,6 +28,10 @@ export class ScenesQueryDto extends DiscoverQueryDto {
   @IsOptional()
   @IsIn(SCENE_FEED_SORT_VALUES)
   sort?: SceneFeedSort;
+
+  @IsOptional()
+  @IsIn(SORT_DIRECTION_VALUES)
+  direction?: SortDirection;
 
   @IsOptional()
   @Transform(({ value }) => {

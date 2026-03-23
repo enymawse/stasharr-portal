@@ -19,6 +19,7 @@ export class ScenesController {
       query.page,
       query.perPage,
       query.sort,
+      query.direction,
       query.tagIds,
       query.tagMode,
       query.favorites,

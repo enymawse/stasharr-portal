@@ -30,6 +30,7 @@ import {
   PerformerFeedItem,
   PerformerGender,
   PerformerSort,
+  SortDirection,
 } from '../../core/api/discover.types';
 
 type GenderOption = PerformerGender | 'NONE';
@@ -53,6 +54,7 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
   private static readonly PAGE_SIZE = 50;
   private static readonly NAME_FILTER_DEBOUNCE_MS = 300;
   private static readonly DEFAULT_SORT: PerformerSort = 'NAME';
+  private static readonly DEFAULT_DIRECTION: SortDirection = 'ASC';
   private static readonly DEFAULT_GENDER: GenderOption = 'NONE';
 
   protected static readonly SORT_OPTIONS: Array<{
@@ -127,6 +129,9 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
   protected readonly nameFilter = signal('');
   protected readonly selectedGender = signal<GenderOption>(PerformersPageComponent.DEFAULT_GENDER);
   protected readonly selectedSort = signal<PerformerSort>(PerformersPageComponent.DEFAULT_SORT);
+  protected readonly selectedDirection = signal<SortDirection>(
+    PerformersPageComponent.DEFAULT_DIRECTION,
+  );
   protected readonly favoritesOnly = signal(false);
   protected readonly favoriteInFlightById = signal<Record<string, boolean>>({});
   protected readonly sortOptions = PerformersPageComponent.SORT_OPTIONS;
@@ -218,6 +223,36 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
       this.syncUrlWithCurrentFilters(false);
       this.resetFeedAndReload();
     }
+  }
+
+  protected onDirectionChanged(nextValue: string): void {
+    if (nextValue !== 'ASC' && nextValue !== 'DESC') {
+      return;
+    }
+
+    if (this.selectedDirection() === nextValue) {
+      return;
+    }
+
+    this.selectedDirection.set(nextValue);
+    this.syncUrlWithCurrentFilters(false);
+    this.resetFeedAndReload();
+  }
+
+  protected toggleSortDirection(): void {
+    this.onDirectionChanged(this.selectedDirection() === 'ASC' ? 'DESC' : 'ASC');
+  }
+
+  protected sortDirectionIconClass(): string {
+    return this.selectedDirection() === 'ASC'
+      ? 'pi pi-sort-amount-up-alt'
+      : 'pi pi-sort-amount-down-alt';
+  }
+
+  protected sortDirectionToggleLabel(): string {
+    return this.selectedDirection() === 'ASC'
+      ? 'Sort direction: ascending. Toggle to descending.'
+      : 'Sort direction: descending. Toggle to ascending.';
   }
 
   protected onFavoritesOnlyChanged(nextValue: boolean): void {
@@ -334,6 +369,7 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
         name: this.normalizedNameFilter(),
         gender: this.selectedGenderFilter(),
         sort: this.selectedSort(),
+        direction: this.selectedDirection(),
         favoritesOnly: this.favoritesOnly(),
       })
       .pipe(
@@ -414,6 +450,7 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
     name: string;
     gender: GenderOption;
     sort: PerformerSort;
+    direction: SortDirection;
     favoritesOnly: boolean;
   } {
     const name = (queryParamMap.get('q') ?? '').trim();
@@ -446,11 +483,17 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
 
     const favoritesOnlyParam = queryParamMap.get('fav');
     const favoritesOnly = favoritesOnlyParam === '1' || favoritesOnlyParam === 'true';
+    const directionParam = queryParamMap.get('dir');
+    const direction: SortDirection =
+      directionParam === 'ASC' || directionParam === 'DESC'
+        ? directionParam
+        : PerformersPageComponent.DEFAULT_DIRECTION;
 
     return {
       name,
       gender,
       sort,
+      direction,
       favoritesOnly,
     };
   }
@@ -459,12 +502,14 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
     name: string;
     gender: GenderOption;
     sort: PerformerSort;
+    direction: SortDirection;
     favoritesOnly: boolean;
   }): boolean {
     const changed =
       this.nameFilter() !== state.name ||
       this.selectedGender() !== state.gender ||
       this.selectedSort() !== state.sort ||
+      this.selectedDirection() !== state.direction ||
       this.favoritesOnly() !== state.favoritesOnly;
 
     if (!changed) {
@@ -474,6 +519,7 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.nameFilter.set(state.name);
     this.selectedGender.set(state.gender);
     this.selectedSort.set(state.sort);
+    this.selectedDirection.set(state.direction);
     this.favoritesOnly.set(state.favoritesOnly);
     return true;
   }
@@ -490,6 +536,10 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
         this.selectedSort() === PerformersPageComponent.DEFAULT_SORT
           ? null
           : this.selectedSort(),
+      dir:
+        this.selectedDirection() === PerformersPageComponent.DEFAULT_DIRECTION
+          ? null
+          : this.selectedDirection(),
       fav: this.favoritesOnly() ? '1' : null,
     };
 
@@ -498,6 +548,7 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
       (current.get('q') ?? null) === next.q &&
       (current.get('gender') ?? null) === next.gender &&
       (current.get('sort') ?? null) === next.sort &&
+      (current.get('dir') ?? null) === next.dir &&
       (current.get('fav') ?? null) === next.fav
     ) {
       return;

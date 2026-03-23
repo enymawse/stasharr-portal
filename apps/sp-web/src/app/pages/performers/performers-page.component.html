@@ -36,16 +36,27 @@
 
       <label class="control-field">
         <span>Sort By</span>
-        <p-select
-          inputId="performers-sort"
-          [ngModel]="selectedSort()"
-          (ngModelChange)="onSortChanged($event)"
-          [options]="sortOptions"
-          optionLabel="label"
-          optionValue="value"
-          [appendTo]="'body'"
-          panelStyleClass="performer-filter-select-panel"
-        />
+        <div class="sort-with-direction">
+          <p-select
+            inputId="performers-sort"
+            [ngModel]="selectedSort()"
+            (ngModelChange)="onSortChanged($event)"
+            [options]="sortOptions"
+            optionLabel="label"
+            optionValue="value"
+            [appendTo]="'body'"
+            panelStyleClass="performer-filter-select-panel"
+          />
+          <button
+            type="button"
+            class="sort-direction-toggle"
+            [attr.aria-label]="sortDirectionToggleLabel()"
+            [attr.title]="sortDirectionToggleLabel()"
+            (click)="toggleSortDirection()"
+          >
+            <i [class]="sortDirectionIconClass()" aria-hidden="true"></i>
+          </button>
+        </div>
       </label>
 
       <label class="control-field favorites-field">

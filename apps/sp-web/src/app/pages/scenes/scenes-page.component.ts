@@ -33,6 +33,7 @@ import {
   SceneFavoritesFilter,
   SceneFeedSort,
   SceneRequestContext,
+  SortDirection,
   SceneTagMatchMode,
   SceneTagOption,
 } from '../../core/api/discover.types';
@@ -75,6 +76,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly PAGE_SIZE = 50;
   private static readonly SEARCH_DEBOUNCE_MS = 250;
   private static readonly DEFAULT_SORT: SceneFeedSort = 'DATE';
+  private static readonly DEFAULT_DIRECTION: SortDirection = 'DESC';
   private static readonly DEFAULT_FAVORITES: FavoritesFilterOption = 'NONE';
   private static readonly DEFAULT_TAG_MODE: SceneTagMatchMode = 'OR';
   protected static readonly SORT_OPTIONS: Array<{
@@ -149,6 +151,9 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly requestModalOpen = signal(false);
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
   protected readonly selectedSort = signal<SceneFeedSort>(ScenesPageComponent.DEFAULT_SORT);
+  protected readonly selectedDirection = signal<SortDirection>(
+    ScenesPageComponent.DEFAULT_DIRECTION,
+  );
   protected readonly selectedFavorites = signal<FavoritesFilterOption>(
     ScenesPageComponent.DEFAULT_FAVORITES,
   );
@@ -248,6 +253,36 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.syncUrlWithCurrentFilters(false);
       this.resetFeedAndReload();
     }
+  }
+
+  protected onDirectionChanged(nextValue: string): void {
+    if (nextValue !== 'ASC' && nextValue !== 'DESC') {
+      return;
+    }
+
+    if (this.selectedDirection() === nextValue) {
+      return;
+    }
+
+    this.selectedDirection.set(nextValue);
+    this.syncUrlWithCurrentFilters(false);
+    this.resetFeedAndReload();
+  }
+
+  protected toggleSortDirection(): void {
+    this.onDirectionChanged(this.selectedDirection() === 'ASC' ? 'DESC' : 'ASC');
+  }
+
+  protected sortDirectionIconClass(): string {
+    return this.selectedDirection() === 'ASC'
+      ? 'pi pi-sort-amount-up-alt'
+      : 'pi pi-sort-amount-down-alt';
+  }
+
+  protected sortDirectionToggleLabel(): string {
+    return this.selectedDirection() === 'ASC'
+      ? 'Sort direction: ascending. Toggle to descending.'
+      : 'Sort direction: descending. Toggle to ascending.';
   }
 
   protected onFavoritesChanged(nextValue: string): void {
@@ -400,6 +435,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
         nextPage,
         ScenesPageComponent.PAGE_SIZE,
         this.selectedSort(),
+        this.selectedDirection(),
         this.selectedTagIds(),
         this.selectedTagMode(),
         this.selectedFavoritesFilter(),
@@ -503,6 +539,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private readUrlState(queryParamMap: import('@angular/router').ParamMap): {
     sort: SceneFeedSort;
+    direction: SortDirection;
     favorites: FavoritesFilterOption;
     mode: SceneTagMatchMode;
     tagIds: string[];
@@ -528,6 +565,11 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       favoritesParam === 'STUDIO'
         ? favoritesParam
         : ScenesPageComponent.DEFAULT_FAVORITES;
+    const directionParam = queryParamMap.get('dir');
+    const direction: SortDirection =
+      directionParam === 'ASC' || directionParam === 'DESC'
+        ? directionParam
+        : ScenesPageComponent.DEFAULT_DIRECTION;
 
     const modeParam = queryParamMap.get('mode');
     const mode: SceneTagMatchMode =
@@ -570,6 +612,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
     return {
       sort,
+      direction,
       favorites,
       mode,
       tagIds,
@@ -581,6 +624,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private applyUrlState(state: {
     sort: SceneFeedSort;
+    direction: SortDirection;
     favorites: FavoritesFilterOption;
     mode: SceneTagMatchMode;
     tagIds: string[];
@@ -597,6 +641,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     );
     const changed =
       this.selectedSort() !== state.sort ||
+      this.selectedDirection() !== state.direction ||
       this.selectedFavorites() !== state.favorites ||
       this.selectedTagMode() !== state.mode ||
       tagsChanged ||
@@ -607,6 +652,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.selectedSort.set(state.sort);
+    this.selectedDirection.set(state.direction);
     this.selectedFavorites.set(state.favorites);
     this.selectedTagMode.set(state.mode);
     this.selectedTagIdsModel.set(state.tagIds);
@@ -653,6 +699,10 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
         this.selectedSort() === ScenesPageComponent.DEFAULT_SORT
           ? null
           : this.selectedSort(),
+      dir:
+        this.selectedDirection() === ScenesPageComponent.DEFAULT_DIRECTION
+          ? null
+          : this.selectedDirection(),
       fav:
         this.selectedFavorites() === ScenesPageComponent.DEFAULT_FAVORITES
           ? null
@@ -681,6 +731,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const current = this.route.snapshot.queryParamMap;
     const currentSort = current.get('sort');
     const currentFav = current.get('fav');
+    const currentDir = current.get('dir');
     const currentMode = current.get('mode');
     const currentTags = current.get('tags');
     const currentTagNames = current.get('tagNames');
@@ -688,6 +739,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const currentStudioNames = current.get('studioNames');
     if (
       (currentSort ?? null) === next.sort &&
+      (currentDir ?? null) === next.dir &&
       (currentFav ?? null) === next.fav &&
       (currentMode ?? null) === next.mode &&
       (currentTags ?? null) === next.tags &&

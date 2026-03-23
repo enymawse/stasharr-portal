@@ -206,6 +206,7 @@ describe('StashdbAdapter', () => {
     ) as { query: string };
 
     expect(requestBody.query).toContain('sort: DATE');
+    expect(requestBody.query).toContain('direction: DESC');
   });
 
   it('passes through selected sort value for scene feeds', async () => {
@@ -239,6 +240,36 @@ describe('StashdbAdapter', () => {
     ) as { query: string };
 
     expect(requestBody.query).toContain('sort: UPDATED_AT');
+    expect(requestBody.query).toContain('direction: DESC');
+  });
+
+  it('passes through requested scene direction', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getScenesBySort({
+      baseUrl: 'http://stashdb.local/graphql',
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      direction: 'ASC',
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).toContain('direction: ASC');
   });
 
   it('maps OR tag mode to INCLUDES and sends selected tag ids', async () => {
@@ -548,6 +579,7 @@ describe('StashdbAdapter', () => {
     ) as { query: string };
 
     expect(requestBody.query).toContain('sort: NAME');
+    expect(requestBody.query).toContain('direction: ASC');
     expect(requestBody.query).toContain('images');
     expect(requestBody.query).not.toContain('is_favorite: true');
   });
@@ -583,8 +615,37 @@ describe('StashdbAdapter', () => {
     expect(requestBody.query).toContain('name: $name');
     expect(requestBody.query).toContain('gender: FEMALE');
     expect(requestBody.query).toContain('sort: SCENE_COUNT');
+    expect(requestBody.query).toContain('direction: ASC');
     expect(requestBody.query).toContain('is_favorite: true');
     expect(requestBody.variables.name).toBe('aj');
+  });
+
+  it('passes through requested performer feed direction', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryPerformers: {
+              count: 0,
+              performers: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getPerformersFeed({
+      baseUrl: 'http://stashdb.local/graphql',
+      page: 1,
+      perPage: 50,
+      direction: 'DESC',
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).toContain('direction: DESC');
   });
 
   it('omits is_favorite filter when favoritesOnly is false', async () => {
@@ -734,6 +795,7 @@ describe('StashdbAdapter', () => {
     ) as { query: string; variables: Record<string, unknown> };
 
     expect(requestBody.query).toContain('performers: { value: $performerId, modifier: INCLUDES }');
+    expect(requestBody.query).toContain('direction: DESC');
     expect(requestBody.query).toContain('studios: { value: $studioIds, modifier: INCLUDES }');
     expect(requestBody.query).toContain('tags: { value: $tagIds, modifier: INCLUDES }');
     expect(requestBody.query).toContain('favorites: STUDIO');
@@ -771,6 +833,37 @@ describe('StashdbAdapter', () => {
     expect(requestBody.query).not.toContain('studios:');
     expect(requestBody.query).not.toContain('tags:');
     expect(requestBody.query).not.toContain('favorites: STUDIO');
+    expect(requestBody.query).toContain('direction: DESC');
+  });
+
+  it('passes through requested performer-scenes direction', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getScenesForPerformer({
+      baseUrl: 'http://stashdb.local/graphql',
+      performerId: 'p-1',
+      page: 1,
+      perPage: 25,
+      sort: 'DATE',
+      direction: 'ASC',
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string };
+
+    expect(requestBody.query).toContain('direction: ASC');
   });
 
   it('favorites performer successfully', async () => {
