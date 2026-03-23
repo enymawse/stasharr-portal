@@ -14,6 +14,7 @@ import { finalize } from 'rxjs';
 import { Subscription } from 'rxjs';
 import { ButtonDirective } from 'primeng/button';
 import { Dialog } from 'primeng/dialog';
+import { Message } from 'primeng/message';
 import { MultiSelect } from 'primeng/multiselect';
 import { Select } from 'primeng/select';
 import { ToggleSwitch } from 'primeng/toggleswitch';
@@ -39,6 +40,7 @@ type NumberSelectOption = {
     ReactiveFormsModule,
     Dialog,
     ButtonDirective,
+    Message,
     Select,
     ToggleSwitch,
     MultiSelect,

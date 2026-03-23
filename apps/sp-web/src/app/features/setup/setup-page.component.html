@@ -5,18 +5,18 @@
   </header>
 
   @if (loading()) {
-    <p class="state">Loading setup status...</p>
+    <p-message severity="info" styleClass="app-page-message">Loading setup status...</p-message>
   } @else if (loadError()) {
-    <p class="state error">{{ loadError() }}</p>
+    <p-message severity="error" styleClass="app-page-message">{{ loadError() }}</p-message>
   } @else {
     @if (isSetupComplete()) {
-      <p class="banner success">
+      <p-message severity="success" styleClass="app-banner-message">
         Setup complete: Stash, Whisparr, and StashDB are configured.
-      </p>
+      </p-message>
     } @else {
-      <p class="banner warning">
+      <p-message severity="warn" styleClass="app-banner-message">
         Setup incomplete: configure Stash, Whisparr, and StashDB to continue.
-      </p>
+      </p-message>
     }
 
     <section class="cards">

@@ -22,6 +22,7 @@ import {
   switchMap,
 } from 'rxjs';
 import { InputText } from 'primeng/inputtext';
+import { Message } from 'primeng/message';
 import { MultiSelect } from 'primeng/multiselect';
 import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
@@ -47,6 +48,7 @@ interface MultiSelectOption {
   imports: [
     RouterLink,
     FormsModule,
+    Message,
     InputText,
     Select,
     MultiSelect,

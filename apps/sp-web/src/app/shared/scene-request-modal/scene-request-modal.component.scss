@@ -117,15 +117,6 @@
   gap: 0.45rem;
 }
 
-.state {
-  margin: 0;
-  color: #f4f8ff;
-}
-
-.state.error {
-  color: var(--danger);
-}
-
 :host ::ng-deep .request-modal-body .p-select,
 :host ::ng-deep .request-modal-body .p-multiselect {
   width: 100%;
@@ -157,6 +148,12 @@
   background: var(--chip-bg);
   border: 1px solid var(--chip-border);
   color: var(--chip-text);
+}
+
+:host ::ng-deep .request-modal-body .app-inline-message {
+  border-color: rgb(182 209 238 / 45%);
+  background: rgb(9 22 34 / 72%);
+  color: #e7f2ff;
 }
 
 :host ::ng-deep .request-modal-body .p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider {

@@ -51,7 +51,9 @@
           @if (tagSearchLoading()) {
             <p class="tag-state">Searching tags...</p>
           } @else if (tagSearchError()) {
-            <p class="tag-state error">{{ tagSearchError() }}</p>
+            <p-message severity="error" styleClass="app-control-message">
+              {{ tagSearchError() }}
+            </p-message>
           } @else if (tagSearchTerm().trim().length > 0 && tagOptions().length === 0) {
             <p class="tag-state">No matching tags.</p>
           }
@@ -93,9 +95,9 @@
   </section>
 
   @if (loading()) {
-    <p class="state">Loading scenes feed...</p>
+    <p-message severity="info" styleClass="app-page-message">Loading scenes feed...</p-message>
   } @else if (error()) {
-    <p class="state error">{{ error() }}</p>
+    <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
     <button type="button" class="retry-button" (click)="retryInitialLoad()">Retry</button>
   } @else if (!hasItems()) {
     <p class="state">No dated scenes are available right now.</p>
@@ -159,7 +161,7 @@
 
     @if (loadMoreError()) {
       <div class="load-more-error">
-        <p class="state error">{{ loadMoreError() }}</p>
+        <p-message severity="error" styleClass="app-inline-message">{{ loadMoreError() }}</p-message>
         <button type="button" class="retry-button" (click)="retryLoadMore()">Retry</button>
       </div>
     }

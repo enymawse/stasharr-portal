@@ -8,9 +8,9 @@
   </header>
 
   @if (loading()) {
-    <p class="state">Loading requests feed...</p>
+    <p-message severity="info" styleClass="app-page-message">Loading requests feed...</p-message>
   } @else if (error()) {
-    <p class="state error">{{ error() }}</p>
+    <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
     <button type="button" (click)="retryInitialLoad()">Retry</button>
   } @else if (!hasItems()) {
     <p class="state">No queued scenes are available right now.</p>
@@ -74,7 +74,7 @@
 
     @if (loadMoreError()) {
       <div class="load-more-error">
-        <p class="state error">{{ loadMoreError() }}</p>
+        <p-message severity="error" styleClass="app-inline-message">{{ loadMoreError() }}</p-message>
         <button type="button" (click)="retryLoadMore()">Retry</button>
       </div>
     }

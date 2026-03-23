@@ -22,6 +22,7 @@ import {
   switchMap,
 } from 'rxjs';
 import { InputText } from 'primeng/inputtext';
+import { Message } from 'primeng/message';
 import { MultiSelect } from 'primeng/multiselect';
 import { Select } from 'primeng/select';
 import { ToggleSwitch } from 'primeng/toggleswitch';
@@ -61,6 +62,7 @@ interface MultiSelectGroup {
     Select,
     ToggleSwitch,
     InputText,
+    Message,
     MultiSelect,
     SceneStatusBadgeComponent,
     SceneRequestModalComponent,

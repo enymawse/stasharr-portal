@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
+import { Message } from 'primeng/message';
 import { DiscoverService } from '../../core/api/discover.service';
 import { DiscoverItem, SceneRequestContext } from '../../core/api/discover.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
@@ -17,7 +18,7 @@ import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene
 
 @Component({
   selector: 'app-requests-page',
-  imports: [RouterLink, SceneStatusBadgeComponent, SceneRequestModalComponent],
+  imports: [RouterLink, Message, SceneStatusBadgeComponent, SceneRequestModalComponent],
   templateUrl: './requests-page.component.html',
   styleUrl: './requests-page.component.scss',
 })

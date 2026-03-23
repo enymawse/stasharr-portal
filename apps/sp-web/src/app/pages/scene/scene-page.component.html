@@ -2,9 +2,9 @@
   <a class="back-link" [routerLink]="['/discover']">Back to Discover</a>
 
   @if (loading()) {
-    <p class="state">Loading scene details...</p>
+    <p-message severity="info" styleClass="app-page-message">Loading scene details...</p-message>
   } @else if (error()) {
-    <p class="state error">{{ error() }}</p>
+    <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
     <button pButton type="button" (click)="retry()">Retry</button>
   } @else if (scene(); as scene) {
     <section class="hero-shell">

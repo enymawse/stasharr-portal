@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { finalize, forkJoin, map, switchMap } from 'rxjs';
+import { Message } from 'primeng/message';
 import {
   IntegrationResponse,
   IntegrationType,
@@ -14,7 +15,7 @@ import { SetupStatusResponse } from '../../core/api/setup.types';
 
 @Component({
   selector: 'app-setup-page',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, Message],
   templateUrl: './setup-page.component.html',
   styleUrl: './setup-page.component.scss',
 })

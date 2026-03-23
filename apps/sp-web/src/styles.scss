@@ -197,3 +197,35 @@ body {
 .app-toast .p-toast-detail {
   color: var(--text-muted);
 }
+
+.app-page-message {
+  margin-top: 0.85rem;
+}
+
+.app-banner-message {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.app-inline-message,
+.app-control-message,
+.app-page-message,
+.app-banner-message {
+  font-size: 0.9rem;
+}
+
+.app-inline-message {
+  margin: 0;
+}
+
+.app-control-message {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.app-inline-message .p-message-content,
+.app-control-message .p-message-content,
+.app-page-message .p-message-content,
+.app-banner-message .p-message-content {
+  gap: 0.45rem;
+}

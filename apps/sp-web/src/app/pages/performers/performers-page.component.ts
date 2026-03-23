@@ -19,6 +19,7 @@ import {
 } from 'rxjs';
 import { ButtonDirective } from 'primeng/button';
 import { InputText } from 'primeng/inputtext';
+import { Message } from 'primeng/message';
 import { Select } from 'primeng/select';
 import { ToggleSwitch } from 'primeng/toggleswitch';
 import { DiscoverService } from '../../core/api/discover.service';
@@ -32,7 +33,15 @@ type GenderOption = PerformerGender | 'NONE';
 
 @Component({
   selector: 'app-performers-page',
-  imports: [RouterLink, FormsModule, InputText, Select, ToggleSwitch, ButtonDirective],
+  imports: [
+    RouterLink,
+    FormsModule,
+    InputText,
+    Message,
+    Select,
+    ToggleSwitch,
+    ButtonDirective,
+  ],
   templateUrl: './performers-page.component.html',
   styleUrl: './performers-page.component.scss',
 })

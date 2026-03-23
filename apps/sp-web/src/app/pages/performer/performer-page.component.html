@@ -2,9 +2,9 @@
   <a class="back-link" [routerLink]="['/performers']">Back to Performers</a>
 
   @if (loadingPerformer()) {
-    <p class="state">Loading performer details...</p>
+    <p-message severity="info" styleClass="app-page-message">Loading performer details...</p-message>
   } @else if (performerError()) {
-    <p class="state error">{{ performerError() }}</p>
+    <p-message severity="error" styleClass="app-page-message">{{ performerError() }}</p-message>
     <button type="button" (click)="retryPerformerLoad()">Retry</button>
   } @else if (performer(); as performer) {
     <section class="hero-shell">
@@ -166,7 +166,9 @@
           @if (studioSearchLoading()) {
             <p class="hint">Searching studios...</p>
           } @else if (studioSearchError()) {
-            <p class="hint error">{{ studioSearchError() }}</p>
+            <p-message severity="error" styleClass="app-control-message">
+              {{ studioSearchError() }}
+            </p-message>
           } @else if (studioSearchTerm().trim().length > 0 && studioOptions().length === 0) {
             <p class="hint">No studios found for this query.</p>
           }
@@ -205,7 +207,9 @@
           @if (tagSearchLoading()) {
             <p class="hint">Searching tags...</p>
           } @else if (tagSearchError()) {
-            <p class="hint error">{{ tagSearchError() }}</p>
+            <p-message severity="error" styleClass="app-control-message">
+              {{ tagSearchError() }}
+            </p-message>
           } @else if (tagSearchTerm().trim().length > 0 && tagOptions().length === 0) {
             <p class="hint">No tags found for this query.</p>
           }
@@ -214,9 +218,9 @@
     </section>
 
     @if (loadingScenes()) {
-      <p class="state">Loading performer scenes...</p>
+      <p-message severity="info" styleClass="app-page-message">Loading performer scenes...</p-message>
     } @else if (scenesError()) {
-      <p class="state error">{{ scenesError() }}</p>
+      <p-message severity="error" styleClass="app-page-message">{{ scenesError() }}</p-message>
       <button type="button" (click)="retryInitialScenesLoad()">Retry</button>
     } @else if (!hasScenes()) {
       <p class="state">No scenes found for this performer and filters.</p>
@@ -272,7 +276,9 @@
 
       @if (loadMoreScenesError()) {
         <div class="load-more-error">
-          <p class="state error">{{ loadMoreScenesError() }}</p>
+          <p-message severity="error" styleClass="app-inline-message">
+            {{ loadMoreScenesError() }}
+          </p-message>
           <button type="button" (click)="retryLoadMoreScenes()">Retry</button>
         </div>
       }

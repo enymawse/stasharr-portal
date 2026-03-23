@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { ButtonDirective } from 'primeng/button';
+import { Message } from 'primeng/message';
 import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
 import { SceneDetails, SceneRequestContext } from '../../core/api/discover.types';
@@ -14,6 +15,7 @@ import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene
   imports: [
     RouterLink,
     FormsModule,
+    Message,
     Select,
     ButtonDirective,
     SceneStatusBadgeComponent,

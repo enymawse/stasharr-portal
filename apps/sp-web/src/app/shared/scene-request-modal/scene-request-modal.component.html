@@ -42,9 +42,13 @@
 
       <div class="request-modal-body">
         @if (requestOptionsLoading()) {
-          <p class="state">Loading request options...</p>
+          <p-message severity="info" styleClass="app-inline-message">
+            Loading request options...
+          </p-message>
         } @else if (requestOptionsError()) {
-          <p class="state error">{{ requestOptionsError() }}</p>
+          <p-message severity="error" styleClass="app-inline-message">
+            {{ requestOptionsError() }}
+          </p-message>
         } @else {
           <form [formGroup]="requestForm" (ngSubmit)="submitRequest()">
             <label class="field" for="request-root-folder">
@@ -113,7 +117,9 @@
             }
 
             @if (requestSubmitError()) {
-              <p class="state error">{{ requestSubmitError() }}</p>
+              <p-message severity="error" styleClass="app-inline-message">
+                {{ requestSubmitError() }}
+              </p-message>
             }
 
             <div class="request-actions">
