@@ -12,6 +12,7 @@ import { SettingsPageComponent } from './pages/settings/settings-page.component'
 import { RequestsPageComponent } from './pages/requests/requests-page.component';
 import { PerformersPageComponent } from './pages/performers/performers-page.component';
 import { PerformerPageComponent } from './pages/performer/performer-page.component';
+import { StudiosPageComponent } from './pages/studios/studios-page.component';
 
 export const routes: Routes = [
   {
@@ -43,6 +44,10 @@ export const routes: Routes = [
       {
         path: 'performers',
         component: PerformersPageComponent,
+      },
+      {
+        path: 'studios',
+        component: StudiosPageComponent,
       },
       {
         path: 'performer/:performerId',

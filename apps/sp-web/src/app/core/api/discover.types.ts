@@ -255,3 +255,27 @@ export interface PerformerStudioOption {
     name: string;
   }>;
 }
+
+export type StudioFeedSort = 'NAME' | 'CREATED_AT' | 'UPDATED_AT';
+
+export interface StudioFeedChild {
+  id: string;
+  name: string;
+}
+
+export interface StudioFeedItem {
+  id: string;
+  name: string;
+  isFavorite: boolean;
+  imageUrl: string | null;
+  parentStudio: StudioFeedChild | null;
+  childStudios: StudioFeedChild[];
+}
+
+export interface StudioFeedResponse {
+  total: number;
+  page: number;
+  perPage: number;
+  hasMore: boolean;
+  items: StudioFeedItem[];
+}

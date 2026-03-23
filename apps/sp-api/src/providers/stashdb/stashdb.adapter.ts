@@ -119,6 +119,37 @@ export interface StashdbStudioOption {
   }>;
 }
 
+export type StashdbStudioFeedSort = 'NAME' | 'CREATED_AT' | 'UPDATED_AT';
+
+export interface StashdbStudiosFeedConfig extends StashdbAdapterBaseConfig {
+  page: number;
+  perPage: number;
+  sort?: StashdbStudioFeedSort;
+  direction?: StashdbSortDirection;
+  name?: string;
+  favoritesOnly?: boolean;
+}
+
+export interface StashdbStudioFeedItem {
+  id: string;
+  name: string;
+  isFavorite: boolean;
+  imageUrl: string | null;
+  parentStudio: {
+    id: string;
+    name: string;
+  } | null;
+  childStudios: Array<{
+    id: string;
+    name: string;
+  }>;
+}
+
+export interface StashdbStudiosFeedResult {
+  total: number;
+  studios: StashdbStudioFeedItem[];
+}
+
 export interface StashdbPerformerScenesConfig extends StashdbAdapterBaseConfig {
   performerId: string;
   page: number;
@@ -268,9 +299,17 @@ interface StashdbGraphqlResponse {
       }>;
     };
     queryStudios?: {
+      count?: unknown;
       studios?: Array<{
         id?: unknown;
         name?: unknown;
+        is_favorite?: unknown;
+        images?: Array<{
+          id?: unknown;
+          url?: unknown;
+          width?: unknown;
+          height?: unknown;
+        }>;
         child_studios?: Array<{
           id?: unknown;
           name?: unknown;
@@ -531,6 +570,130 @@ export class StashdbAdapter {
     return {
       total,
       performers,
+    };
+  }
+
+  async getStudiosFeed(
+    config: StashdbStudiosFeedConfig,
+  ): Promise<StashdbStudiosFeedResult> {
+    const normalizedName = config.name?.trim() ?? '';
+    const sort = config.sort ?? 'NAME';
+    const direction = config.direction;
+    const inputParts = [
+      'per_page: $perPage',
+      'page: $page',
+      `sort: ${sort}`,
+    ];
+
+    if (direction) {
+      inputParts.push(`direction: ${direction}`);
+    }
+
+    if (normalizedName) {
+      inputParts.push('name: $name');
+    }
+
+    if (config.favoritesOnly) {
+      inputParts.push('is_favorite: true');
+    }
+
+    const nameVariableDeclaration = normalizedName ? ', $name: String!' : '';
+    const query = `
+      query QueryStudios($page: Int!, $perPage: Int!${nameVariableDeclaration}) {
+        queryStudios(input: { ${inputParts.join(', ')} }) {
+          count
+          studios {
+            id
+            name
+            is_favorite
+            images {
+              id
+              url
+              width
+              height
+            }
+            child_studios {
+              id
+              name
+            }
+          }
+        }
+      }
+    `;
+
+    const variables: Record<string, unknown> = {
+      page: config.page,
+      perPage: config.perPage,
+    };
+    if (normalizedName) {
+      variables.name = normalizedName;
+    }
+
+    const payload = await this.executeQuery(config, query, variables);
+    const total =
+      typeof payload.data?.queryStudios?.count === 'number'
+        ? payload.data.queryStudios.count
+        : 0;
+    const rawStudios = payload.data?.queryStudios?.studios ?? [];
+    const parentByChildId = new Map<string, { id: string; name: string }>();
+
+    rawStudios.forEach((studio) => {
+      if (typeof studio.id !== 'string' || typeof studio.name !== 'string') {
+        return;
+      }
+      const studioId = studio.id;
+      const studioName = studio.name;
+
+      (studio.child_studios ?? []).forEach((child) => {
+        if (typeof child.id !== 'string') {
+          return;
+        }
+
+        if (!parentByChildId.has(child.id)) {
+          parentByChildId.set(child.id, {
+            id: studioId,
+            name: studioName,
+          });
+        }
+      });
+    });
+
+    const studios = rawStudios
+      .map((studio): StashdbStudioFeedItem | null => {
+        if (typeof studio.id !== 'string' || typeof studio.name !== 'string') {
+          return null;
+        }
+
+        const childStudios = (studio.child_studios ?? [])
+          .map((child): { id: string; name: string } | null => {
+            if (typeof child.id !== 'string' || typeof child.name !== 'string') {
+              return null;
+            }
+
+            return {
+              id: child.id,
+              name: child.name,
+            };
+          })
+          .filter(
+            (child): child is { id: string; name: string } => child !== null,
+          );
+
+        return {
+          id: studio.id,
+          name: studio.name,
+          isFavorite: studio.is_favorite === true,
+          imageUrl:
+            this.selectPrimaryImage(this.normalizeImages(studio.images))?.url ?? null,
+          parentStudio: parentByChildId.get(studio.id) ?? null,
+          childStudios,
+        };
+      })
+      .filter((studio): studio is StashdbStudioFeedItem => studio !== null);
+
+    return {
+      total,
+      studios,
     };
   }
 

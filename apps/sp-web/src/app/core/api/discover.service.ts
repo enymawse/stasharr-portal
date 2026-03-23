@@ -9,6 +9,8 @@ import {
   PerformerSort,
   PerformerStudioOption,
   FavoriteMutationResponse,
+  StudioFeedResponse,
+  StudioFeedSort,
   SceneFavoritesFilter,
   SceneFeedSort,
   SortDirection,
@@ -205,5 +207,35 @@ export class DiscoverService {
       `/api/scenes/studios/${encodeURIComponent(studioId)}/favorite`,
       { favorite },
     );
+  }
+
+  getStudiosFeed(
+    page: number,
+    perPage: number,
+    filters?: {
+      name?: string;
+      sort?: StudioFeedSort;
+      direction?: SortDirection;
+      favoritesOnly?: boolean;
+    },
+  ): Observable<StudioFeedResponse> {
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('perPage', perPage.toString());
+
+    if (filters?.name) {
+      params = params.set('name', filters.name);
+    }
+    if (filters?.sort) {
+      params = params.set('sort', filters.sort);
+    }
+    if (filters?.direction) {
+      params = params.set('direction', filters.direction);
+    }
+    if (filters?.favoritesOnly) {
+      params = params.set('favoritesOnly', 'true');
+    }
+
+    return this.http.get<StudioFeedResponse>('/api/studios', { params });
   }
 }

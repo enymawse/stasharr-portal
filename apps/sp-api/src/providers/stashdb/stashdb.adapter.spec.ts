@@ -765,6 +765,101 @@ describe('StashdbAdapter', () => {
     ]);
   });
 
+  it('queries studios feed with sort/name/favorites and normalizes image + children', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            queryStudios: {
+              count: 2,
+              studios: [
+                {
+                  id: 'studio-1',
+                  name: 'Studio One',
+                  is_favorite: true,
+                  images: [
+                    {
+                      id: 'studio-img-small',
+                      url: 'https://studio-small.jpg',
+                      width: 64,
+                      height: 64,
+                    },
+                    {
+                      id: 'studio-img-large',
+                      url: 'https://studio-large.jpg',
+                      width: 480,
+                      height: 320,
+                    },
+                  ],
+                  child_studios: [
+                    { id: 'child-1', name: 'Child One' },
+                    { id: 'child-2', name: 'Child Two' },
+                  ],
+                },
+                {
+                  id: 'parent-1',
+                  name: 'Parent Studio',
+                  is_favorite: false,
+                  images: [],
+                  child_studios: [{ id: 'studio-1', name: 'Studio One' }],
+                },
+              ],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.getStudiosFeed({
+        baseUrl: 'http://stashdb.local/graphql',
+        page: 2,
+        perPage: 25,
+        sort: 'UPDATED_AT',
+        direction: 'DESC',
+        name: 'studio',
+        favoritesOnly: true,
+      }),
+    ).resolves.toEqual({
+      total: 2,
+      studios: [
+        {
+          id: 'studio-1',
+          name: 'Studio One',
+          isFavorite: true,
+          imageUrl: 'https://studio-large.jpg',
+          parentStudio: { id: 'parent-1', name: 'Parent Studio' },
+          childStudios: [
+            { id: 'child-1', name: 'Child One' },
+            { id: 'child-2', name: 'Child Two' },
+          ],
+        },
+        {
+          id: 'parent-1',
+          name: 'Parent Studio',
+          isFavorite: false,
+          imageUrl: null,
+          parentStudio: null,
+          childStudios: [{ id: 'studio-1', name: 'Studio One' }],
+        },
+      ],
+    });
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string; variables: { page: number; perPage: number; name?: string } };
+
+    expect(requestBody.query).toContain('queryStudios');
+    expect(requestBody.query).toContain('sort: UPDATED_AT');
+    expect(requestBody.query).toContain('direction: DESC');
+    expect(requestBody.query).toContain('is_favorite: true');
+    expect(requestBody.variables).toEqual({
+      page: 2,
+      perPage: 25,
+      name: 'studio',
+    });
+  });
+
   it('builds performer-scoped scenes query with optional filters', async () => {
     fetchMock.mockResolvedValue({
       ok: true,

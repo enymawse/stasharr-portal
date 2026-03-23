@@ -8,6 +8,7 @@ import { PerformersModule } from './performers/performers.module';
 import { RequestsModule } from './requests/requests.module';
 import { ScenesModule } from './scenes/scenes.module';
 import { SetupModule } from './setup/setup.module';
+import { StudiosModule } from './studios/studios.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SetupModule } from './setup/setup.module';
     ScenesModule,
     RequestsModule,
     PerformersModule,
+    StudiosModule,
   ],
 })
 export class AppModule {}

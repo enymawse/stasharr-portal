@@ -181,6 +181,16 @@ body {
   font-size: 0.82rem;
 }
 
+.studios-filter-select-panel {
+  border-color: color-mix(in srgb, var(--border-strong) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 90%, #0e1a28);
+}
+
+.studios-filter-select-panel .p-select-option,
+.studios-filter-select-panel .p-select-empty-message {
+  font-size: 0.82rem;
+}
+
 .app-toast .p-toast-message {
   border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
   background: color-mix(in srgb, var(--surface-1) 94%, #0e1a28);

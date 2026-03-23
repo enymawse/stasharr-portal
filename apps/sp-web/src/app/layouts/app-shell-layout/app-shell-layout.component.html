@@ -71,6 +71,18 @@
       </a>
 
       <a
+        routerLink="/studios"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        class="nav-item"
+      >
+        <span class="icon" aria-hidden="true"><i class="pi pi-building"></i></span>
+        @if (!collapsed()) {
+          <span>Studios</span>
+        }
+      </a>
+
+      <a
         routerLink="/settings"
         routerLinkActive="active"
         [routerLinkActiveOptions]="{ exact: true }"

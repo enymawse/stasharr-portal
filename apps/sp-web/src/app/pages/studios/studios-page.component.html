@@ -1,0 +1,149 @@
+<main>
+  <header>
+    <h1>Studios</h1>
+    <p>Studio feed from your configured StashDB integration.</p>
+    @if (!loading() && !error()) {
+      <p class="state">Total studios: {{ total() }}</p>
+    }
+  </header>
+
+  <section class="controls-shell" aria-label="Studios controls">
+    <div class="controls-row">
+      <label class="control-field">
+        <span>Filter Studio Name</span>
+        <input
+          pInputText
+          type="text"
+          [ngModel]="nameFilter()"
+          placeholder="Search studio name"
+          (ngModelChange)="onNameFilterChanged($event)"
+        />
+      </label>
+
+      <div class="control-field">
+        <span>Sort By</span>
+        <div class="sort-with-direction">
+          <p-select
+            inputId="studios-sort"
+            [ngModel]="selectedSort()"
+            (ngModelChange)="onSortChanged($event)"
+            [options]="sortOptions"
+            optionLabel="label"
+            optionValue="value"
+            [appendTo]="'body'"
+            panelStyleClass="studios-filter-select-panel"
+          />
+          <button
+            type="button"
+            class="sort-direction-toggle"
+            [attr.aria-label]="sortDirectionToggleLabel()"
+            [attr.title]="sortDirectionToggleLabel()"
+            (click)="toggleSortDirection()"
+          >
+            <i [class]="sortDirectionIconClass()" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+
+      <label class="control-field favorites-field">
+        <span>Favorites Only</span>
+        <div class="favorites-toggle-row">
+          <p-toggleswitch
+            inputId="studios-favorites-only"
+            [ngModel]="favoritesOnly()"
+            (ngModelChange)="onFavoritesOnlyChanged($event)"
+          />
+          <label class="favorites-toggle-label" for="studios-favorites-only">
+            Show favorites only
+          </label>
+        </div>
+      </label>
+    </div>
+  </section>
+
+  @if (loading()) {
+    <div class="app-blocking-loader" role="status" aria-live="polite">
+      <p-progressspinner
+        styleClass="app-blocking-spinner"
+        strokeWidth="4"
+        [style]="{ width: '2.25rem', height: '2.25rem' }"
+      />
+      <p>Loading studios feed...</p>
+    </div>
+  } @else if (error()) {
+    <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
+    <button pButton type="button" class="retry-button" (click)="retryInitialLoad()">Retry</button>
+  } @else if (!hasItems()) {
+    <p class="state">No studios are available for the current filters.</p>
+  } @else {
+    <section class="studio-grid">
+      @for (item of items(); track item.id) {
+        <article class="studio-card">
+          <a
+            class="studio-link-stretch"
+            [routerLink]="['/scenes']"
+            [queryParams]="studioScenesQueryParams(item)"
+            [attr.aria-label]="'Open scenes for studio ' + item.name"
+          ></a>
+
+          <button
+            type="button"
+            class="favorite-star"
+            [class.is-favorite]="item.isFavorite"
+            [disabled]="favoriteToggleBusy(item.id)"
+            [attr.aria-busy]="favoriteToggleBusy(item.id)"
+            [attr.aria-label]="favoriteToggleLabel(item.isFavorite)"
+            [title]="favoriteToggleLabel(item.isFavorite)"
+            (click)="toggleStudioFavorite($event, item)"
+          >
+            <i [class]="item.isFavorite ? 'pi pi-star-fill' : 'pi pi-star'" aria-hidden="true"></i>
+          </button>
+
+          @if (item.imageUrl) {
+            <img class="studio-image" [src]="item.imageUrl" [alt]="item.name + ' logo'" loading="lazy" />
+          } @else {
+            <div class="studio-image placeholder" aria-hidden="true">
+              {{ studioInitial(item.name) }}
+            </div>
+          }
+
+          <div class="studio-meta">
+            <p class="studio-name">{{ item.name }}</p>
+            @if (item.childStudios.length > 0) {
+              <p class="child-summary">
+                Child studios: {{ item.childStudios.length }}
+              </p>
+              <div class="child-chips">
+                @for (childName of childStudiosPreview(item); track childName) {
+                  <span class="child-chip">{{ childName }}</span>
+                }
+                @if (childStudiosOverflowCount(item) > 0) {
+                  <span class="child-chip">+{{ childStudiosOverflowCount(item) }}</span>
+                }
+              </div>
+            } @else if (item.parentStudio) {
+              <p class="child-summary">
+                Parent studio: {{ item.parentStudio.name }}
+              </p>
+            } @else {
+              <p class="child-summary muted">No child studios</p>
+            }
+          </div>
+        </article>
+      }
+    </section>
+
+    <div #loadMoreSentinel class="load-sentinel"></div>
+
+    @if (loadingMore()) {
+      <p class="state">Loading more studios...</p>
+    }
+
+    @if (loadMoreError()) {
+      <div class="load-more-error">
+        <p-message severity="error" styleClass="app-inline-message">{{ loadMoreError() }}</p-message>
+        <button pButton type="button" class="retry-button" (click)="retryLoadMore()">Retry</button>
+      </div>
+    }
+  }
+</main>
