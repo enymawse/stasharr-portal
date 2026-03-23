@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import {
   combineLatest,
   Subject,
@@ -161,6 +161,9 @@ export class PerformerPageComponent
 
   protected readonly requestModalOpen = signal(false);
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
+  protected readonly backLinkPath = signal('/performers');
+  protected readonly backLinkQueryParams = signal<Params>({});
+  protected readonly backLinkLabel = signal('Back to Performers');
 
   ngOnInit(): void {
     this.setupStudioSearch();
@@ -169,6 +172,11 @@ export class PerformerPageComponent
       this.route.paramMap,
       this.route.queryParamMap,
     ]).subscribe(([params, queryParamMap]) => {
+      const resolvedBackLink = this.parseReturnTo(queryParamMap.get('returnTo'), '/performers');
+      this.backLinkPath.set(resolvedBackLink.path);
+      this.backLinkQueryParams.set(resolvedBackLink.queryParams);
+      this.backLinkLabel.set(this.backLinkText(resolvedBackLink.path, 'Back to Performers'));
+
       const nextPerformerId = params.get('performerId')?.trim() ?? '';
       if (!nextPerformerId) {
         this.performerId.set(null);
@@ -458,6 +466,10 @@ export class PerformerPageComponent
     pushIfValue('Updated', performer.updatedAt);
 
     return rows;
+  }
+
+  protected currentRouteUrl(): string {
+    return this.router.url;
   }
 
   private loadPerformer(): void {
@@ -833,6 +845,59 @@ export class PerformerPageComponent
     }
 
     return true;
+  }
+
+  private parseReturnTo(
+    rawReturnTo: string | null,
+    fallback: string,
+  ): { path: string; queryParams: Params } {
+    const trimmed = rawReturnTo?.trim();
+    if (!trimmed) {
+      return { path: fallback, queryParams: {} };
+    }
+
+    if (!trimmed.startsWith('/') || trimmed.startsWith('//')) {
+      return { path: fallback, queryParams: {} };
+    }
+
+    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)) {
+      return { path: fallback, queryParams: {} };
+    }
+
+    try {
+      const parsed = this.router.parseUrl(trimmed);
+      const primarySegments = parsed.root.children['primary']?.segments ?? [];
+      const path = `/${primarySegments.map((segment) => segment.path).join('/')}`;
+      return {
+        path: path === '/' ? fallback : path,
+        queryParams: parsed.queryParams,
+      };
+    } catch {
+      return { path: fallback, queryParams: {} };
+    }
+  }
+
+  private backLinkText(returnTo: string, fallbackLabel: string): string {
+    if (returnTo.startsWith('/discover')) {
+      return 'Back to Discover';
+    }
+    if (returnTo.startsWith('/scenes')) {
+      return 'Back to Scenes';
+    }
+    if (returnTo.startsWith('/requests')) {
+      return 'Back to Requests';
+    }
+    if (returnTo.startsWith('/performers')) {
+      return 'Back to Performers';
+    }
+    if (returnTo.startsWith('/performer/')) {
+      return 'Back to Performer';
+    }
+    if (returnTo.startsWith('/scene/')) {
+      return 'Back to Scene';
+    }
+
+    return fallbackLabel;
   }
 
   private rebuildTagSelectOptions(searchResults: SceneTagOption[]): void {

@@ -1,5 +1,11 @@
 <main>
-  <a class="back-link" [routerLink]="['/performers']">Back to Performers</a>
+  <a
+    class="back-link"
+    [routerLink]="backLinkPath()"
+    [queryParams]="backLinkQueryParams()"
+  >
+    {{ backLinkLabel() }}
+  </a>
 
   @if (loadingPerformer()) {
     <div class="app-blocking-loader" role="status" aria-live="polite">
@@ -246,6 +252,7 @@
               <a
                 class="media-link-stretch"
                 [routerLink]="['/scene', item.id]"
+                [queryParams]="{ returnTo: currentRouteUrl() }"
                 [attr.aria-label]="item.title"
               ></a>
 

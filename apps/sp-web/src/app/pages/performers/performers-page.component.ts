@@ -246,6 +246,10 @@ export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy
     return isFavorite ? 'Favorite performer' : 'Not marked favorite';
   }
 
+  protected currentRouteUrl(): string {
+    return this.router.url;
+  }
+
   private loadNextPage(): void {
     if (this.inFlight() || !this.hasMore()) {
       return;

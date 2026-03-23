@@ -85,6 +85,7 @@
           <a
             class="performer-link-stretch"
             [routerLink]="['/performer', item.id]"
+            [queryParams]="{ returnTo: currentRouteUrl() }"
             [attr.aria-label]="'View performer ' + item.name"
           ></a>
 

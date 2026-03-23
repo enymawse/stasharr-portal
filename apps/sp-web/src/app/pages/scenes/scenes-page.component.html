@@ -116,6 +116,7 @@
             <a
               class="media-link-stretch"
               [routerLink]="['/scene', item.id]"
+              [queryParams]="{ returnTo: currentRouteUrl() }"
               [attr.aria-label]="item.title"
             ></a>
 

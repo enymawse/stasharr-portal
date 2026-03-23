@@ -1,6 +1,6 @@
 import { Component, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { ButtonDirective } from 'primeng/button';
 import { Message } from 'primeng/message';
@@ -28,6 +28,7 @@ import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene
 })
 export class ScenePageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly discoverService = inject(DiscoverService);
   private previousFocusedElement: HTMLElement | null = null;
 
@@ -41,8 +42,18 @@ export class ScenePageComponent implements OnInit {
   protected readonly selectedStashCopyUrl = signal<string | null>(null);
   protected readonly requestModalOpen = signal(false);
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
+  protected readonly backLinkPath = signal('/discover');
+  protected readonly backLinkQueryParams = signal<Params>({});
+  protected readonly backLinkLabel = signal('Back to Discover');
 
   ngOnInit(): void {
+    const resolvedBackLink = this.parseReturnTo(
+      this.route.snapshot.queryParamMap.get('returnTo'),
+      '/discover',
+    );
+    this.backLinkPath.set(resolvedBackLink.path);
+    this.backLinkQueryParams.set(resolvedBackLink.queryParams);
+    this.backLinkLabel.set(this.backLinkText(resolvedBackLink.path, 'Back to Discover'));
     this.loadSceneByRoute();
   }
 
@@ -181,6 +192,10 @@ export class ScenePageComponent implements OnInit {
     this.loadScene(stashId);
   }
 
+  protected currentRouteUrl(): string {
+    return this.router.url;
+  }
+
   private loadSceneByRoute(): void {
     const stashIdParam = this.route.snapshot.paramMap.get('stashId')?.trim();
     if (!stashIdParam) {
@@ -223,5 +238,58 @@ export class ScenePageComponent implements OnInit {
 
   private normalizeDescription(description: string): string {
     return description.replaceAll(/\s+/g, ' ').trim();
+  }
+
+  private parseReturnTo(
+    rawReturnTo: string | null,
+    fallback: string,
+  ): { path: string; queryParams: Params } {
+    const trimmed = rawReturnTo?.trim();
+    if (!trimmed) {
+      return { path: fallback, queryParams: {} };
+    }
+
+    if (!trimmed.startsWith('/') || trimmed.startsWith('//')) {
+      return { path: fallback, queryParams: {} };
+    }
+
+    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)) {
+      return { path: fallback, queryParams: {} };
+    }
+
+    try {
+      const parsed = this.router.parseUrl(trimmed);
+      const primarySegments = parsed.root.children['primary']?.segments ?? [];
+      const path = `/${primarySegments.map((segment) => segment.path).join('/')}`;
+      return {
+        path: path === '/' ? fallback : path,
+        queryParams: parsed.queryParams,
+      };
+    } catch {
+      return { path: fallback, queryParams: {} };
+    }
+  }
+
+  private backLinkText(returnTo: string, fallbackLabel: string): string {
+    if (returnTo.startsWith('/discover')) {
+      return 'Back to Discover';
+    }
+    if (returnTo.startsWith('/scenes')) {
+      return 'Back to Scenes';
+    }
+    if (returnTo.startsWith('/requests')) {
+      return 'Back to Requests';
+    }
+    if (returnTo.startsWith('/performers')) {
+      return 'Back to Performers';
+    }
+    if (returnTo.startsWith('/performer/')) {
+      return 'Back to Performer';
+    }
+    if (returnTo.startsWith('/scene/')) {
+      return 'Back to Scene';
+    }
+
+    return fallbackLabel;
   }
 }

@@ -1,5 +1,11 @@
 <main>
-  <a class="back-link" [routerLink]="['/discover']">Back to Discover</a>
+  <a
+    class="back-link"
+    [routerLink]="backLinkPath()"
+    [queryParams]="backLinkQueryParams()"
+  >
+    {{ backLinkLabel() }}
+  </a>
 
   @if (loading()) {
     <div class="app-blocking-loader" role="status" aria-live="polite">
@@ -71,7 +77,14 @@
             <div class="hero-tags">
               @for (tag of scene.tags; track tag.id; let idx = $index) {
                 @if (idx < 4) {
-                  <span class="meta-chip">{{ tag.name }}</span>
+                  <a
+                    class="meta-chip tag-link"
+                    [routerLink]="['/scenes']"
+                    [queryParams]="{ tags: tag.id, tagNames: tag.name }"
+                    [attr.aria-label]="'Open scenes tagged ' + tag.name"
+                  >
+                    {{ tag.name }}
+                  </a>
                 }
               }
             </div>
@@ -168,6 +181,13 @@
           <div class="performer-grid">
             @for (performer of scene.performers; track performer.id) {
               <article class="performer-card">
+                <a
+                  class="performer-link-stretch"
+                  [routerLink]="['/performer', performer.id]"
+                  [queryParams]="{ returnTo: currentRouteUrl() }"
+                  [attr.aria-label]="'View performer ' + performer.name"
+                ></a>
+
                 @if (performer.imageUrl) {
                   <img class="performer-image" [src]="performer.imageUrl" [alt]="performer.name" />
                 } @else {
@@ -193,7 +213,14 @@
           <h2>Tags</h2>
           <div class="chips">
             @for (tag of scene.tags; track tag.id) {
-              <span class="chip">{{ tag.name }}</span>
+              <a
+                class="chip tag-link"
+                [routerLink]="['/scenes']"
+                [queryParams]="{ tags: tag.id, tagNames: tag.name }"
+                [attr.aria-label]="'Open scenes tagged ' + tag.name"
+              >
+                {{ tag.name }}
+              </a>
             }
           </div>
         </section>

@@ -192,6 +192,20 @@ a.studio-logo-overlay:focus-visible {
   padding: 0.18rem 0.56rem;
 }
 
+.tag-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.tag-link:hover {
+  border-color: color-mix(in srgb, var(--focus-ring) 62%, rgb(189 216 241 / 40%));
+}
+
+.tag-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .hero-tags {
   display: flex;
   flex-wrap: wrap;
@@ -310,11 +324,24 @@ button {
 }
 
 .performer-card {
+  position: relative;
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   overflow: hidden;
   background: var(--surface-2);
   display: grid;
+}
+
+.performer-link-stretch {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 10px;
+}
+
+.performer-link-stretch:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .performer-image {

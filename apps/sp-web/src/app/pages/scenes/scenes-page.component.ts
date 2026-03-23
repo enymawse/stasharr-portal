@@ -310,6 +310,10 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     );
   }
 
+  protected currentRouteUrl(): string {
+    return this.router.url;
+  }
+
   private loadNextPage(): void {
     if (this.inFlight() || !this.hasMore()) {
       return;
@@ -434,6 +438,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     favorites: FavoritesFilterOption;
     mode: SceneTagMatchMode;
     tagIds: string[];
+    tagNamesById: Map<string, string>;
   } {
     const sortParam = queryParamMap.get('sort');
     const sort: SceneFeedSort =
@@ -460,18 +465,30 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
         ? modeParam
         : ScenesPageComponent.DEFAULT_TAG_MODE;
 
-    const tagIds = this.dedupeStrings(
-      (queryParamMap.get('tags') ?? '')
-        .split(',')
-        .map((value) => value.trim())
-        .filter((value) => value.length > 0),
-    );
+    const rawTagIds = (queryParamMap.get('tags') ?? '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+    const rawTagNames = (queryParamMap.get('tagNames') ?? '')
+      .split(',')
+      .map((value) => value.trim());
+
+    const tagNamesById = new Map<string, string>();
+    rawTagIds.forEach((id, index) => {
+      const name = rawTagNames[index];
+      if (name) {
+        tagNamesById.set(id, name);
+      }
+    });
+
+    const tagIds = this.dedupeStrings(rawTagIds);
 
     return {
       sort,
       favorites,
       mode,
       tagIds,
+      tagNamesById,
     };
   }
 
@@ -480,6 +497,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     favorites: FavoritesFilterOption;
     mode: SceneTagMatchMode;
     tagIds: string[];
+    tagNamesById: Map<string, string>;
   }): boolean {
     const currentSelectedIds = this.selectedTagIds();
     const tagsChanged = !this.areStringArraysEqual(currentSelectedIds, state.tagIds);
@@ -508,7 +526,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
         return {
           id,
-          name: id,
+          name: state.tagNamesById.get(id) ?? id,
           description: null,
           aliases: [],
         } satisfies SceneTagOption;
@@ -535,6 +553,12 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
           ? null
           : this.selectedTagMode(),
       tags: this.selectedTagIds().length > 0 ? this.selectedTagIds().join(',') : null,
+      tagNames:
+        this.selectedTags().length > 0
+          ? this.selectedTags()
+              .map((tag) => tag.name.trim())
+              .join(',')
+          : null,
     };
 
     const current = this.route.snapshot.queryParamMap;
@@ -542,11 +566,13 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const currentFav = current.get('fav');
     const currentMode = current.get('mode');
     const currentTags = current.get('tags');
+    const currentTagNames = current.get('tagNames');
     if (
       (currentSort ?? null) === next.sort &&
       (currentFav ?? null) === next.fav &&
       (currentMode ?? null) === next.mode &&
-      (currentTags ?? null) === next.tags
+      (currentTags ?? null) === next.tags &&
+      (currentTagNames ?? null) === next.tagNames
     ) {
       return;
     }

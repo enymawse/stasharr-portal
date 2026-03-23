@@ -8,7 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { Message } from 'primeng/message';
 import { ProgressSpinner } from 'primeng/progressspinner';
@@ -33,6 +33,7 @@ export class DiscoverPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly PAGE_SIZE = 50;
 
   private readonly discoverService = inject(DiscoverService);
+  private readonly router = inject(Router);
   private observer: IntersectionObserver | null = null;
   private sentinelElement: HTMLDivElement | null = null;
   private sentinelIntersecting = false;
@@ -131,6 +132,10 @@ export class DiscoverPageComponent implements OnInit, AfterViewInit, OnDestroy {
           : item,
       ),
     );
+  }
+
+  protected currentRouteUrl(): string {
+    return this.router.url;
   }
 
   private loadNextPage(): void {
