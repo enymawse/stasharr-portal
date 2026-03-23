@@ -21,7 +21,6 @@ import {
   of,
   switchMap,
 } from 'rxjs';
-import { InputText } from 'primeng/inputtext';
 import { Message } from 'primeng/message';
 import { MultiSelect } from 'primeng/multiselect';
 import { ProgressSpinner } from 'primeng/progressspinner';
@@ -62,7 +61,6 @@ interface SelectedStudioChip {
     RouterLink,
     FormsModule,
     Message,
-    InputText,
     ProgressSpinner,
     Select,
     MultiSelect,
@@ -302,14 +300,48 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  protected onTagSearchChanged(nextValue: string): void {
-    this.tagSearchTerm.set(nextValue);
-    this.tagSearchTerms.next(nextValue);
+  protected onTagFilterChanged(nextValue: string | null | undefined): void {
+    const nextTerm = (nextValue ?? '').trimStart();
+    this.tagSearchTerm.set(nextTerm);
+    this.tagSearchTerms.next(nextTerm);
   }
 
-  protected onStudioSearchChanged(nextValue: string): void {
-    this.studioSearchTerm.set(nextValue);
-    this.studioSearchTerms.next(nextValue);
+  protected onStudioFilterChanged(nextValue: string | null | undefined): void {
+    const nextTerm = (nextValue ?? '').trimStart();
+    this.studioSearchTerm.set(nextTerm);
+    this.studioSearchTerms.next(nextTerm);
+  }
+
+  protected onTagFilterPanelHide(): void {
+    this.onTagFilterChanged('');
+  }
+
+  protected onStudioFilterPanelHide(): void {
+    this.onStudioFilterChanged('');
+  }
+
+  protected studioSelectEmptyMessage(): string {
+    if (this.studioSearchError()) {
+      return this.studioSearchError() ?? 'Failed to load studio options.';
+    }
+
+    if (this.studioSearchTerm().trim().length === 0) {
+      return 'Type to search studio networks.';
+    }
+
+    return 'No matching studios.';
+  }
+
+  protected tagSelectEmptyMessage(): string {
+    if (this.tagSearchError()) {
+      return this.tagSearchError() ?? 'Failed to load tag options.';
+    }
+
+    if (this.tagSearchTerm().trim().length === 0) {
+      return 'Type to search tags.';
+    }
+
+    return 'No matching tags.';
   }
 
   protected onStudioSelectionChanged(nextValue: string[] | null): void {
