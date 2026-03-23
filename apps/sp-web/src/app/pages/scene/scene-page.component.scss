@@ -72,12 +72,17 @@ p {
     );
 }
 
-.studio-logo-overlay {
+.studio-affordance-cluster {
   position: absolute;
   top: 0.85rem;
   right: 0.95rem;
   z-index: 2;
-  max-width: min(9.8rem, 28%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+.studio-logo-overlay {
   height: 2.2rem;
   border-radius: 0.72rem;
   padding: 0.22rem 0.5rem;
@@ -110,6 +115,36 @@ a.studio-logo-overlay:focus-visible {
   object-fit: contain;
   object-position: right center;
   filter: drop-shadow(0 1px 1px rgb(0 0 0 / 25%));
+}
+
+.studio-favorite-indicator {
+  width: 1.7rem;
+  height: 1.7rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgb(188 213 238 / 52%);
+  border-radius: 999px;
+  background: rgb(13 27 41 / 70%);
+  font-size: 1rem;
+  font-weight: 800;
+  color: rgb(255 255 255 / 85%);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 55%);
+  cursor: pointer;
+}
+
+.studio-favorite-indicator.active {
+  color: #ffcf4a;
+}
+
+.studio-favorite-indicator:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.studio-favorite-indicator:disabled {
+  opacity: 0.75;
+  cursor: wait;
 }
 
 .hero-layout {
@@ -436,11 +471,19 @@ button {
     gap: 0.9rem;
   }
 
-  .studio-logo-overlay {
+  .studio-affordance-cluster {
     top: 0.68rem;
     right: 0.68rem;
-    max-width: min(8.2rem, 44%);
+    gap: 0.35rem;
+  }
+
+  .studio-logo-overlay {
     height: 1.95rem;
   }
 
+  .studio-favorite-indicator {
+    width: 1.62rem;
+    height: 1.62rem;
+    font-size: 0.94rem;
+  }
 }

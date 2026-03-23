@@ -179,8 +179,19 @@ export class ScenePageComponent implements OnInit {
     return !this.favoritingStudio();
   }
 
-  protected studioFavoriteLabel(scene: SceneDetails): string {
-    return scene.studioIsFavorite ? 'Unfavorite Studio' : 'Favorite Studio';
+  protected studioFavoriteAriaLabel(scene: SceneDetails): string {
+    const studioName = scene.studio?.trim();
+    if (studioName) {
+      return scene.studioIsFavorite
+        ? `Unfavorite studio ${studioName}`
+        : `Favorite studio ${studioName}`;
+    }
+
+    return scene.studioIsFavorite ? 'Unfavorite studio' : 'Favorite studio';
+  }
+
+  protected studioFavoriteTitle(scene: SceneDetails): string {
+    return this.studioFavoriteAriaLabel(scene);
   }
 
   protected toggleFavoriteStudio(scene: SceneDetails): void {

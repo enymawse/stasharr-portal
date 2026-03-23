@@ -30,22 +30,41 @@
       }
       <div class="hero-shade" aria-hidden="true"></div>
 
-      @if (scene.studioImageUrl) {
-        @if (scene.studioUrl) {
-          <a
-            class="studio-logo-overlay"
-            [href]="scene.studioUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            [attr.aria-label]="studioLogoAriaLabel(scene)"
-          >
-            <img [src]="scene.studioImageUrl" alt="" />
-          </a>
-        } @else {
-          <div class="studio-logo-overlay" aria-hidden="true">
-            <img [src]="scene.studioImageUrl" alt="" />
-          </div>
-        }
+      @if (scene.studioImageUrl || scene.studioId) {
+        <div class="studio-affordance-cluster">
+          @if (scene.studioImageUrl) {
+            @if (scene.studioUrl) {
+              <a
+                class="studio-logo-overlay"
+                [href]="scene.studioUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                [attr.aria-label]="studioLogoAriaLabel(scene)"
+              >
+                <img [src]="scene.studioImageUrl" alt="" />
+              </a>
+            } @else {
+              <div class="studio-logo-overlay" aria-hidden="true">
+                <img [src]="scene.studioImageUrl" alt="" />
+              </div>
+            }
+          }
+
+          @if (scene.studioId) {
+            <button
+              type="button"
+              class="studio-favorite-indicator"
+              [class.active]="scene.studioIsFavorite"
+              [disabled]="!canToggleFavoriteStudio(scene)"
+              [attr.aria-busy]="favoritingStudio()"
+              [attr.aria-label]="studioFavoriteAriaLabel(scene)"
+              [attr.title]="studioFavoriteTitle(scene)"
+              (click)="toggleFavoriteStudio(scene)"
+            >
+              {{ scene.studioIsFavorite ? '★' : '☆' }}
+            </button>
+          }
+        </div>
       }
 
       <div class="hero-layout">
@@ -90,21 +109,8 @@
             </div>
           }
 
-          @if (scene.studioId || hasStashCopy(scene) || hasWhisparrLink(scene) || canRequestScene(scene)) {
+          @if (hasStashCopy(scene) || hasWhisparrLink(scene) || canRequestScene(scene)) {
             <div class="hero-actions">
-              @if (scene.studioId) {
-                <button
-                  pButton
-                  type="button"
-                  class="hero-action-button"
-                  [disabled]="!canToggleFavoriteStudio(scene)"
-                  [attr.aria-busy]="favoritingStudio()"
-                  (click)="toggleFavoriteStudio(scene)"
-                >
-                  {{ studioFavoriteLabel(scene) }}
-                </button>
-              }
-
               @if (hasStashCopy(scene)) {
                 @if (hasMultipleStashCopies(scene)) {
                   <label class="stash-copy-selector">
