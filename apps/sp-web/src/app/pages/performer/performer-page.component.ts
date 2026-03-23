@@ -29,6 +29,7 @@ import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { ToggleSwitch } from 'primeng/toggleswitch';
 import { DiscoverService } from '../../core/api/discover.service';
+import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import {
   DiscoverItem,
   PerformerDetails,
@@ -92,6 +93,7 @@ export class PerformerPageComponent
   ];
 
   private readonly discoverService = inject(DiscoverService);
+  private readonly notifications = inject(AppNotificationsService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -130,6 +132,7 @@ export class PerformerPageComponent
   protected readonly loadingPerformer = signal(false);
   protected readonly performerError = signal<string | null>(null);
   protected readonly activeImageIndex = signal(0);
+  protected readonly favoritingPerformer = signal(false);
 
   protected readonly sceneSort = signal<SceneFeedSort>(PerformerPageComponent.DEFAULT_SORT);
   protected readonly onlyFavoriteStudios = signal(false);
@@ -222,6 +225,47 @@ export class PerformerPageComponent
 
   protected retryPerformerLoad(): void {
     this.loadPerformer();
+  }
+
+  protected canFavoritePerformer(performer: PerformerDetails): boolean {
+    return !performer.isFavorite && !this.favoritingPerformer();
+  }
+
+  protected favoritePerformer(performer: PerformerDetails): void {
+    if (this.favoritingPerformer()) {
+      return;
+    }
+
+    if (performer.isFavorite) {
+      this.notifications.info('Performer already favorited');
+      return;
+    }
+
+    this.favoritingPerformer.set(true);
+    this.discoverService
+      .favoritePerformer(performer.id)
+      .pipe(
+        finalize(() => {
+          this.favoritingPerformer.set(false);
+        }),
+      )
+      .subscribe({
+        next: (result) => {
+          this.performer.update((current) =>
+            current ? { ...current, isFavorite: true } : current,
+          );
+
+          if (result.alreadyFavorited) {
+            this.notifications.info('Performer already favorited');
+            return;
+          }
+
+          this.notifications.success('Performer favorited');
+        },
+        error: () => {
+          this.notifications.error('Failed to favorite performer');
+        },
+      });
   }
 
   protected hasScenes(): boolean {

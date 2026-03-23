@@ -193,6 +193,18 @@ export class PerformersService {
     return this.stashdbAdapter.searchStudios(normalizedQuery, config);
   }
 
+  async favoritePerformer(
+    performerId: string,
+  ): Promise<{ favorited: true; alreadyFavorited: boolean }> {
+    const normalizedPerformerId = performerId.trim();
+    if (!normalizedPerformerId) {
+      throw new BadRequestException('Performer id is required.');
+    }
+
+    const config = await this.getStashdbConfig();
+    return this.stashdbAdapter.favoritePerformer(normalizedPerformerId, config);
+  }
+
   private async getStashdbConfig(): Promise<{
     baseUrl: string;
     apiKey: string | null;

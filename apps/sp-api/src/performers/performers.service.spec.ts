@@ -14,6 +14,7 @@ describe('PerformersService', () => {
     getPerformerById: jest.fn(),
     getScenesForPerformer: jest.fn(),
     searchStudios: jest.fn(),
+    favoritePerformer: jest.fn(),
   } as unknown as StashdbAdapter;
 
   const sceneStatusService = {
@@ -115,6 +116,10 @@ describe('PerformersService', () => {
         childStudios: [{ id: 'studio-1a', name: 'Studio Child' }],
       },
     ]);
+    stashdbAdapter.favoritePerformer = jest.fn().mockResolvedValue({
+      favorited: true,
+      alreadyFavorited: false,
+    });
     sceneStatusService.resolveForScenes = jest
       .fn()
       .mockResolvedValue(new Map([['scene-1', { state: 'AVAILABLE' }]]));
@@ -245,5 +250,17 @@ describe('PerformersService', () => {
         childStudios: [{ id: 'studio-1a', name: 'Studio Child' }],
       },
     ]);
+  });
+
+  it('favorites performer by id', async () => {
+    await expect(service.favoritePerformer('p-1')).resolves.toEqual({
+      favorited: true,
+      alreadyFavorited: false,
+    });
+
+    expect(stashdbAdapter.favoritePerformer).toHaveBeenCalledWith('p-1', {
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
+    });
   });
 });

@@ -90,8 +90,21 @@
             </div>
           }
 
-          @if (hasStashCopy(scene) || hasWhisparrLink(scene) || canRequestScene(scene)) {
+          @if (scene.studioId || hasStashCopy(scene) || hasWhisparrLink(scene) || canRequestScene(scene)) {
             <div class="hero-actions">
+              @if (scene.studioId) {
+                <button
+                  pButton
+                  type="button"
+                  class="hero-action-button"
+                  [disabled]="!canFavoriteStudio(scene)"
+                  [attr.aria-busy]="favoritingStudio()"
+                  (click)="favoriteStudio(scene)"
+                >
+                  {{ studioFavoritedInSession() ? 'Studio Favorited' : 'Favorite Studio' }}
+                </button>
+              }
+
               @if (hasStashCopy(scene)) {
                 @if (hasMultipleStashCopies(scene)) {
                   <label class="stash-copy-selector">

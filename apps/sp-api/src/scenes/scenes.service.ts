@@ -173,6 +173,7 @@ export class ScenesService {
       description: scene.details,
       imageUrl: scene.imageUrl,
       images: scene.images,
+      studioId: scene.studioId,
       studio: scene.studioName,
       studioImageUrl: scene.studioImageUrl,
       studioUrl: this.resolveStudioUrl(scene.sourceUrls),
@@ -186,6 +187,18 @@ export class ScenesService {
       stash,
       whisparr,
     };
+  }
+
+  async favoriteStudio(
+    studioId: string,
+  ): Promise<{ favorited: true; alreadyFavorited: boolean }> {
+    const normalizedStudioId = studioId.trim();
+    if (!normalizedStudioId) {
+      throw new BadRequestException('Studio id is required.');
+    }
+
+    const config = await this.getStashdbConfig();
+    return this.stashdbAdapter.favoriteStudio(normalizedStudioId, config);
   }
 
   private async resolveStashAvailability(
@@ -235,6 +248,33 @@ export class ScenesService {
 
       throw error;
     }
+  }
+
+  private async getStashdbConfig(): Promise<{
+    baseUrl: string;
+    apiKey: string | null;
+  }> {
+    const integration = await this.getStashdbIntegration();
+
+    if (!integration.enabled) {
+      throw new ConflictException('STASHDB integration is disabled.');
+    }
+
+    if (integration.status !== IntegrationStatus.CONFIGURED) {
+      throw new ConflictException('STASHDB integration is not configured.');
+    }
+
+    const baseUrl = integration.baseUrl?.trim();
+    if (!baseUrl) {
+      throw new BadRequestException(
+        'STASHDB integration is missing a base URL.',
+      );
+    }
+
+    return {
+      baseUrl,
+      apiKey: integration.apiKey,
+    };
   }
 
   private normalizeTagIds(tagIds: string[]): string[] {

@@ -66,14 +66,17 @@
         <div class="hero-info">
           <div class="title-row">
             <h1>{{ performer.name }}</h1>
-            <span
+            <button
+              type="button"
               class="favorite-indicator"
               [class.active]="performer.isFavorite"
+              [disabled]="!canFavoritePerformer(performer)"
+              [attr.aria-busy]="favoritingPerformer()"
               [attr.aria-label]="performer.isFavorite ? 'Favorite performer' : 'Not favorite performer'"
-              role="img"
+              (click)="favoritePerformer(performer)"
             >
               {{ performer.isFavorite ? '★' : '☆' }}
-            </span>
+            </button>
           </div>
 
           @if (performer.disambiguation) {

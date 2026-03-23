@@ -7,6 +7,7 @@ import { Message } from 'primeng/message';
 import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
+import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import { SceneDetails, SceneRequestContext } from '../../core/api/discover.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
@@ -30,6 +31,7 @@ export class ScenePageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly discoverService = inject(DiscoverService);
+  private readonly notifications = inject(AppNotificationsService);
   private previousFocusedElement: HTMLElement | null = null;
 
   @ViewChild('requestTriggerButton')
@@ -42,6 +44,8 @@ export class ScenePageComponent implements OnInit {
   protected readonly selectedStashCopyUrl = signal<string | null>(null);
   protected readonly requestModalOpen = signal(false);
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
+  protected readonly favoritingStudio = signal(false);
+  protected readonly studioFavoritedInSession = signal(false);
   protected readonly backLinkPath = signal('/discover');
   protected readonly backLinkQueryParams = signal<Params>({});
   protected readonly backLinkLabel = signal('Back to Discover');
@@ -163,6 +167,53 @@ export class ScenePageComponent implements OnInit {
     return scene.status.state === 'NOT_REQUESTED';
   }
 
+  protected canFavoriteStudio(scene: SceneDetails): boolean {
+    if (!scene.studioId) {
+      return false;
+    }
+
+    return !this.studioFavoritedInSession() && !this.favoritingStudio();
+  }
+
+  protected favoriteStudio(scene: SceneDetails): void {
+    if (!scene.studioId) {
+      this.notifications.info('Studio information is unavailable');
+      return;
+    }
+
+    if (this.favoritingStudio()) {
+      return;
+    }
+
+    if (this.studioFavoritedInSession()) {
+      this.notifications.info('Studio already favorited');
+      return;
+    }
+
+    this.favoritingStudio.set(true);
+    this.discoverService
+      .favoriteStudio(scene.studioId)
+      .pipe(
+        finalize(() => {
+          this.favoritingStudio.set(false);
+        }),
+      )
+      .subscribe({
+        next: (result) => {
+          this.studioFavoritedInSession.set(true);
+          if (result.alreadyFavorited) {
+            this.notifications.info('Studio already favorited');
+            return;
+          }
+
+          this.notifications.success('Studio favorited');
+        },
+        error: () => {
+          this.notifications.error('Failed to favorite studio');
+        },
+      });
+  }
+
   protected openRequestPanel(scene: SceneDetails): void {
     if (!this.canRequestScene(scene)) {
       return;
@@ -212,6 +263,7 @@ export class ScenePageComponent implements OnInit {
     this.descriptionExpanded.set(false);
     this.selectedStashCopyUrl.set(null);
     this.requestModalOpen.set(false);
+    this.studioFavoritedInSession.set(false);
 
     this.discoverService
       .getSceneDetails(stashIdParam)

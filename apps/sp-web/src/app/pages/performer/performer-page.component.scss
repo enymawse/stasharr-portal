@@ -178,12 +178,27 @@ main > button {
 }
 
 .favorite-indicator {
+  padding: 0.1rem 0.28rem;
+  border: 1px solid rgb(170 201 229 / 45%);
+  border-radius: 999px;
+  background: rgb(17 33 49 / 56%);
   font-size: 1.5rem;
   color: rgb(255 255 255 / 78%);
+  cursor: pointer;
 }
 
 .favorite-indicator.active {
   color: #ffcf4a;
+  cursor: default;
+}
+
+.favorite-indicator:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.favorite-indicator:disabled {
+  opacity: 0.95;
 }
 
 .subheading {

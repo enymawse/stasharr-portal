@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { DiscoverResponseDto } from '../discover/dto/discover-item.dto';
 import { PerformerDetailsDto } from './dto/performer-details.dto';
 import { PerformerFeedResponseDto } from './dto/performer-feed-response.dto';
@@ -54,5 +54,12 @@ export class PerformersController {
     @Param('performerId') performerId: string,
   ): Promise<PerformerDetailsDto> {
     return this.performersService.getPerformerById(performerId);
+  }
+
+  @Post(':performerId/favorite')
+  favoritePerformer(
+    @Param('performerId') performerId: string,
+  ): Promise<{ favorited: true; alreadyFavorited: boolean }> {
+    return this.performersService.favoritePerformer(performerId);
   }
 }

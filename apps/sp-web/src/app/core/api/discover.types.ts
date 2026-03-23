@@ -99,6 +99,7 @@ export interface SceneDetails {
   description: string | null;
   imageUrl: string | null;
   images: SceneImage[];
+  studioId: string | null;
   studio: string | null;
   studioImageUrl: string | null;
   studioUrl: string | null;
@@ -157,6 +158,11 @@ export interface SubmitSceneRequestResponse {
   alreadyExists: boolean;
   stashId: string;
   whisparrMovieId: number | null;
+}
+
+export interface FavoriteMutationResponse {
+  favorited: true;
+  alreadyFavorited: boolean;
 }
 
 export interface SceneRequestContext {

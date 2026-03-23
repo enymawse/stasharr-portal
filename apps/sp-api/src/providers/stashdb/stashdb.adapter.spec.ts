@@ -89,6 +89,7 @@ describe('StashdbAdapter', () => {
           title: 'Scene 1',
           details: 'Details',
           imageUrl: 'https://scene-large.jpg',
+          studioId: 'studio-1',
           studioName: 'Studio Name',
           studioImageUrl: 'https://studio-large.jpg',
           date: '2026-03-01',
@@ -770,5 +771,99 @@ describe('StashdbAdapter', () => {
     expect(requestBody.query).not.toContain('studios:');
     expect(requestBody.query).not.toContain('tags:');
     expect(requestBody.query).not.toContain('favorites: STUDIO');
+  });
+
+  it('favorites performer successfully', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            favoritePerformer: true,
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.favoritePerformer('performer-1', {
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
+    ).resolves.toEqual({
+      favorited: true,
+      alreadyFavorited: false,
+    });
+  });
+
+  it('treats performer duplicate favorite as idempotent success', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: null,
+          errors: [
+            {
+              message:
+                'ERROR: duplicate key value violates unique constraint "performer_favorites_unique_idx" (SQLSTATE 23505)',
+              path: ['favoritePerformer'],
+            },
+          ],
+        }),
+    } as Response);
+
+    await expect(
+      adapter.favoritePerformer('performer-1', {
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
+    ).resolves.toEqual({
+      favorited: true,
+      alreadyFavorited: true,
+    });
+  });
+
+  it('favorites studio successfully', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            favoriteStudio: true,
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.favoriteStudio('studio-1', {
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
+    ).resolves.toEqual({
+      favorited: true,
+      alreadyFavorited: false,
+    });
+  });
+
+  it('treats studio duplicate favorite as idempotent success', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: null,
+          errors: [
+            {
+              message:
+                'ERROR: duplicate key value violates unique constraint "studio_favorites_unique_idx" (SQLSTATE 23505)',
+              path: ['favoriteStudio'],
+            },
+          ],
+        }),
+    } as Response);
+
+    await expect(
+      adapter.favoriteStudio('studio-1', {
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
+    ).resolves.toEqual({
+      favorited: true,
+      alreadyFavorited: true,
+    });
   });
 });

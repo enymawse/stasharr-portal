@@ -18,6 +18,7 @@ describe('ScenesService', () => {
     getSceneById: jest.fn(),
     getScenesBySort: jest.fn(),
     searchTags: jest.fn(),
+    favoriteStudio: jest.fn(),
   } as unknown as StashdbAdapter;
 
   const sceneStatusService = {
@@ -120,6 +121,10 @@ describe('ScenesService', () => {
       ],
     });
     stashdbAdapter.searchTags = jest.fn().mockResolvedValue([]);
+    stashdbAdapter.favoriteStudio = jest.fn().mockResolvedValue({
+      favorited: true,
+      alreadyFavorited: false,
+    });
     sceneStatusService.resolveForScene = jest
       .fn()
       .mockResolvedValue({ state: 'AVAILABLE' });
@@ -401,6 +406,18 @@ describe('ScenesService', () => {
     ).resolves.toMatchObject({
       id: 'stashdb-scene-1',
       whisparr: null,
+    });
+  });
+
+  it('favorites studio by id', async () => {
+    await expect(service.favoriteStudio('studio-1')).resolves.toEqual({
+      favorited: true,
+      alreadyFavorited: false,
+    });
+
+    expect(stashdbAdapter.favoriteStudio).toHaveBeenCalledWith('studio-1', {
+      baseUrl: stashdbIntegration.baseUrl,
+      apiKey: stashdbIntegration.apiKey,
     });
   });
 });

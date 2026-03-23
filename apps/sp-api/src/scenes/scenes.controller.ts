@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { DiscoverResponseDto } from '../discover/dto/discover-item.dto';
 import { SceneTagOptionDto } from './dto/scene-tag-option.dto';
 import { SceneDetailsDto } from './dto/scene-details.dto';
@@ -28,6 +28,13 @@ export class ScenesController {
   @Get('tags')
   getSceneTagOptions(@Query() query: ScenesTagsQueryDto): Promise<SceneTagOptionDto[]> {
     return this.scenesService.searchSceneTags(query.query);
+  }
+
+  @Post('studios/:studioId/favorite')
+  favoriteStudio(
+    @Param('studioId') studioId: string,
+  ): Promise<{ favorited: true; alreadyFavorited: boolean }> {
+    return this.scenesService.favoriteStudio(studioId);
   }
 
   @Get(':stashId')

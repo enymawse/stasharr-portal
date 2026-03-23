@@ -9,6 +9,11 @@ export interface StashdbAdapterBaseConfig {
   apiKey?: string | null;
 }
 
+export interface StashdbFavoriteResult {
+  favorited: true;
+  alreadyFavorited: boolean;
+}
+
 export interface StashdbAdapterTrendingConfig extends StashdbAdapterBaseConfig {
   page: number;
   perPage: number;
@@ -350,8 +355,13 @@ interface StashdbGraphqlResponse {
         } | null;
       }>;
     } | null;
+    favoritePerformer?: unknown;
+    favoriteStudio?: unknown;
   };
-  errors?: Array<{ message?: unknown }>;
+  errors?: Array<{
+    message?: unknown;
+    path?: unknown;
+  }>;
 }
 
 @Injectable()
@@ -771,6 +781,42 @@ export class StashdbAdapter {
     const scenes = this.normalizeSceneFeedItems(payload.data?.queryScenes?.scenes ?? []);
 
     return { total, scenes };
+  }
+
+  async favoritePerformer(
+    performerId: string,
+    config: StashdbAdapterBaseConfig,
+  ): Promise<StashdbFavoriteResult> {
+    const query = `
+      mutation FavoritePerformer($id: ID!) {
+        favoritePerformer(id: $id, favorite: true)
+      }
+    `;
+
+    const payload = await this.executeQueryRaw(config, query, { id: performerId });
+    return this.normalizeFavoriteMutationResult(
+      payload,
+      'favoritePerformer',
+      'performer_favorites_unique_idx',
+    );
+  }
+
+  async favoriteStudio(
+    studioId: string,
+    config: StashdbAdapterBaseConfig,
+  ): Promise<StashdbFavoriteResult> {
+    const query = `
+      mutation FavoriteStudio($id: ID!) {
+        favoriteStudio(id: $id, favorite: true)
+      }
+    `;
+
+    const payload = await this.executeQueryRaw(config, query, { id: studioId });
+    return this.normalizeFavoriteMutationResult(
+      payload,
+      'favoriteStudio',
+      'studio_favorites_unique_idx',
+    );
   }
 
   private async getSceneFeed(
@@ -1216,7 +1262,81 @@ export class StashdbAdapter {
     return normalized.length > 0 ? normalized : null;
   }
 
+  private normalizeFavoriteMutationResult(
+    payload: StashdbGraphqlResponse,
+    mutationField: 'favoritePerformer' | 'favoriteStudio',
+    duplicateConstraint: string,
+  ): StashdbFavoriteResult {
+    if (payload.data?.[mutationField] === true) {
+      return {
+        favorited: true,
+        alreadyFavorited: false,
+      };
+    }
+
+    if (
+      payload.errors?.some((error) =>
+        this.isDuplicateFavoriteError(error, mutationField, duplicateConstraint),
+      )
+    ) {
+      return {
+        favorited: true,
+        alreadyFavorited: true,
+      };
+    }
+
+    if (payload.errors && payload.errors.length > 0) {
+      const firstError = payload.errors[0]?.message;
+      const message =
+        typeof firstError === 'string' && firstError.length > 0
+          ? firstError
+          : 'StashDB favorite mutation failed.';
+      throw new BadGatewayException(message);
+    }
+
+    throw new BadGatewayException('StashDB favorite mutation returned an invalid response.');
+  }
+
+  private isDuplicateFavoriteError(
+    error: { message?: unknown; path?: unknown },
+    mutationField: 'favoritePerformer' | 'favoriteStudio',
+    duplicateConstraint: string,
+  ): boolean {
+    const message =
+      typeof error.message === 'string'
+        ? error.message.toLowerCase()
+        : '';
+    const path = Array.isArray(error.path)
+      ? error.path.filter((segment): segment is string => typeof segment === 'string')
+      : [];
+
+    return (
+      path.includes(mutationField) &&
+      message.includes('duplicate key value violates unique constraint') &&
+      message.includes(duplicateConstraint.toLowerCase())
+    );
+  }
+
   private async executeQuery(
+    config: StashdbAdapterBaseConfig,
+    query: string,
+    variables?: Record<string, unknown>,
+  ): Promise<StashdbGraphqlResponse> {
+    const payload = await this.executeQueryRaw(config, query, variables);
+
+    if (payload.errors && payload.errors.length > 0) {
+      const firstError = payload.errors[0]?.message;
+      const message =
+        typeof firstError === 'string' && firstError.length > 0
+          ? firstError
+          : 'StashDB GraphQL request failed.';
+      throw new BadGatewayException(message);
+    }
+
+    return payload;
+  }
+
+  private async executeQueryRaw(
     config: StashdbAdapterBaseConfig,
     query: string,
     variables?: Record<string, unknown>,
@@ -1254,16 +1374,6 @@ export class StashdbAdapter {
     }
 
     const payload = (await response.json()) as StashdbGraphqlResponse;
-
-    if (payload.errors && payload.errors.length > 0) {
-      const firstError = payload.errors[0]?.message;
-      const message =
-        typeof firstError === 'string' && firstError.length > 0
-          ? firstError
-          : 'StashDB GraphQL request failed.';
-      throw new BadGatewayException(message);
-    }
-
     return payload;
   }
 

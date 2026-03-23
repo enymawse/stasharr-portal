@@ -8,6 +8,7 @@ import {
   PerformerGender,
   PerformerSort,
   PerformerStudioOption,
+  FavoriteMutationResponse,
   SceneFavoritesFilter,
   SceneFeedSort,
   SceneTagMatchMode,
@@ -171,5 +172,19 @@ export class DiscoverService {
     return this.http.get<PerformerStudioOption[]>('/api/performers/studios', {
       params,
     });
+  }
+
+  favoritePerformer(performerId: string): Observable<FavoriteMutationResponse> {
+    return this.http.post<FavoriteMutationResponse>(
+      `/api/performers/${encodeURIComponent(performerId)}/favorite`,
+      {},
+    );
+  }
+
+  favoriteStudio(studioId: string): Observable<FavoriteMutationResponse> {
+    return this.http.post<FavoriteMutationResponse>(
+      `/api/scenes/studios/${encodeURIComponent(studioId)}/favorite`,
+      {},
+    );
   }
 }
