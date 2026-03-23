@@ -44,43 +44,11 @@
               </div>
 
               <form [formGroup]="formFor(type)" (ngSubmit)="saveIntegration(type)">
-                <label>
-                  Name
-                  <input pInputText type="text" formControlName="name" />
-                </label>
-
-                <label>
-                  Base URL
-                  <input
-                    pInputText
-                    type="text"
-                    formControlName="baseUrl"
-                    placeholder="http://localhost:9999"
-                  />
-                </label>
-
-                <label>
-                  API Key
-                  <input
-                    pInputText
-                    type="password"
-                    formControlName="apiKey"
-                    placeholder="Enter to update key"
-                  />
-                </label>
-
-                @if (hasStoredApiKey(type)) {
-                  <p-message
-                    severity="info"
-                    text="API key already stored. Leave blank to keep current key."
-                    styleClass="inline-message"
-                  />
-                }
-
-                <label class="toggle-row">
-                  <p-toggleswitch [inputId]="'enabled-' + type" formControlName="enabled" />
-                  <span>Enabled</span>
-                </label>
+                <app-integration-form-fields
+                  [form]="formFor(type)"
+                  [hasStoredApiKey]="hasStoredApiKey(type)"
+                  [enabledInputId]="'settings-enabled-' + type"
+                />
 
                 <div class="actions">
                   <button pButton type="submit" [disabled]="isSaving(type)">

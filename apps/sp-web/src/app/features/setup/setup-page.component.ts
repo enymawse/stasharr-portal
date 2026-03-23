@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { finalize, forkJoin, map, switchMap } from 'rxjs';
+import { ButtonDirective } from 'primeng/button';
 import { Message } from 'primeng/message';
 import { ProgressSpinner } from 'primeng/progressspinner';
 import {
@@ -13,10 +14,17 @@ import { IntegrationsService } from '../../core/api/integrations.service';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import { SetupService } from '../../core/api/setup.service';
 import { SetupStatusResponse } from '../../core/api/setup.types';
+import { IntegrationFormFieldsComponent } from '../../shared/integration-form-fields/integration-form-fields.component';
 
 @Component({
   selector: 'app-setup-page',
-  imports: [ReactiveFormsModule, Message, ProgressSpinner],
+  imports: [
+    ReactiveFormsModule,
+    Message,
+    ProgressSpinner,
+    ButtonDirective,
+    IntegrationFormFieldsComponent,
+  ],
   templateUrl: './setup-page.component.html',
   styleUrl: './setup-page.component.scss',
 })

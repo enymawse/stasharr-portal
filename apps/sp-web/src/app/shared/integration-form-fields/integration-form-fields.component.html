@@ -1,0 +1,29 @@
+<div class="integration-form-fields" [formGroup]="form">
+  <label>
+    Name
+    <input pInputText type="text" formControlName="name" />
+  </label>
+
+  <label>
+    Base URL
+    <input pInputText type="text" formControlName="baseUrl" placeholder="http://localhost:9999" />
+  </label>
+
+  <label>
+    API Key
+    <input pInputText type="password" formControlName="apiKey" placeholder="Enter to update key" />
+  </label>
+
+  @if (hasStoredApiKey) {
+    <p-message
+      severity="info"
+      text="API key already stored. Leave blank to keep current key."
+      styleClass="integration-inline-message"
+    />
+  }
+
+  <label class="toggle-row">
+    <p-toggleswitch [inputId]="enabledInputId" formControlName="enabled" />
+    <span>Enabled</span>
+  </label>
+</div>

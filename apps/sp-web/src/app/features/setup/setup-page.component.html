@@ -35,36 +35,17 @@
           </p>
 
           <form [formGroup]="formFor(type)" (ngSubmit)="saveIntegration(type)">
-            <label>
-              Name
-              <input type="text" formControlName="name" />
-            </label>
-
-            <label>
-              Base URL
-              <input type="text" formControlName="baseUrl" placeholder="http://localhost:9999" />
-            </label>
-
-            <label>
-              API Key
-              <input type="password" formControlName="apiKey" placeholder="Enter to update key" />
-            </label>
-
-            @if (hasStoredApiKey(type)) {
-              <p class="hint">An API key is already stored. Leave blank to keep current key.</p>
-            }
-
-            <label class="checkbox-row">
-              <input type="checkbox" formControlName="enabled" />
-              Enabled
-            </label>
+            <app-integration-form-fields
+              [form]="formFor(type)"
+              [hasStoredApiKey]="hasStoredApiKey(type)"
+              [enabledInputId]="'setup-enabled-' + type"
+            />
 
             <div class="actions">
-              <button type="submit" [disabled]="isSaving(type)">
+              <button pButton type="submit" [disabled]="isSaving(type)">
                 {{ isSaving(type) ? 'Saving...' : 'Save' }}
               </button>
             </div>
-
           </form>
         </article>
       }

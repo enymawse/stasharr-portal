@@ -3,15 +3,14 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { finalize, forkJoin } from 'rxjs';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonDirective } from 'primeng/button';
-import { InputText } from 'primeng/inputtext';
 import { Message } from 'primeng/message';
 import { ProgressSpinner } from 'primeng/progressspinner';
 import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
-import { ToggleSwitch } from 'primeng/toggleswitch';
 import { HealthService } from '../../core/api/health.service';
 import { HealthStatusResponse } from '../../core/api/health.types';
 import { IntegrationsService } from '../../core/api/integrations.service';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
+import { IntegrationFormFieldsComponent } from '../../shared/integration-form-fields/integration-form-fields.component';
 import {
   IntegrationResponse,
   IntegrationType,
@@ -30,11 +29,10 @@ type SettingsTab = ServiceTab | 'ABOUT';
     Tab,
     TabPanels,
     TabPanel,
-    InputText,
-    ToggleSwitch,
     ButtonDirective,
     Message,
     ProgressSpinner,
+    IntegrationFormFieldsComponent,
   ],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.scss',

@@ -54,33 +54,11 @@ form {
   gap: 0.75rem;
 }
 
-label {
-  display: grid;
-  gap: 0.35rem;
-  font-size: 0.95rem;
-}
-
-input[type='text'],
-input[type='password'] {
-  width: 100%;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  background: var(--surface-2);
-  color: var(--text-primary);
-}
-
-.checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
 .actions {
   display: flex;
 }
 
-button {
+:host ::ng-deep .p-button {
   padding: 0.45rem 0.75rem;
   border-radius: 6px;
   border: 1px solid var(--button-border);
@@ -89,12 +67,7 @@ button {
   cursor: pointer;
 }
 
-button:disabled {
+:host ::ng-deep .p-button:disabled {
   cursor: default;
   opacity: 0.7;
-}
-
-.hint {
-  color: var(--text-muted);
-  font-size: 0.9rem;
 }

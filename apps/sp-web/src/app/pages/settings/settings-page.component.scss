@@ -84,29 +84,6 @@ form {
   gap: 0.65rem;
 }
 
-label {
-  display: grid;
-  gap: 0.26rem;
-  font-size: 0.92rem;
-}
-
-input[type='text'],
-:host ::ng-deep .p-inputtext {
-  border-radius: 6px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  padding: 0.5rem 0.62rem;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
 .actions {
   display: flex;
   gap: 0.45rem;
