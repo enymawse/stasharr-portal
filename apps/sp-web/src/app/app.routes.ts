@@ -27,6 +27,13 @@ export const routes: Routes = [
     canActivate: [requireSetupCompleteGuard],
     children: [
       {
+        path: 'home',
+        loadComponent: () =>
+          import('./pages/home/home-page.component').then(
+            (module) => module.HomePageComponent,
+          ),
+      },
+      {
         path: 'discover',
         component: DiscoverPageComponent,
       },
@@ -65,7 +72,7 @@ export const routes: Routes = [
       {
         path: '',
         pathMatch: 'full',
-        redirectTo: 'discover',
+        redirectTo: 'home',
       },
     ],
   },
