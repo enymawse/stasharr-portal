@@ -354,11 +354,24 @@
 
               <div class="media-bottom">
                 <h2 class="media-title">{{ item.title }}</h2>
-                @if (isRequestable(item)) {
-                  <button type="button" class="request-cta" (click)="openRequestModal(item)">
-                    Request
-                  </button>
-                }
+                <div class="media-meta-row">
+                  <p class="media-date">
+                    @if (item.releaseDate) {
+                      <time [attr.datetime]="item.releaseDate">{{ item.releaseDate }}</time>
+                    } @else {
+                      <span class="media-date-placeholder">No date</span>
+                    }
+                  </p>
+                  <div class="media-action">
+                    @if (isRequestable(item)) {
+                      <button type="button" class="request-cta" (click)="openRequestModal(item)">
+                        Request
+                      </button>
+                    } @else {
+                      <app-scene-status-badge class="footer-status-badge" [status]="item.status" />
+                    }
+                  </div>
+                </div>
               </div>
             </div>
           </article>
