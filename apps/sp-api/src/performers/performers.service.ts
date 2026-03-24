@@ -10,6 +10,7 @@ import {
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
+import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import { SceneStatusService } from '../scene-status/scene-status.service';
 import { PerformerDetailsDto } from './dto/performer-details.dto';
 import { PerformerFeedResponseDto } from './dto/performer-feed-response.dto';
@@ -92,6 +93,7 @@ export class PerformersService {
         sceneCount: performer.sceneCount,
         isFavorite: performer.isFavorite,
         imageUrl: performer.imageUrl,
+        cardImageUrl: withStashImageSize(performer.imageUrl, 300),
       })),
     };
   }
@@ -185,6 +187,7 @@ export class PerformersService {
         title: scene.title,
         description: scene.details,
         imageUrl: scene.imageUrl,
+        cardImageUrl: withStashImageSize(scene.imageUrl, 600),
         studioId: scene.studioId,
         studio: scene.studioName,
         studioImageUrl: scene.studioImageUrl,

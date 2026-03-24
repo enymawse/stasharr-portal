@@ -113,8 +113,8 @@
             <i [class]="item.isFavorite ? 'pi pi-star-fill' : 'pi pi-star'" aria-hidden="true"></i>
           </button>
 
-          @if (item.imageUrl) {
-            <img class="performer-image" [src]="item.imageUrl" [alt]="item.name" loading="lazy" />
+          @if (item.cardImageUrl || item.imageUrl) {
+            <img class="performer-image" [src]="item.cardImageUrl ?? item.imageUrl" [alt]="item.name" loading="lazy" />
           } @else {
             <div class="performer-image placeholder" aria-hidden="true">
               {{ performerInitial(item.name) }}

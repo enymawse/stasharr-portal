@@ -7,6 +7,7 @@ import {
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
+import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import { SceneStatusService } from '../scene-status/scene-status.service';
 import { DiscoverResponseDto } from './dto/discover-item.dto';
 
@@ -63,6 +64,7 @@ export class DiscoverService {
         title: scene.title,
         description: scene.details,
         imageUrl: scene.imageUrl,
+        cardImageUrl: withStashImageSize(scene.imageUrl, 600),
         studioId: scene.studioId,
         studio: scene.studioName,
         studioImageUrl: scene.studioImageUrl,

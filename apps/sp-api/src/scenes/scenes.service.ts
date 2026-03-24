@@ -9,6 +9,7 @@ import { DiscoverResponseDto } from '../discover/dto/discover-item.dto';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
+import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
 import { SceneStatusService } from '../scene-status/scene-status.service';
 import { SceneTagOptionDto } from './dto/scene-tag-option.dto';
@@ -99,6 +100,7 @@ export class ScenesService {
         title: scene.title,
         description: scene.details,
         imageUrl: scene.imageUrl,
+        cardImageUrl: withStashImageSize(scene.imageUrl, 600),
         studioId: scene.studioId,
         studio: scene.studioName,
         studioImageUrl: scene.studioImageUrl,
@@ -184,7 +186,10 @@ export class ScenesService {
       releaseDate: scene.releaseDate,
       duration: scene.duration,
       tags: scene.tags,
-      performers: scene.performers,
+      performers: scene.performers.map((performer) => ({
+        ...performer,
+        cardImageUrl: withStashImageSize(performer.imageUrl, 300),
+      })),
       sourceUrls: scene.sourceUrls,
       source: 'STASHDB',
       status,

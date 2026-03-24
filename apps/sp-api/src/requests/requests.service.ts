@@ -20,6 +20,7 @@ import {
   StashdbAdapter,
   StashdbSceneDetails,
 } from '../providers/stashdb/stashdb.adapter';
+import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import {
   WhisparrAdapter,
   WhisparrAdapterBaseConfig,
@@ -374,6 +375,7 @@ export class RequestsService {
       title: scene.title,
       description: scene.details,
       imageUrl: scene.imageUrl,
+      cardImageUrl: withStashImageSize(scene.imageUrl, 600),
       studioId: scene.studioId,
       studio: scene.studioName,
       studioImageUrl: scene.studioImageUrl,

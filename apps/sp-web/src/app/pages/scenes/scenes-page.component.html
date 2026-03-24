@@ -155,8 +155,8 @@
               [attr.aria-label]="item.title"
             ></a>
 
-            @if (item.imageUrl) {
-              <img class="thumbnail" [src]="item.imageUrl" [alt]="item.title" loading="lazy" />
+            @if (item.cardImageUrl || item.imageUrl) {
+              <img class="thumbnail" [src]="item.cardImageUrl ?? item.imageUrl" [alt]="item.title" loading="lazy" />
             } @else {
               <div class="thumbnail placeholder" aria-hidden="true"></div>
             }

@@ -13,6 +13,7 @@ export interface DiscoverItem {
   title: string;
   description: string | null;
   imageUrl: string | null;
+  cardImageUrl: string | null;
   studioId: string | null;
   studio: string | null;
   studioImageUrl: string | null;
@@ -68,6 +69,7 @@ export interface ScenePerformer {
   gender: string | null;
   isFavorite: boolean;
   imageUrl: string | null;
+  cardImageUrl: string | null;
 }
 
 export interface SceneUrl {
@@ -199,6 +201,7 @@ export interface PerformerFeedItem {
   sceneCount: number;
   isFavorite: boolean;
   imageUrl: string | null;
+  cardImageUrl: string | null;
 }
 
 export interface PerformerFeedResponse {

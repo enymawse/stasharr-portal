@@ -19,6 +19,7 @@ export class ScenePerformerDto {
   gender!: string | null;
   isFavorite!: boolean;
   imageUrl!: string | null;
+  cardImageUrl!: string | null;
 }
 
 export class SceneUrlDto {

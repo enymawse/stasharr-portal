@@ -7,4 +7,5 @@ export interface PerformerFeedItemDto {
   sceneCount: number;
   isFavorite: boolean;
   imageUrl: string | null;
+  cardImageUrl: string | null;
 }
