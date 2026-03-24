@@ -1,7 +1,15 @@
-import { Component, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
+import { Subscription, combineLatest, finalize } from 'rxjs';
 import { ButtonDirective } from 'primeng/button';
 import { Message } from 'primeng/message';
 import { ProgressSpinner } from 'primeng/progressspinner';
@@ -31,12 +39,13 @@ import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene
   templateUrl: './scene-page.component.html',
   styleUrl: './scene-page.component.scss',
 })
-export class ScenePageComponent implements OnInit {
+export class ScenePageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly discoverService = inject(DiscoverService);
   private readonly notifications = inject(AppNotificationsService);
   private previousFocusedElement: HTMLElement | null = null;
+  private routeSubscription: Subscription | null = null;
 
   @ViewChild('requestTriggerButton')
   private requestTriggerButton?: ElementRef<HTMLButtonElement>;
@@ -55,14 +64,33 @@ export class ScenePageComponent implements OnInit {
   protected readonly backLinkLabel = signal('Back to Discover');
 
   ngOnInit(): void {
-    const resolvedBackLink = this.parseReturnTo(
-      this.route.snapshot.queryParamMap.get('returnTo'),
-      '/discover',
-    );
-    this.backLinkPath.set(resolvedBackLink.path);
-    this.backLinkQueryParams.set(resolvedBackLink.queryParams);
-    this.backLinkLabel.set(this.backLinkText(resolvedBackLink.path, 'Back to Discover'));
-    this.loadSceneByRoute();
+    this.routeSubscription = combineLatest([
+      this.route.paramMap,
+      this.route.queryParamMap,
+    ]).subscribe(([paramMap, queryParamMap]) => {
+      const resolvedBackLink = this.parseReturnTo(
+        queryParamMap.get('returnTo'),
+        '/discover',
+      );
+      this.backLinkPath.set(resolvedBackLink.path);
+      this.backLinkQueryParams.set(resolvedBackLink.queryParams);
+      this.backLinkLabel.set(
+        this.backLinkText(resolvedBackLink.path, 'Back to Discover'),
+      );
+
+      const stashIdParam = paramMap.get('stashId')?.trim();
+      if (!stashIdParam) {
+        this.error.set('Scene id is missing from the route.');
+        this.loading.set(false);
+        return;
+      }
+
+      this.loadScene(stashIdParam);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.routeSubscription?.unsubscribe();
   }
 
   protected retry(): void {
@@ -339,6 +367,7 @@ export class ScenePageComponent implements OnInit {
       this.loading.set(false);
       return;
     }
+
     this.loadScene(stashIdParam);
   }
 
@@ -408,6 +437,9 @@ export class ScenePageComponent implements OnInit {
   }
 
   private backLinkText(returnTo: string, fallbackLabel: string): string {
+    if (returnTo.startsWith('/home')) {
+      return 'Back to Home';
+    }
     if (returnTo.startsWith('/discover')) {
       return 'Back to Discover';
     }
@@ -422,6 +454,12 @@ export class ScenePageComponent implements OnInit {
     }
     if (returnTo.startsWith('/performer/')) {
       return 'Back to Performer';
+    }
+    if (returnTo.startsWith('/studios')) {
+      return 'Back to Studios';
+    }
+    if (returnTo.startsWith('/studio/')) {
+      return 'Back to Studio';
     }
     if (returnTo.startsWith('/scene/')) {
       return 'Back to Scene';
