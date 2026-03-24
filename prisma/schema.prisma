@@ -14,11 +14,29 @@ model Request {
   updatedAt DateTime      @updatedAt
 }
 
+model HomeRail {
+  id        String      @id @default(cuid())
+  key       HomeRailKey @unique
+  title     String
+  subtitle  String
+  enabled   Boolean     @default(true)
+  sortOrder Int
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([sortOrder])
+}
+
 enum RequestStatus {
   REQUESTED
   PROCESSING
   AVAILABLE
   FAILED
+}
+
+enum HomeRailKey {
+  FAVORITE_STUDIOS
+  FAVORITE_PERFORMERS
 }
 
 enum IntegrationType {

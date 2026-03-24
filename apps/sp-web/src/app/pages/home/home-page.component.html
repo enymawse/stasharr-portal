@@ -8,6 +8,9 @@
           Fresh scenes from favorite studios and performers, arranged for fast browsing instead of another endless vertical feed.
         </p>
         <div class="hero-actions">
+          <button type="button" class="hero-link secondary" (click)="openEditor()">
+            Customize Home
+          </button>
           <a class="hero-link" [routerLink]="['/performers']">Find Favorite Performers</a>
           <a class="hero-link secondary" [routerLink]="['/studios']">Find Favorite Studios</a>
         </div>
@@ -39,14 +42,94 @@
       />
       <p>Loading your personalized rails...</p>
     </div>
-  } @else if (isPageErrorState()) {
+  } @else if (configError()) {
     <section class="home-state error-state">
       <h2>Home could not be loaded</h2>
-      <p>The favorites-driven rails did not return successfully. Try again.</p>
+      <p>{{ configError() }}</p>
       <button type="button" class="state-button" (click)="loadHome()">Retry</button>
     </section>
-  } @else if (isPageEmptyState()) {
-    <section class="home-state empty-state">
+  } @else {
+    @if (editorOpen()) {
+      <section class="editor-shell" aria-label="Customize Home rails">
+        <div class="editor-head">
+          <div>
+            <p class="eyebrow">Customize Home</p>
+            <h2>Enable, disable, and reorder your built-in rails</h2>
+          </div>
+          <div class="editor-actions">
+            <button type="button" class="state-button secondary" (click)="cancelEditor()">
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="state-button"
+              [disabled]="!hasDraftChanges() || savingRails()"
+              (click)="saveRails()"
+            >
+              {{ savingRails() ? 'Saving...' : 'Save Rails' }}
+            </button>
+          </div>
+        </div>
+
+        @if (saveError(); as saveError) {
+          <p class="editor-error">{{ saveError }}</p>
+        }
+
+        <div class="editor-list">
+          @for (rail of draftRails(); track rail.key; let i = $index) {
+            <article class="editor-item">
+              <div class="editor-item-copy">
+                <h3>{{ rail.title }}</h3>
+                <p>{{ rail.subtitle }}</p>
+              </div>
+
+              <div class="editor-item-controls">
+                <label class="rail-toggle">
+                  <input
+                    type="checkbox"
+                    [checked]="rail.enabled"
+                    (change)="setDraftRailEnabled(rail.key, $any($event.target).checked)"
+                  />
+                  <span>{{ rail.enabled ? 'Enabled' : 'Disabled' }}</span>
+                </label>
+
+                <div class="move-controls">
+                  <button
+                    type="button"
+                    class="mini-button"
+                    [disabled]="!canMoveDraftRail(i, 'up')"
+                    (click)="moveDraftRail(i, 'up')"
+                  >
+                    Move Up
+                  </button>
+                  <button
+                    type="button"
+                    class="mini-button"
+                    [disabled]="!canMoveDraftRail(i, 'down')"
+                    (click)="moveDraftRail(i, 'down')"
+                  >
+                    Move Down
+                  </button>
+                </div>
+              </div>
+            </article>
+          }
+        </div>
+      </section>
+    }
+
+    @if (isNoRailsEnabledState()) {
+      <section class="home-state empty-state">
+        <h2>No Home rails are enabled</h2>
+        <p>
+          Turn at least one rail back on to restore your personalized landing page.
+        </p>
+        <div class="empty-links">
+          <button type="button" class="hero-link" (click)="openEditor()">Edit Rails</button>
+        </div>
+      </section>
+    } @else if (isPageEmptyState()) {
+      <section class="home-state empty-state">
       <h2>No favorites are shaping Home yet</h2>
       <p>
         Add favorite performers or studios and this page will start filling with the latest matching scenes.
@@ -55,127 +138,128 @@
         <a class="hero-link" [routerLink]="['/performers']">Browse Performers</a>
         <a class="hero-link secondary" [routerLink]="['/studios']">Browse Studios</a>
       </div>
-    </section>
-  } @else {
-    <div class="rail-stack">
-      @for (rail of rails(); track rail.key) {
-        @if (showRail(rail)) {
-          <section class="rail-section">
-            <header class="rail-head">
-              <div class="rail-copy">
-                <p class="rail-kicker">Personalized Rail</p>
-                <h2>{{ rail.title }}</h2>
-                <p>{{ rail.subtitle }}</p>
-              </div>
+      </section>
+    } @else {
+      <div class="rail-stack">
+        @for (rail of rails(); track rail.key) {
+          @if (showRail(rail)) {
+            <section class="rail-section">
+              <header class="rail-head">
+                <div class="rail-copy">
+                  <p class="rail-kicker">Personalized Rail</p>
+                  <h2>{{ rail.title }}</h2>
+                  <p>{{ rail.subtitle }}</p>
+                </div>
 
-              <div class="rail-actions">
-                @if (rail.items.length > 0) {
-                  <a
-                    class="see-all-link"
-                    [routerLink]="['/scenes']"
-                    [queryParams]="rail.seeAllQueryParams"
-                  >
-                    See all
-                  </a>
-                  <button
-                    type="button"
-                    class="scroll-button"
-                    (click)="scrollRail(rail.key, 'prev')"
-                    [attr.aria-label]="'Scroll ' + rail.title + ' left'"
-                  >
-                    <i class="pi pi-angle-left" aria-hidden="true"></i>
-                  </button>
-                  <button
-                    type="button"
-                    class="scroll-button"
-                    (click)="scrollRail(rail.key, 'next')"
-                    [attr.aria-label]="'Scroll ' + rail.title + ' right'"
-                  >
-                    <i class="pi pi-angle-right" aria-hidden="true"></i>
-                  </button>
-                }
-              </div>
-            </header>
+                <div class="rail-actions">
+                  @if (rail.items.length > 0) {
+                    <a
+                      class="see-all-link"
+                      [routerLink]="['/scenes']"
+                      [queryParams]="rail.seeAllQueryParams"
+                    >
+                      See all
+                    </a>
+                    <button
+                      type="button"
+                      class="scroll-button"
+                      (click)="scrollRail(rail.key, 'prev')"
+                      [attr.aria-label]="'Scroll ' + rail.title + ' left'"
+                    >
+                      <i class="pi pi-angle-left" aria-hidden="true"></i>
+                    </button>
+                    <button
+                      type="button"
+                      class="scroll-button"
+                      (click)="scrollRail(rail.key, 'next')"
+                      [attr.aria-label]="'Scroll ' + rail.title + ' right'"
+                    >
+                      <i class="pi pi-angle-right" aria-hidden="true"></i>
+                    </button>
+                  }
+                </div>
+              </header>
 
-            @if (rail.items.length > 0) {
-              <div class="rail-viewport" #railViewport [attr.data-rail-key]="rail.key">
-                <div class="rail-track">
-                  @for (item of rail.items; track item.id) {
-                    <article class="rail-card">
-                      <div class="media">
-                        <a
-                          class="media-link-stretch"
-                          [routerLink]="['/scene', item.id]"
-                          [queryParams]="{ returnTo: currentRouteUrl() }"
-                          [attr.aria-label]="item.title"
-                        ></a>
+              @if (rail.items.length > 0) {
+                <div class="rail-viewport" #railViewport [attr.data-rail-key]="rail.key">
+                  <div class="rail-track">
+                    @for (item of rail.items; track item.id) {
+                      <article class="rail-card">
+                        <div class="media">
+                          <a
+                            class="media-link-stretch"
+                            [routerLink]="['/scene', item.id]"
+                            [queryParams]="{ returnTo: currentRouteUrl() }"
+                            [attr.aria-label]="item.title"
+                          ></a>
 
-                        @if (railImageUrl(item); as imageUrl) {
-                          <img class="thumbnail" [src]="imageUrl" [alt]="item.title" loading="lazy" />
-                        } @else {
-                          <div class="thumbnail placeholder" aria-hidden="true"></div>
-                        }
-
-                        <div class="media-top">
-                          @if (item.studioImageUrl) {
-                            <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
-                              <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
-                            </div>
-                          } @else if (item.studio) {
-                            <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                          @if (railImageUrl(item); as imageUrl) {
+                            <img class="thumbnail" [src]="imageUrl" [alt]="item.title" loading="lazy" />
+                          } @else {
+                            <div class="thumbnail placeholder" aria-hidden="true"></div>
                           }
 
-                          @if (item.status.state !== 'NOT_REQUESTED') {
-                            <app-scene-status-badge
-                              class="status-icon"
-                              [status]="item.status"
-                              mode="icon"
-                            />
-                          }
-                        </div>
+                          <div class="media-top">
+                            @if (item.studioImageUrl) {
+                              <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                                <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
+                              </div>
+                            } @else if (item.studio) {
+                              <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                            }
 
-                        <div class="media-bottom">
-                          <h3 class="media-title">{{ item.title }}</h3>
-                          <div class="media-meta-row">
-                            <p class="media-date">
-                              @if (item.releaseDate) {
-                                <time [attr.datetime]="item.releaseDate">{{ item.releaseDate }}</time>
-                              } @else {
-                                <span class="media-date-placeholder">No date</span>
-                              }
-                            </p>
-                            <div class="media-action">
-                              @if (isRequestable(item)) {
-                                <button
-                                  type="button"
-                                  class="request-cta"
-                                  (click)="openRequestModal(item)"
-                                >
-                                  Request
-                                </button>
-                              } @else {
-                                <app-scene-status-badge
-                                  class="footer-status-badge"
-                                  [status]="item.status"
-                                />
-                              }
+                            @if (item.status.state !== 'NOT_REQUESTED') {
+                              <app-scene-status-badge
+                                class="status-icon"
+                                [status]="item.status"
+                                mode="icon"
+                              />
+                            }
+                          </div>
+
+                          <div class="media-bottom">
+                            <h3 class="media-title">{{ item.title }}</h3>
+                            <div class="media-meta-row">
+                              <p class="media-date">
+                                @if (item.releaseDate) {
+                                  <time [attr.datetime]="item.releaseDate">{{ item.releaseDate }}</time>
+                                } @else {
+                                  <span class="media-date-placeholder">No date</span>
+                                }
+                              </p>
+                              <div class="media-action">
+                                @if (isRequestable(item)) {
+                                  <button
+                                    type="button"
+                                    class="request-cta"
+                                    (click)="openRequestModal(item)"
+                                  >
+                                    Request
+                                  </button>
+                                } @else {
+                                  <app-scene-status-badge
+                                    class="footer-status-badge"
+                                    [status]="item.status"
+                                  />
+                                }
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </article>
-                  }
+                      </article>
+                    }
+                  </div>
                 </div>
-              </div>
-            } @else if (rail.error) {
-              <div class="rail-state error">
-                <p>{{ rail.error }}</p>
-              </div>
-            }
-          </section>
+              } @else if (rail.error) {
+                <div class="rail-state error">
+                  <p>{{ rail.error }}</p>
+                </div>
+              }
+            </section>
+          }
         }
-      }
-    </div>
+      </div>
+    }
   }
 
   <app-scene-request-modal

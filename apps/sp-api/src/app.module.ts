@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DiscoverModule } from './discover/discover.module';
 import { HealthModule } from './health/health.module';
+import { HomeModule } from './home/home.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PerformersModule } from './performers/performers.module';
@@ -18,6 +19,7 @@ import { StudiosModule } from './studios/studios.module';
     }),
     PrismaModule,
     HealthModule,
+    HomeModule,
     IntegrationsModule,
     SetupModule,
     DiscoverModule,
