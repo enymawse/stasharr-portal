@@ -1,8 +1,33 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { HomeRail, HomeRailKey } from '@prisma/client';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  HomeRail,
+  HomeRailContentType,
+  HomeRailKey,
+  HomeRailKind,
+  HomeRailSource,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { HomeRailDto, type HomeRailFavorites } from './dto/home-rail.dto';
+import {
+  HOME_RAIL_CONTENT_TYPE_VALUES,
+  HOME_RAIL_DIRECTION_VALUES,
+  HOME_RAIL_FAVORITES_VALUES,
+  HOME_RAIL_SCENE_LIMIT_DEFAULT,
+  HOME_RAIL_SCENE_LIMIT_MAX,
+  HOME_RAIL_SCENE_LIMIT_MIN,
+  HOME_RAIL_SCENE_SORT_VALUES,
+  HOME_RAIL_SOURCE_VALUES,
+  HOME_RAIL_TAG_MODE_VALUES,
+  HomeRailDto,
+  type HomeRailKey as HomeRailDtoKey,
+  type HomeRailSceneConfigDto,
+} from './dto/home-rail.dto';
 import { UpdateHomeRailsDto } from './dto/update-home-rails.dto';
+import { CreateHomeRailDto, UpdateHomeRailDto } from './dto/create-home-rail.dto';
 
 const DEFAULT_HOME_RAILS: Array<{
   key: HomeRailKey;
@@ -10,7 +35,9 @@ const DEFAULT_HOME_RAILS: Array<{
   subtitle: string;
   enabled: boolean;
   sortOrder: number;
-  favorites: HomeRailFavorites;
+  source: HomeRailSource;
+  contentType: HomeRailContentType;
+  config: HomeRailSceneConfigDto;
 }> = [
   {
     key: HomeRailKey.FAVORITE_STUDIOS,
@@ -18,7 +45,19 @@ const DEFAULT_HOME_RAILS: Array<{
     subtitle: 'Recent scenes pulled from the studios you have starred.',
     enabled: true,
     sortOrder: 0,
-    favorites: 'STUDIO',
+    source: HomeRailSource.STASHDB,
+    contentType: HomeRailContentType.SCENES,
+    config: {
+      sort: 'DATE',
+      direction: 'DESC',
+      favorites: 'STUDIO',
+      tagIds: [],
+      tagNames: [],
+      tagMode: null,
+      studioIds: [],
+      studioNames: [],
+      limit: HOME_RAIL_SCENE_LIMIT_DEFAULT,
+    },
   },
   {
     key: HomeRailKey.FAVORITE_PERFORMERS,
@@ -26,7 +65,19 @@ const DEFAULT_HOME_RAILS: Array<{
     subtitle: 'A rolling lineup from performers you are actively tracking.',
     enabled: true,
     sortOrder: 1,
-    favorites: 'PERFORMER',
+    source: HomeRailSource.STASHDB,
+    contentType: HomeRailContentType.SCENES,
+    config: {
+      sort: 'DATE',
+      direction: 'DESC',
+      favorites: 'PERFORMER',
+      tagIds: [],
+      tagNames: [],
+      tagMode: null,
+      studioIds: [],
+      studioNames: [],
+      limit: HOME_RAIL_SCENE_LIMIT_DEFAULT,
+    },
   },
 ];
 
@@ -36,21 +87,19 @@ export class HomeService {
 
   async getRails(): Promise<HomeRailDto[]> {
     await this.ensureDefaultRails();
-    const rails = await this.prisma.homeRail.findMany({
-      orderBy: { sortOrder: 'asc' },
-    });
-
+    const rails = await this.listRails();
     return rails.map((rail) => this.toDto(rail));
   }
 
   async updateRails(payload: UpdateHomeRailsDto): Promise<HomeRailDto[]> {
     await this.ensureDefaultRails();
-    this.validateSubmittedRails(payload);
+    const existingRails = await this.listRails();
+    this.validateSubmittedRails(payload, existingRails);
 
     await this.prisma.$transaction(
       payload.rails.map((rail, index) =>
         this.prisma.homeRail.update({
-          where: { key: rail.key },
+          where: { id: rail.id },
           data: {
             enabled: rail.enabled,
             sortOrder: index,
@@ -62,53 +111,268 @@ export class HomeService {
     return this.getRails();
   }
 
+  async createRail(payload: CreateHomeRailDto): Promise<HomeRailDto> {
+    await this.ensureDefaultRails();
+    const lastRail = await this.prisma.homeRail.findFirst({
+      orderBy: { sortOrder: 'desc' },
+    });
+
+    const created = await this.prisma.homeRail.create({
+      data: {
+        key: null,
+        kind: HomeRailKind.CUSTOM,
+        source: HomeRailSource.STASHDB,
+        contentType: HomeRailContentType.SCENES,
+        title: payload.title.trim(),
+        subtitle: this.normalizeSubtitle(payload.subtitle),
+        enabled: payload.enabled,
+        sortOrder: (lastRail?.sortOrder ?? -1) + 1,
+        config: this.normalizeSceneRailConfig(payload.config) as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return this.toDto(created);
+  }
+
+  async updateRail(id: string, payload: UpdateHomeRailDto): Promise<HomeRailDto> {
+    await this.ensureDefaultRails();
+    await this.requireCustomRail(id);
+
+    const updated = await this.prisma.homeRail.update({
+      where: { id },
+      data: {
+        title: payload.title.trim(),
+        subtitle: this.normalizeSubtitle(payload.subtitle),
+        enabled: payload.enabled,
+        config: this.normalizeSceneRailConfig(payload.config) as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return this.toDto(updated);
+  }
+
+  async deleteRail(id: string): Promise<void> {
+    await this.ensureDefaultRails();
+    await this.requireCustomRail(id);
+    await this.prisma.homeRail.delete({ where: { id } });
+    await this.reindexSortOrders();
+  }
+
   private async ensureDefaultRails(): Promise<void> {
     for (const rail of DEFAULT_HOME_RAILS) {
       await this.prisma.homeRail.upsert({
         where: { key: rail.key },
-        update: {},
+        update: {
+          kind: HomeRailKind.BUILTIN,
+          source: rail.source,
+          contentType: rail.contentType,
+          title: rail.title,
+          subtitle: rail.subtitle,
+          config: rail.config as unknown as Prisma.InputJsonValue,
+        },
         create: {
           key: rail.key,
+          kind: HomeRailKind.BUILTIN,
+          source: rail.source,
+          contentType: rail.contentType,
           title: rail.title,
           subtitle: rail.subtitle,
           enabled: rail.enabled,
           sortOrder: rail.sortOrder,
+          config: rail.config as unknown as Prisma.InputJsonValue,
         },
       });
     }
   }
 
-  private validateSubmittedRails(payload: UpdateHomeRailsDto): void {
-    const submittedKeys = payload.rails.map((rail) => rail.key);
-    const uniqueKeys = new Set(submittedKeys);
-    if (uniqueKeys.size !== submittedKeys.length) {
-      throw new BadRequestException('Home rails payload contains duplicate keys.');
+  private async listRails(): Promise<HomeRail[]> {
+    return this.prisma.homeRail.findMany({
+      orderBy: { sortOrder: 'asc' },
+    });
+  }
+
+  private validateSubmittedRails(payload: UpdateHomeRailsDto, existingRails: HomeRail[]): void {
+    const submittedIds = payload.rails.map((rail) => rail.id.trim());
+    const uniqueIds = new Set(submittedIds);
+    if (uniqueIds.size !== submittedIds.length) {
+      throw new BadRequestException('Home rails payload contains duplicate ids.');
     }
 
-    const expectedKeys = DEFAULT_HOME_RAILS.map((rail) => rail.key);
+    const existingIds = existingRails.map((rail) => rail.id);
     if (
-      submittedKeys.length !== expectedKeys.length ||
-      expectedKeys.some((key) => !uniqueKeys.has(key))
+      submittedIds.length !== existingIds.length ||
+      existingIds.some((id) => !uniqueIds.has(id))
     ) {
       throw new BadRequestException(
-        'Home rails payload must include each built-in rail exactly once.',
+        'Home rails payload must include each persisted rail exactly once.',
       );
     }
   }
 
-  private toDto(rail: HomeRail): HomeRailDto {
-    const defaults = DEFAULT_HOME_RAILS.find((defaultRail) => defaultRail.key === rail.key);
-    if (!defaults) {
-      throw new BadRequestException(`Unsupported Home rail key: ${rail.key}`);
+  private async requireCustomRail(id: string): Promise<HomeRail> {
+    const rail = await this.prisma.homeRail.findUnique({ where: { id } });
+    if (!rail) {
+      throw new NotFoundException('Home rail not found.');
+    }
+    if (rail.kind !== HomeRailKind.CUSTOM) {
+      throw new BadRequestException('Built-in Home rails cannot be deleted or edited here.');
     }
 
+    return rail;
+  }
+
+  private async reindexSortOrders(): Promise<void> {
+    const rails = await this.listRails();
+    const updates = rails
+      .map((rail, index) => ({ rail, index }))
+      .filter(({ rail, index }) => rail.sortOrder !== index)
+      .map(({ rail, index }) =>
+        this.prisma.homeRail.update({
+          where: { id: rail.id },
+          data: { sortOrder: index },
+        }),
+      );
+
+    if (updates.length > 0) {
+      await this.prisma.$transaction(updates);
+    }
+  }
+
+  private toDto(rail: HomeRail): HomeRailDto {
+    const defaults = rail.key
+      ? DEFAULT_HOME_RAILS.find((defaultRail) => defaultRail.key === rail.key)
+      : null;
+
     return {
-      key: rail.key,
+      id: rail.id,
+      key: (rail.key as HomeRailDtoKey | null) ?? null,
+      kind: rail.kind,
+      source: this.ensureInSet(rail.source, HOME_RAIL_SOURCE_VALUES),
+      contentType: this.ensureInSet(rail.contentType, HOME_RAIL_CONTENT_TYPE_VALUES),
       title: rail.title,
       subtitle: rail.subtitle,
       enabled: rail.enabled,
       sortOrder: rail.sortOrder,
-      favorites: defaults.favorites,
+      editable: rail.kind === HomeRailKind.CUSTOM,
+      deletable: rail.kind === HomeRailKind.CUSTOM,
+      config: this.normalizeSceneRailConfig(rail.config, defaults?.config ?? null),
     };
+  }
+
+  private normalizeSceneRailConfig(
+    input: unknown,
+    fallback: Partial<HomeRailSceneConfigDto> | null = null,
+  ): HomeRailSceneConfigDto {
+    const record = this.asRecord(input);
+    const sort = this.parseInSet(record.sort, HOME_RAIL_SCENE_SORT_VALUES, fallback?.sort ?? 'DATE');
+    const direction = this.parseInSet(
+      record.direction,
+      HOME_RAIL_DIRECTION_VALUES,
+      fallback?.direction ?? 'DESC',
+    );
+    const favorites = this.parseOptionalInSet(
+      record.favorites,
+      HOME_RAIL_FAVORITES_VALUES,
+      fallback?.favorites ?? null,
+    );
+    const tags = this.normalizeNamedIds(record.tagIds, record.tagNames);
+    const studios = this.normalizeNamedIds(record.studioIds, record.studioNames);
+    const fallbackTagMode = tags.ids.length > 0 ? fallback?.tagMode ?? 'OR' : null;
+    const tagMode =
+      tags.ids.length > 0
+        ? this.parseOptionalInSet(record.tagMode, HOME_RAIL_TAG_MODE_VALUES, fallbackTagMode)
+        : null;
+    const limit = this.parseLimit(record.limit, fallback?.limit ?? HOME_RAIL_SCENE_LIMIT_DEFAULT);
+
+    return {
+      sort,
+      direction,
+      favorites,
+      tagIds: tags.ids,
+      tagNames: tags.names,
+      tagMode,
+      studioIds: studios.ids,
+      studioNames: studios.names,
+      limit,
+    };
+  }
+
+  private normalizeNamedIds(idsValue: unknown, namesValue: unknown): { ids: string[]; names: string[] } {
+    const ids = Array.isArray(idsValue) ? idsValue : [];
+    const names = Array.isArray(namesValue) ? namesValue : [];
+    const seen = new Set<string>();
+    const normalizedIds: string[] = [];
+    const normalizedNames: string[] = [];
+
+    ids.forEach((rawId, index) => {
+      const id = String(rawId).trim();
+      if (!id || seen.has(id)) {
+        return;
+      }
+
+      seen.add(id);
+      normalizedIds.push(id);
+      const rawName = names[index];
+      if (typeof rawName === 'string' && rawName.trim().length > 0) {
+        normalizedNames.push(rawName.trim());
+      } else {
+        normalizedNames.push(id);
+      }
+    });
+
+    return {
+      ids: normalizedIds,
+      names: normalizedNames,
+    };
+  }
+
+  private parseLimit(value: unknown, fallback: number): number {
+    const next = Number(value);
+    if (!Number.isInteger(next)) {
+      return fallback;
+    }
+
+    return Math.min(Math.max(next, HOME_RAIL_SCENE_LIMIT_MIN), HOME_RAIL_SCENE_LIMIT_MAX);
+  }
+
+  private parseOptionalInSet<const T extends readonly string[]>(
+    value: unknown,
+    validValues: T,
+    fallback: T[number] | null,
+  ): T[number] | null {
+    if (value === null || value === undefined || value === '') {
+      return fallback;
+    }
+
+    return this.parseInSet(value, validValues, fallback ?? validValues[0]);
+  }
+
+  private parseInSet<const T extends readonly string[]>(
+    value: unknown,
+    validValues: T,
+    fallback: T[number],
+  ): T[number] {
+    return typeof value === 'string' && validValues.includes(value as T[number])
+      ? (value as T[number])
+      : fallback;
+  }
+
+  private ensureInSet<const T extends readonly string[]>(value: string, validValues: T): T[number] {
+    if (!validValues.includes(value as T[number])) {
+      throw new BadRequestException(`Unsupported Home rail value: ${value}`);
+    }
+
+    return value as T[number];
+  }
+
+  private normalizeSubtitle(value: string | null | undefined): string | null {
+    const normalized = value?.trim();
+    return normalized ? normalized : null;
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
   }
 }

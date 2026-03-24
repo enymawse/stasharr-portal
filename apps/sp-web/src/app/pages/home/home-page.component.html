@@ -3,9 +3,11 @@
     <div class="hero-grid">
       <div class="hero-copy">
         <p class="eyebrow">Home</p>
-        <h1>Your favorites, surfaced in rows.</h1>
+        <h1>Your rails, now driven by saved scene filters.</h1>
         <p class="lede">
-          Fresh scenes from favorite studios and performers, arranged for fast browsing instead of another endless vertical feed.
+          Keep the built-in favorites rails, add as many custom StashDB scene rails as you
+          want, and shape Home into a personal browsing screen instead of a fixed landing
+          page.
         </p>
         <div class="hero-actions">
           <button type="button" class="hero-link secondary" (click)="openEditor()">
@@ -22,12 +24,12 @@
           <strong>{{ activeRailCount() }}</strong>
         </div>
         <div class="fact-card">
-          <span class="fact-label">Scenes Loaded</span>
-          <strong>{{ totalLoadedScenes() }}</strong>
+          <span class="fact-label">Custom Rails</span>
+          <strong>{{ customRailCount() }}</strong>
         </div>
         <div class="fact-card wide">
-          <span class="fact-label">Powered By</span>
-          <strong>Favorite Studios + Favorite Performers</strong>
+          <span class="fact-label">Scenes Loaded</span>
+          <strong>{{ totalLoadedScenes() }}</strong>
         </div>
       </div>
     </div>
@@ -40,7 +42,7 @@
         strokeWidth="4"
         [style]="{ width: '2.15rem', height: '2.15rem' }"
       />
-      <p>Loading your personalized rails...</p>
+      <p>Loading your Home rails...</p>
     </div>
   } @else if (configError()) {
     <section class="home-state error-state">
@@ -54,11 +56,11 @@
         <div class="editor-head">
           <div>
             <p class="eyebrow">Customize Home</p>
-            <h2>Enable, disable, and reorder your built-in rails</h2>
+            <h2>Reorder built-ins and add custom StashDB scene rails</h2>
           </div>
           <div class="editor-actions">
             <button type="button" class="state-button secondary" (click)="cancelEditor()">
-              Cancel
+              Close
             </button>
             <button
               type="button"
@@ -66,21 +68,63 @@
               [disabled]="!hasDraftChanges() || savingRails()"
               (click)="saveRails()"
             >
-              {{ savingRails() ? 'Saving...' : 'Save Rails' }}
+              {{ savingRails() ? 'Saving...' : 'Save Order & Enabled State' }}
             </button>
           </div>
         </div>
 
+        <p class="editor-note">
+          Built-in rails stay fixed to their favorite-based query. Custom rails save their
+          filter definition immediately when you create or edit them. Enable/disable and
+          ordering changes are staged until you save this editor.
+        </p>
+
         @if (saveError(); as saveError) {
           <p class="editor-error">{{ saveError }}</p>
         }
+        @if (deleteError(); as deleteError) {
+          <p class="editor-error">{{ deleteError }}</p>
+        }
+
+        <div class="editor-toolbar">
+          <button
+            type="button"
+            class="state-button"
+            [disabled]="!canMutateCustomRails()"
+            (click)="openCreateRailForm()"
+          >
+            Add Rail
+          </button>
+          @if (!canMutateCustomRails()) {
+            <span class="toolbar-hint"
+              >Save or cancel ordering changes before editing custom rails.</span
+            >
+          }
+        </div>
 
         <div class="editor-list">
-          @for (rail of draftRails(); track rail.key; let i = $index) {
+          @for (rail of draftRails(); track rail.id; let i = $index) {
             <article class="editor-item">
               <div class="editor-item-copy">
-                <h3>{{ rail.title }}</h3>
-                <p>{{ rail.subtitle }}</p>
+                <div class="editor-item-headline">
+                  <span class="rail-kind-pill">{{ kindLabel(rail) }}</span>
+                  <h3>{{ rail.title }}</h3>
+                </div>
+                <p>{{ rail.subtitle || 'No subtitle' }}</p>
+                <div class="editor-summary-line">
+                  <span>{{ rail.config.sort }}</span>
+                  <span>{{ rail.config.direction }}</span>
+                  <span>Limit {{ rail.config.limit }}</span>
+                  @if (rail.config.favorites) {
+                    <span>{{ rail.config.favorites }}</span>
+                  }
+                  @if (rail.config.tagIds.length > 0) {
+                    <span>{{ rail.config.tagIds.length }} tags</span>
+                  }
+                  @if (rail.config.studioIds.length > 0) {
+                    <span>{{ rail.config.studioIds.length }} studios</span>
+                  }
+                </div>
               </div>
 
               <div class="editor-item-controls">
@@ -88,7 +132,7 @@
                   <input
                     type="checkbox"
                     [checked]="rail.enabled"
-                    (change)="setDraftRailEnabled(rail.key, $any($event.target).checked)"
+                    (change)="setDraftRailEnabled(rail.id, $any($event.target).checked)"
                   />
                   <span>{{ rail.enabled ? 'Enabled' : 'Disabled' }}</span>
                 </label>
@@ -110,11 +154,232 @@
                   >
                     Move Down
                   </button>
+                  @if (rail.editable) {
+                    <button
+                      type="button"
+                      class="mini-button"
+                      [disabled]="!canMutateCustomRails()"
+                      (click)="openEditRailForm(rail)"
+                    >
+                      Edit
+                    </button>
+                  }
+                  @if (rail.deletable) {
+                    <button
+                      type="button"
+                      class="mini-button danger"
+                      [disabled]="!canMutateCustomRails() || isDeletingRail(rail.id)"
+                      (click)="deleteCustomRail(rail)"
+                    >
+                      {{ isDeletingRail(rail.id) ? 'Deleting...' : 'Delete' }}
+                    </button>
+                  }
                 </div>
               </div>
             </article>
           }
         </div>
+
+        @if (railFormOpen() && railForm(); as form) {
+          <section class="rail-form-shell">
+            <div class="rail-form-head">
+              <div>
+                <p class="eyebrow">{{ editingRailId() ? 'Edit Rail' : 'Add Rail' }}</p>
+                <h3>
+                  {{
+                    editingRailId()
+                      ? 'Update custom StashDB scene rail'
+                      : 'Create a custom StashDB scene rail'
+                  }}
+                </h3>
+              </div>
+              <div class="editor-actions">
+                <button type="button" class="state-button secondary" (click)="closeRailForm()">
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  class="state-button"
+                  [disabled]="railFormSaving()"
+                  (click)="saveRailForm()"
+                >
+                  {{
+                    railFormSaving()
+                      ? 'Saving...'
+                      : editingRailId()
+                        ? 'Update Rail'
+                        : 'Create Rail'
+                  }}
+                </button>
+              </div>
+            </div>
+
+            @if (railFormError(); as railFormError) {
+              <p class="editor-error">{{ railFormError }}</p>
+            }
+
+            <div class="rail-form-grid">
+              <label class="control-field">
+                <span>Title</span>
+                <input
+                  type="text"
+                  [ngModel]="form.title"
+                  (ngModelChange)="updateRailForm('title', $event)"
+                  placeholder="Weekend queue, New tags, Favorite studios..."
+                />
+              </label>
+
+              <label class="control-field">
+                <span>Subtitle</span>
+                <input
+                  type="text"
+                  [ngModel]="form.subtitle"
+                  (ngModelChange)="updateRailForm('subtitle', $event)"
+                  placeholder="Optional context for this rail"
+                />
+              </label>
+
+              <label class="control-field checkbox-field compact-toggle">
+                <span>Enabled</span>
+                <label class="toggle-inline">
+                  <input
+                    type="checkbox"
+                    [ngModel]="form.enabled"
+                    (ngModelChange)="updateRailForm('enabled', $event)"
+                  />
+                  <span>{{ form.enabled ? 'Enabled' : 'Disabled' }}</span>
+                </label>
+              </label>
+
+              <label class="control-field">
+                <span>Item Limit</span>
+                <input
+                  type="number"
+                  min="6"
+                  max="30"
+                  step="1"
+                  [ngModel]="form.limit"
+                  (ngModelChange)="updateRailForm('limit', $event)"
+                />
+              </label>
+
+              <label class="control-field">
+                <span>Sort</span>
+                <p-select
+                  inputId="home-rail-sort"
+                  [ngModel]="form.sort"
+                  (ngModelChange)="updateRailForm('sort', $event)"
+                  [options]="sortOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  [appendTo]="'body'"
+                  panelStyleClass="home-rail-select-panel"
+                />
+              </label>
+
+              <label class="control-field">
+                <span>Direction</span>
+                <p-select
+                  inputId="home-rail-direction"
+                  [ngModel]="form.direction"
+                  (ngModelChange)="updateRailForm('direction', $event)"
+                  [options]="directionOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  [appendTo]="'body'"
+                  panelStyleClass="home-rail-select-panel"
+                />
+              </label>
+
+              <label class="control-field">
+                <span>Favorites</span>
+                <p-select
+                  inputId="home-rail-favorites"
+                  [ngModel]="form.favorites"
+                  (ngModelChange)="updateRailForm('favorites', $event)"
+                  [options]="favoritesOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  [appendTo]="'body'"
+                  panelStyleClass="home-rail-select-panel"
+                />
+              </label>
+
+              <label class="control-field">
+                <span>Tag Mode</span>
+                <p-select
+                  inputId="home-rail-tag-mode"
+                  [ngModel]="form.tagMode"
+                  (ngModelChange)="updateRailForm('tagMode', $event)"
+                  [options]="tagMatchOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  [appendTo]="'body'"
+                  panelStyleClass="home-rail-select-panel"
+                />
+              </label>
+            </div>
+
+            <div class="rail-form-pickers">
+              <label class="control-field">
+                <span>Tags</span>
+                <p-multiselect
+                  inputId="home-rail-tags"
+                  [ngModel]="formTagSelectedIdsModel()"
+                  (ngModelChange)="onRailFormTagSelectionChanged($event)"
+                  (onFilter)="onRailFormTagFilterChanged($event.filter)"
+                  (onPanelHide)="onRailFormTagPanelHide()"
+                  [filter]="true"
+                  [filterValue]="tagSearchTerm()"
+                  filterPlaceHolder="Search tags"
+                  [loading]="tagSearchLoading()"
+                  [options]="tagSelectOptions()"
+                  optionLabel="label"
+                  optionValue="value"
+                  [showToggleAll]="false"
+                  display="chip"
+                  [emptyMessage]="tagSelectEmptyMessage()"
+                  [emptyFilterMessage]="tagSelectEmptyMessage()"
+                  [resetFilterOnHide]="true"
+                  [appendTo]="'body'"
+                  panelStyleClass="home-rail-tag-panel"
+                  placeholder="Select matching tags"
+                  scrollHeight="16rem"
+                />
+              </label>
+
+              <label class="control-field">
+                <span>Studios</span>
+                <p-multiselect
+                  inputId="home-rail-studios"
+                  [ngModel]="formStudioSelectedIdsModel()"
+                  (ngModelChange)="onRailFormStudioSelectionChanged($event)"
+                  (onFilter)="onRailFormStudioFilterChanged($event.filter)"
+                  (onPanelHide)="onRailFormStudioPanelHide()"
+                  [filter]="true"
+                  [filterValue]="studioSearchTerm()"
+                  filterPlaceHolder="Search studio networks"
+                  [loading]="studioSearchLoading()"
+                  [options]="studioSelectOptions()"
+                  [group]="true"
+                  optionGroupLabel="label"
+                  optionGroupChildren="items"
+                  optionLabel="label"
+                  optionValue="value"
+                  [showToggleAll]="false"
+                  display="chip"
+                  [emptyMessage]="studioSelectEmptyMessage()"
+                  [emptyFilterMessage]="studioSelectEmptyMessage()"
+                  [resetFilterOnHide]="true"
+                  [appendTo]="'body'"
+                  panelStyleClass="home-rail-studio-panel"
+                  placeholder="Choose studio networks or child studios"
+                  scrollHeight="16rem"
+                />
+              </label>
+            </div>
+          </section>
+        }
       </section>
     }
 
@@ -122,7 +387,8 @@
       <section class="home-state empty-state">
         <h2>No Home rails are enabled</h2>
         <p>
-          Turn at least one rail back on to restore your personalized landing page.
+          Turn at least one rail back on or create a custom rail to restore your
+          personalized landing page.
         </p>
         <div class="empty-links">
           <button type="button" class="hero-link" (click)="openEditor()">Edit Rails</button>
@@ -130,25 +396,41 @@
       </section>
     } @else if (isPageEmptyState()) {
       <section class="home-state empty-state">
-      <h2>No favorites are shaping Home yet</h2>
-      <p>
-        Add favorite performers or studios and this page will start filling with the latest matching scenes.
-      </p>
-      <div class="empty-links">
-        <a class="hero-link" [routerLink]="['/performers']">Browse Performers</a>
-        <a class="hero-link secondary" [routerLink]="['/studios']">Browse Studios</a>
-      </div>
+        <h2>No enabled rails are matching scenes yet</h2>
+        <p>
+          Try favoriting more performers or studios, or add a custom rail with broader
+          tags, studios, or favorites filters.
+        </p>
+        <div class="empty-links">
+          <button type="button" class="hero-link" (click)="openEditor()">
+            Customize Home
+          </button>
+          <a class="hero-link secondary" [routerLink]="['/scenes']">Browse Scenes</a>
+        </div>
       </section>
     } @else {
       <div class="rail-stack">
-        @for (rail of rails(); track rail.key) {
+        @for (rail of rails(); track rail.id) {
           @if (showRail(rail)) {
             <section class="rail-section">
               <header class="rail-head">
                 <div class="rail-copy">
-                  <p class="rail-kicker">Personalized Rail</p>
+                  <p class="rail-kicker">{{ kindLabel(rail) }} Rail</p>
                   <h2>{{ rail.title }}</h2>
-                  <p>{{ rail.subtitle }}</p>
+                  @if (rail.subtitle) {
+                    <p>{{ rail.subtitle }}</p>
+                  }
+                  <div class="rail-summary-line">
+                    <span>{{ rail.summary.sortLabel }}</span>
+                    <span>{{ rail.summary.favoritesLabel }}</span>
+                    <span>{{ rail.summary.limit }} items</span>
+                    @if (rail.summary.tagCount > 0) {
+                      <span>{{ rail.summary.tagCount }} tags</span>
+                    }
+                    @if (rail.summary.studioCount > 0) {
+                      <span>{{ rail.summary.studioCount }} studios</span>
+                    }
+                  </div>
                 </div>
 
                 <div class="rail-actions">
@@ -163,7 +445,7 @@
                     <button
                       type="button"
                       class="scroll-button"
-                      (click)="scrollRail(rail.key, 'prev')"
+                      (click)="scrollRail(rail.id, 'prev')"
                       [attr.aria-label]="'Scroll ' + rail.title + ' left'"
                     >
                       <i class="pi pi-angle-left" aria-hidden="true"></i>
@@ -171,7 +453,7 @@
                     <button
                       type="button"
                       class="scroll-button"
-                      (click)="scrollRail(rail.key, 'next')"
+                      (click)="scrollRail(rail.id, 'next')"
                       [attr.aria-label]="'Scroll ' + rail.title + ' right'"
                     >
                       <i class="pi pi-angle-right" aria-hidden="true"></i>
@@ -181,7 +463,7 @@
               </header>
 
               @if (rail.items.length > 0) {
-                <div class="rail-viewport" #railViewport [attr.data-rail-key]="rail.key">
+                <div class="rail-viewport" #railViewport [attr.data-rail-id]="rail.id">
                   <div class="rail-track">
                     @for (item of rail.items; track item.id) {
                       <article class="rail-card">
@@ -194,7 +476,12 @@
                           ></a>
 
                           @if (railImageUrl(item); as imageUrl) {
-                            <img class="thumbnail" [src]="imageUrl" [alt]="item.title" loading="lazy" />
+                            <img
+                              class="thumbnail"
+                              [src]="imageUrl"
+                              [alt]="item.title"
+                              loading="lazy"
+                            />
                           } @else {
                             <div class="thumbnail placeholder" aria-hidden="true"></div>
                           }
@@ -202,10 +489,16 @@
                           <div class="media-top">
                             @if (item.studioImageUrl) {
                               <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
-                                <img [src]="item.studioImageUrl" [alt]="item.studio ?? 'Studio logo'" loading="lazy" />
+                                <img
+                                  [src]="item.studioImageUrl"
+                                  [alt]="item.studio ?? 'Studio logo'"
+                                  loading="lazy"
+                                />
                               </div>
                             } @else if (item.studio) {
-                              <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                              <div class="studio-badge text-badge" [title]="item.studio">
+                                {{ item.studio }}
+                              </div>
                             }
 
                             @if (item.status.state !== 'NOT_REQUESTED') {

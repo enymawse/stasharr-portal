@@ -15,14 +15,18 @@ model Request {
 }
 
 model HomeRail {
-  id        String      @id @default(cuid())
-  key       HomeRailKey @unique
-  title     String
-  subtitle  String
-  enabled   Boolean     @default(true)
-  sortOrder Int
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id          String              @id @default(cuid())
+  key         HomeRailKey?        @unique
+  kind        HomeRailKind
+  source      HomeRailSource
+  contentType HomeRailContentType
+  title       String
+  subtitle    String?
+  enabled     Boolean             @default(true)
+  sortOrder   Int
+  config      Json?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
   @@index([sortOrder])
 }
@@ -37,6 +41,19 @@ enum RequestStatus {
 enum HomeRailKey {
   FAVORITE_STUDIOS
   FAVORITE_PERFORMERS
+}
+
+enum HomeRailKind {
+  BUILTIN
+  CUSTOM
+}
+
+enum HomeRailSource {
+  STASHDB
+}
+
+enum HomeRailContentType {
+  SCENES
 }
 
 enum IntegrationType {

@@ -8,13 +8,41 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { MultiSelect } from 'primeng/multiselect';
 import { ProgressSpinner } from 'primeng/progressspinner';
-import { Subscription, catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
+import { Select } from 'primeng/select';
+import {
+  Subject,
+  Subscription,
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  finalize,
+  forkJoin,
+  map,
+  of,
+  switchMap,
+} from 'rxjs';
 import { DiscoverService } from '../../core/api/discover.service';
+import {
+  DiscoverItem,
+  PerformerStudioOption,
+  SceneFavoritesFilter,
+  SceneFeedSort,
+  SceneRequestContext,
+  SceneTagMatchMode,
+  SceneTagOption,
+  SortDirection,
+} from '../../core/api/discover.types';
 import { HomeService } from '../../core/api/home.service';
-import { HomeRailConfig, HomeRailKey } from '../../core/api/home.types';
-import { DiscoverItem, SceneRequestContext } from '../../core/api/discover.types';
+import {
+  HomeRailConfig,
+  HomeRailFormDraft,
+  HomeRailViewSummary,
+  SaveHomeRailPayload,
+} from '../../core/api/home.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
@@ -22,24 +50,40 @@ interface HomeRailView extends HomeRailConfig {
   items: DiscoverItem[];
   error: string | null;
   seeAllQueryParams: Record<string, string>;
+  summary: HomeRailViewSummary;
 }
 
 interface RailLoadResult {
-  key: HomeRailKey;
+  id: string;
   items: DiscoverItem[];
   error: string | null;
 }
 
 interface RailContentState {
-  itemsByKey: Partial<Record<HomeRailKey, DiscoverItem[]>>;
-  errorsByKey: Partial<Record<HomeRailKey, string>>;
+  itemsById: Record<string, DiscoverItem[]>;
+  errorsById: Record<string, string>;
 }
+
+interface MultiSelectOption {
+  label: string;
+  value: string;
+}
+
+interface MultiSelectGroup {
+  label: string;
+  items: MultiSelectOption[];
+}
+
+type RailFavoritesOption = SceneFavoritesFilter | 'NONE';
 
 @Component({
   selector: 'app-home-page',
   imports: [
     RouterLink,
+    FormsModule,
+    MultiSelect,
     ProgressSpinner,
+    Select,
     SceneStatusBadgeComponent,
     SceneRequestModalComponent,
   ],
@@ -47,13 +91,56 @@ interface RailContentState {
   styleUrl: './home-page.component.scss',
 })
 export class HomePageComponent implements OnInit, OnDestroy {
-  private static readonly RAIL_SIZE = 16;
+  private static readonly SEARCH_DEBOUNCE_MS = 250;
+  private static readonly DEFAULT_LIMIT = 16;
+  private static readonly LIMIT_MIN = 6;
+  private static readonly LIMIT_MAX = 30;
+  private static readonly DEFAULT_SORT: SceneFeedSort = 'DATE';
+  private static readonly DEFAULT_DIRECTION: SortDirection = 'DESC';
+  private static readonly DEFAULT_TAG_MODE: SceneTagMatchMode = 'OR';
+
+  protected static readonly SORT_OPTIONS: Array<{ value: SceneFeedSort; label: string }> = [
+    { value: 'DATE', label: 'Release Date' },
+    { value: 'TITLE', label: 'Title' },
+    { value: 'TRENDING', label: 'Trending' },
+    { value: 'CREATED_AT', label: 'Created At' },
+    { value: 'UPDATED_AT', label: 'Updated At' },
+  ];
+  protected static readonly DIRECTION_OPTIONS: Array<{
+    value: SortDirection;
+    label: string;
+  }> = [
+    { value: 'DESC', label: 'Newest First' },
+    { value: 'ASC', label: 'Oldest First' },
+  ];
+  protected static readonly FAVORITES_OPTIONS: Array<{
+    value: RailFavoritesOption;
+    label: string;
+  }> = [
+    { value: 'NONE', label: 'No Favorites Filter' },
+    { value: 'ALL', label: 'All Favorites' },
+    { value: 'PERFORMER', label: 'Favorite Performers' },
+    { value: 'STUDIO', label: 'Favorite Studios' },
+  ];
+  protected static readonly TAG_MATCH_OPTIONS: Array<{
+    value: SceneTagMatchMode;
+    label: string;
+  }> = [
+    { value: 'OR', label: 'OR (Any)' },
+    { value: 'AND', label: 'AND (All)' },
+  ];
 
   private readonly discoverService = inject(DiscoverService);
   private readonly homeService = inject(HomeService);
   private readonly router = inject(Router);
+  private readonly tagSearchTerms = new Subject<string>();
+  private readonly studioSearchTerms = new Subject<string>();
   private loadSubscription: Subscription | null = null;
   private saveSubscription: Subscription | null = null;
+  private tagSearchSubscription: Subscription | null = null;
+  private studioSearchSubscription: Subscription | null = null;
+  private railFormMutationSubscription: Subscription | null = null;
+  private railDeleteSubscription: Subscription | null = null;
 
   @ViewChildren('railViewport')
   private railViewports?: QueryList<ElementRef<HTMLDivElement>>;
@@ -63,20 +150,54 @@ export class HomePageComponent implements OnInit, OnDestroy {
   protected readonly savingRails = signal(false);
   protected readonly saveError = signal<string | null>(null);
   protected readonly railConfigs = signal<HomeRailConfig[]>([]);
-  protected readonly editorOpen = signal(false);
   protected readonly draftRails = signal<HomeRailConfig[]>([]);
-  protected readonly railItemsByKey = signal<Partial<Record<HomeRailKey, DiscoverItem[]>>>({});
-  protected readonly railErrorsByKey = signal<Partial<Record<HomeRailKey, string>>>({});
+  protected readonly editorOpen = signal(false);
+
+  protected readonly railFormOpen = signal(false);
+  protected readonly editingRailId = signal<string | null>(null);
+  protected readonly railFormSaving = signal(false);
+  protected readonly railFormError = signal<string | null>(null);
+  protected readonly deletingRailId = signal<string | null>(null);
+  protected readonly deleteError = signal<string | null>(null);
+  protected readonly railForm = signal<HomeRailFormDraft | null>(null);
+
+  protected readonly tagSearchTerm = signal('');
+  protected readonly tagSearchLoading = signal(false);
+  protected readonly tagSearchError = signal<string | null>(null);
+  protected readonly tagOptions = signal<SceneTagOption[]>([]);
+  protected readonly tagSelectOptions = signal<MultiSelectOption[]>([]);
+  protected readonly formTagSelectedIdsModel = signal<string[]>([]);
+
+  protected readonly studioSearchTerm = signal('');
+  protected readonly studioSearchLoading = signal(false);
+  protected readonly studioSearchError = signal<string | null>(null);
+  protected readonly studioOptions = signal<PerformerStudioOption[]>([]);
+  protected readonly studioSelectOptions = signal<MultiSelectGroup[]>([]);
+  protected readonly formStudioSelectedIdsModel = signal<string[]>([]);
+
+  protected readonly railItemsById = signal<Record<string, DiscoverItem[]>>({});
+  protected readonly railErrorsById = signal<Record<string, string>>({});
   protected readonly requestModalOpen = signal(false);
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
 
+  protected readonly sortOptions = HomePageComponent.SORT_OPTIONS;
+  protected readonly directionOptions = HomePageComponent.DIRECTION_OPTIONS;
+  protected readonly favoritesOptions = HomePageComponent.FAVORITES_OPTIONS;
+  protected readonly tagMatchOptions = HomePageComponent.TAG_MATCH_OPTIONS;
+
   ngOnInit(): void {
+    this.setupTagSearch();
+    this.setupStudioSearch();
     this.loadHome();
   }
 
   ngOnDestroy(): void {
     this.loadSubscription?.unsubscribe();
     this.saveSubscription?.unsubscribe();
+    this.tagSearchSubscription?.unsubscribe();
+    this.studioSearchSubscription?.unsubscribe();
+    this.railFormMutationSubscription?.unsubscribe();
+    this.railDeleteSubscription?.unsubscribe();
   }
 
   protected loadHome(): void {
@@ -92,16 +213,16 @@ export class HomePageComponent implements OnInit, OnDestroy {
         switchMap((rails) => {
           this.railConfigs.set(rails);
           this.draftRails.set(this.cloneRails(rails));
-          this.railItemsByKey.set({});
-          this.railErrorsByKey.set({});
+          this.railItemsById.set({});
+          this.railErrorsById.set({});
           return this.loadRailContent(rails);
         }),
         finalize(() => this.loading.set(false)),
       )
       .subscribe({
         next: (content) => {
-          this.railItemsByKey.set(content.itemsByKey);
-          this.railErrorsByKey.set(content.errorsByKey);
+          this.railItemsById.set(content.itemsById);
+          this.railErrorsById.set(content.errorsById);
         },
         error: () => {
           this.configError.set('Unable to load Home rail configuration right now.');
@@ -111,21 +232,73 @@ export class HomePageComponent implements OnInit, OnDestroy {
       });
   }
 
+  protected rails(): HomeRailView[] {
+    return this.railConfigs()
+      .filter((rail) => rail.enabled)
+      .map((rail) => ({
+        ...rail,
+        items: this.railItemsById()[rail.id] ?? [],
+        error: this.railErrorsById()[rail.id] ?? null,
+        seeAllQueryParams: this.buildSeeAllQueryParams(rail.config),
+        summary: this.summarizeRail(rail),
+      }));
+  }
+
+  protected showRail(rail: HomeRailView): boolean {
+    return rail.items.length > 0 || rail.error !== null;
+  }
+
+  protected totalLoadedScenes(): number {
+    return Object.values(this.railItemsById()).reduce(
+      (total, items) => total + (items?.length ?? 0),
+      0,
+    );
+  }
+
+  protected activeRailCount(): number {
+    return this.railConfigs().filter((rail) => rail.enabled).length;
+  }
+
+  protected customRailCount(): number {
+    return this.railConfigs().filter((rail) => rail.kind === 'CUSTOM').length;
+  }
+
+  protected isNoRailsEnabledState(): boolean {
+    return (
+      !this.loading() &&
+      !this.configError() &&
+      this.railConfigs().length > 0 &&
+      this.railConfigs().every((rail) => !rail.enabled)
+    );
+  }
+
+  protected isPageEmptyState(): boolean {
+    const enabledRails = this.rails();
+    if (this.loading() || this.configError() || enabledRails.length === 0) {
+      return false;
+    }
+
+    return enabledRails.every((rail) => rail.items.length === 0 && rail.error === null);
+  }
+
   protected openEditor(): void {
     this.draftRails.set(this.cloneRails(this.railConfigs()));
     this.saveError.set(null);
+    this.closeRailForm();
     this.editorOpen.set(true);
   }
 
   protected cancelEditor(): void {
     this.draftRails.set(this.cloneRails(this.railConfigs()));
     this.saveError.set(null);
+    this.deleteError.set(null);
+    this.closeRailForm();
     this.editorOpen.set(false);
   }
 
-  protected setDraftRailEnabled(railKey: HomeRailKey, enabled: boolean): void {
+  protected setDraftRailEnabled(railId: string, enabled: boolean): void {
     this.draftRails.update((rails) =>
-      rails.map((rail) => (rail.key === railKey ? { ...rail, enabled } : rail)),
+      rails.map((rail) => (rail.id === railId ? { ...rail, enabled } : rail)),
     );
   }
 
@@ -147,9 +320,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
   }
 
   protected canMoveDraftRail(index: number, direction: 'up' | 'down'): boolean {
-    return direction === 'up'
-      ? index > 0
-      : index < this.draftRails().length - 1;
+    return direction === 'up' ? index > 0 : index < this.draftRails().length - 1;
   }
 
   protected hasDraftChanges(): boolean {
@@ -166,11 +337,69 @@ export class HomePageComponent implements OnInit, OnDestroy {
       }
 
       return (
-        rail.key !== persistedRail.key ||
+        rail.id !== persistedRail.id ||
         rail.enabled !== persistedRail.enabled ||
         rail.sortOrder !== persistedRail.sortOrder
       );
     });
+  }
+
+  protected canMutateCustomRails(): boolean {
+    return !this.hasDraftChanges() && !this.savingRails() && !this.railFormSaving();
+  }
+
+  protected openCreateRailForm(): void {
+    if (!this.canMutateCustomRails()) {
+      return;
+    }
+
+    this.editingRailId.set(null);
+    this.deleteError.set(null);
+    this.railFormError.set(null);
+    this.railForm.set(this.createEmptyRailForm());
+    this.formTagSelectedIdsModel.set([]);
+    this.formStudioSelectedIdsModel.set([]);
+    this.tagSearchTerm.set('');
+    this.studioSearchTerm.set('');
+    this.rebuildRailFormTagSelectOptions([]);
+    this.rebuildRailFormStudioSelectOptions([]);
+    this.railFormOpen.set(true);
+  }
+
+  protected openEditRailForm(rail: HomeRailConfig): void {
+    if (!rail.editable || !this.canMutateCustomRails()) {
+      return;
+    }
+
+    this.editingRailId.set(rail.id);
+    this.deleteError.set(null);
+    this.railFormError.set(null);
+    const form = this.buildFormFromRail(rail);
+    this.railForm.set(form);
+    this.formTagSelectedIdsModel.set(form.selectedTags.map((tag) => tag.id));
+    this.formStudioSelectedIdsModel.set(form.selectedStudios.map((studio) => studio.id));
+    this.tagSearchTerm.set('');
+    this.studioSearchTerm.set('');
+    this.rebuildRailFormTagSelectOptions([]);
+    this.rebuildRailFormStudioSelectOptions([]);
+    this.railFormOpen.set(true);
+  }
+
+  protected closeRailForm(): void {
+    this.railFormOpen.set(false);
+    this.editingRailId.set(null);
+    this.railFormError.set(null);
+    this.railForm.set(null);
+    this.formTagSelectedIdsModel.set([]);
+    this.formStudioSelectedIdsModel.set([]);
+    this.tagSearchTerm.set('');
+    this.studioSearchTerm.set('');
+    this.tagOptions.set([]);
+    this.tagSelectOptions.set([]);
+    this.studioOptions.set([]);
+    this.studioSelectOptions.set([]);
+    this.tagSearchError.set(null);
+    this.studioSearchError.set(null);
   }
 
   protected saveRails(): void {
@@ -190,7 +419,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
     this.saveSubscription = this.homeService
       .updateRails({
         rails: orderedRails.map((rail) => ({
-          key: rail.key,
+          id: rail.id,
           enabled: rail.enabled,
         })),
       })
@@ -205,8 +434,8 @@ export class HomePageComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: ({ content }) => {
-          this.railItemsByKey.set(content.itemsByKey);
-          this.railErrorsByKey.set(content.errorsByKey);
+          this.railItemsById.set(content.itemsById);
+          this.railErrorsById.set(content.errorsById);
           this.editorOpen.set(false);
         },
         error: () => {
@@ -215,54 +444,168 @@ export class HomePageComponent implements OnInit, OnDestroy {
       });
   }
 
-  protected rails(): HomeRailView[] {
-    return this.railConfigs()
-      .filter((rail) => rail.enabled)
-      .map((rail) => ({
-        ...rail,
-        items: this.railItemsByKey()[rail.key] ?? [],
-        error: this.railErrorsByKey()[rail.key] ?? null,
-        seeAllQueryParams: {
-          fav: rail.favorites,
-          sort: 'DATE',
-          dir: 'DESC',
-        },
-      }));
-  }
-
-  protected totalLoadedScenes(): number {
-    return Object.values(this.railItemsByKey()).reduce(
-      (total, items) => total + (items?.length ?? 0),
-      0,
-    );
-  }
-
-  protected activeRailCount(): number {
-    return this.railConfigs().filter((rail) => rail.enabled).length;
-  }
-
-  protected isNoRailsEnabledState(): boolean {
-    return (
-      !this.loading() &&
-      !this.configError() &&
-      this.railConfigs().length > 0 &&
-      this.railConfigs().every((rail) => !rail.enabled)
-    );
-  }
-
-  protected isPageEmptyState(): boolean {
-    const enabledRails = this.rails();
-    if (this.loading() || this.configError() || enabledRails.length === 0) {
-      return false;
+  protected saveRailForm(): void {
+    const form = this.railForm();
+    if (!form || this.railFormSaving()) {
+      return;
     }
 
-    return enabledRails.every(
-      (rail) => rail.items.length === 0 && rail.error === null,
-    );
+    const payload = this.buildRailPayload(form);
+    if (!payload.title.trim()) {
+      this.railFormError.set('A title is required for custom Home rails.');
+      return;
+    }
+
+    this.railFormMutationSubscription?.unsubscribe();
+    this.railFormSaving.set(true);
+    this.railFormError.set(null);
+
+    const request$ = this.editingRailId()
+      ? this.homeService.updateRail(this.editingRailId() as string, payload)
+      : this.homeService.createRail(payload);
+
+    this.railFormMutationSubscription = request$
+      .pipe(finalize(() => this.railFormSaving.set(false)))
+      .subscribe({
+        next: () => {
+          this.closeRailForm();
+          this.editorOpen.set(true);
+          this.loadHome();
+        },
+        error: () => {
+          this.railFormError.set('Unable to save this Home rail right now.');
+        },
+      });
   }
 
-  protected showRail(rail: HomeRailView): boolean {
-    return rail.items.length > 0 || rail.error !== null;
+  protected deleteCustomRail(rail: HomeRailConfig): void {
+    if (!rail.deletable || !this.canMutateCustomRails()) {
+      return;
+    }
+
+    if (!window.confirm(`Delete the Home rail "${rail.title}"?`)) {
+      return;
+    }
+
+    this.railDeleteSubscription?.unsubscribe();
+    this.deletingRailId.set(rail.id);
+    this.deleteError.set(null);
+
+    this.railDeleteSubscription = this.homeService
+      .deleteRail(rail.id)
+      .pipe(finalize(() => this.deletingRailId.set(null)))
+      .subscribe({
+        next: () => {
+          if (this.editingRailId() === rail.id) {
+            this.closeRailForm();
+          }
+          this.editorOpen.set(true);
+          this.loadHome();
+        },
+        error: () => {
+          this.deleteError.set('Unable to delete this Home rail right now.');
+        },
+      });
+  }
+
+  protected isDeletingRail(railId: string): boolean {
+    return this.deletingRailId() === railId;
+  }
+
+  protected updateRailForm<K extends keyof Pick<
+    HomeRailFormDraft,
+    'title' | 'subtitle' | 'enabled' | 'sort' | 'direction' | 'favorites' | 'tagMode' | 'limit'
+  >>(field: K, value: HomeRailFormDraft[K]): void {
+    this.railForm.update((current) => (current ? { ...current, [field]: value } : current));
+  }
+
+  protected onRailFormTagSelectionChanged(nextValue: string[] | null): void {
+    const nextIds = this.dedupeStrings(nextValue ?? []);
+    this.formTagSelectedIdsModel.set(nextIds);
+
+    const previousTags = new Map((this.railForm()?.selectedTags ?? []).map((tag) => [tag.id, tag]));
+    const currentTags = new Map(this.tagOptions().map((tag) => [tag.id, tag]));
+    const nextSelected = nextIds
+      .map((id) => currentTags.get(id) ?? previousTags.get(id))
+      .filter((tag): tag is SceneTagOption => Boolean(tag));
+
+    this.railForm.update((current) =>
+      current
+        ? {
+            ...current,
+            selectedTags: nextSelected,
+          }
+        : current,
+    );
+    this.rebuildRailFormTagSelectOptions(this.tagOptions());
+  }
+
+  protected onRailFormStudioSelectionChanged(nextValue: string[] | null): void {
+    const nextIds = this.dedupeStrings(nextValue ?? []);
+    this.formStudioSelectedIdsModel.set(nextIds);
+
+    const previousLabels = new Map(
+      (this.railForm()?.selectedStudios ?? []).map((studio) => [studio.id, studio.label]),
+    );
+    const currentLabels = this.studioLabelMap();
+    const nextSelected = nextIds.map((id) => ({
+      id,
+      label: currentLabels.get(id) ?? previousLabels.get(id) ?? id,
+    }));
+
+    this.railForm.update((current) =>
+      current
+        ? {
+            ...current,
+            selectedStudios: nextSelected,
+          }
+        : current,
+    );
+    this.rebuildRailFormStudioSelectOptions(this.studioOptions());
+  }
+
+  protected onRailFormTagFilterChanged(nextValue: string | null | undefined): void {
+    const nextTerm = (nextValue ?? '').trimStart();
+    this.tagSearchTerm.set(nextTerm);
+    this.tagSearchTerms.next(nextTerm);
+  }
+
+  protected onRailFormStudioFilterChanged(nextValue: string | null | undefined): void {
+    const nextTerm = (nextValue ?? '').trimStart();
+    this.studioSearchTerm.set(nextTerm);
+    this.studioSearchTerms.next(nextTerm);
+  }
+
+  protected onRailFormTagPanelHide(): void {
+    this.onRailFormTagFilterChanged('');
+  }
+
+  protected onRailFormStudioPanelHide(): void {
+    this.onRailFormStudioFilterChanged('');
+  }
+
+  protected tagSelectEmptyMessage(): string {
+    if (this.tagSearchError()) {
+      return this.tagSearchError() ?? 'Failed to load tag options.';
+    }
+
+    if (this.tagSearchTerm().trim().length === 0) {
+      return 'Type to search tags.';
+    }
+
+    return 'No matching tags.';
+  }
+
+  protected studioSelectEmptyMessage(): string {
+    if (this.studioSearchError()) {
+      return this.studioSearchError() ?? 'Failed to load studio options.';
+    }
+
+    if (this.studioSearchTerm().trim().length === 0) {
+      return 'Type to search studio networks.';
+    }
+
+    return 'No matching studios.';
   }
 
   protected railImageUrl(item: DiscoverItem): string | null {
@@ -295,12 +638,10 @@ export class HomePageComponent implements OnInit, OnDestroy {
   }
 
   protected onRequestSubmitted(stashId: string): void {
-    this.railItemsByKey.update((current) => {
-      const next: Partial<Record<HomeRailKey, DiscoverItem[]>> = { ...current };
-      for (const [key, items] of Object.entries(current) as Array<
-        [HomeRailKey, DiscoverItem[] | undefined]
-      >) {
-        next[key] = (items ?? []).map((item) =>
+    this.railItemsById.update((current) => {
+      const next: Record<string, DiscoverItem[]> = { ...current };
+      for (const [railId, items] of Object.entries(current)) {
+        next[railId] = items.map((item) =>
           item.id === stashId
             ? {
                 ...item,
@@ -313,8 +654,8 @@ export class HomePageComponent implements OnInit, OnDestroy {
     });
   }
 
-  protected scrollRail(railKey: HomeRailKey, direction: 'prev' | 'next'): void {
-    const viewport = this.findRailViewport(railKey);
+  protected scrollRail(railId: string, direction: 'prev' | 'next'): void {
+    const viewport = this.findRailViewport(railId);
     if (!viewport) {
       return;
     }
@@ -326,12 +667,16 @@ export class HomePageComponent implements OnInit, OnDestroy {
     });
   }
 
+  protected kindLabel(rail: HomeRailConfig): string {
+    return rail.kind === 'BUILTIN' ? 'Built-in' : 'Custom';
+  }
+
   private loadRailContent(rails: HomeRailConfig[]) {
     const enabledRails = rails.filter((rail) => rail.enabled);
     if (enabledRails.length === 0) {
       return of<RailContentState>({
-        itemsByKey: {},
-        errorsByKey: {},
+        itemsById: {},
+        errorsById: {},
       });
     }
 
@@ -340,24 +685,25 @@ export class HomePageComponent implements OnInit, OnDestroy {
         this.discoverService
           .getScenesFeed(
             1,
-            HomePageComponent.RAIL_SIZE,
-            'DATE',
-            'DESC',
-            undefined,
-            undefined,
-            rail.favorites,
+            rail.config.limit,
+            rail.config.sort,
+            rail.config.direction,
+            rail.config.tagIds,
+            rail.config.tagIds.length > 0 ? rail.config.tagMode ?? 'OR' : undefined,
+            rail.config.favorites ?? undefined,
+            rail.config.studioIds,
           )
           .pipe(
             map(
               (response): RailLoadResult => ({
-                key: rail.key,
+                id: rail.id,
                 items: response.items,
                 error: null,
               }),
             ),
             catchError(() =>
               of<RailLoadResult>({
-                key: rail.key,
+                id: rail.id,
                 items: [],
                 error: this.railLoadErrorMessage(rail),
               }),
@@ -366,20 +712,20 @@ export class HomePageComponent implements OnInit, OnDestroy {
       ),
     ).pipe(
       map((results) => {
-        const itemsByKey: Partial<Record<HomeRailKey, DiscoverItem[]>> = {};
-        const errorsByKey: Partial<Record<HomeRailKey, string>> = {};
+        const itemsById: Record<string, DiscoverItem[]> = {};
+        const errorsById: Record<string, string> = {};
 
         for (const result of results) {
-          itemsByKey[result.key] = result.items;
+          itemsById[result.id] = result.items;
           if (result.error) {
-            errorsByKey[result.key] = result.error;
+            errorsById[result.id] = result.error;
           }
         }
 
         return {
-          itemsByKey,
-          errorsByKey,
-        };
+          itemsById,
+          errorsById,
+        } satisfies RailContentState;
       }),
     );
   }
@@ -388,18 +734,273 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return `Unable to load ${rail.title.toLowerCase()} right now.`;
   }
 
+  private buildSeeAllQueryParams(config: HomeRailConfig['config']): Record<string, string> {
+    const params: Record<string, string> = {
+      sort: config.sort,
+      dir: config.direction,
+    };
+
+    if (config.favorites) {
+      params['fav'] = config.favorites;
+    }
+    if (config.tagIds.length > 0) {
+      params['tags'] = config.tagIds.join(',');
+      params['tagNames'] = config.tagNames.join(',');
+      params['mode'] = config.tagMode ?? 'OR';
+    }
+    if (config.studioIds.length > 0) {
+      params['studios'] = config.studioIds.join(',');
+      params['studioNames'] = config.studioNames.join(',');
+    }
+
+    return params;
+  }
+
+  private summarizeRail(rail: HomeRailConfig): HomeRailViewSummary {
+    return {
+      sortLabel:
+        HomePageComponent.SORT_OPTIONS.find((option) => option.value === rail.config.sort)?.label ??
+        rail.config.sort,
+      favoritesLabel:
+        HomePageComponent.FAVORITES_OPTIONS.find((option) => option.value === (rail.config.favorites ?? 'NONE'))
+          ?.label ?? 'No Favorites Filter',
+      tagCount: rail.config.tagIds.length,
+      studioCount: rail.config.studioIds.length,
+      limit: rail.config.limit,
+    };
+  }
+
   private sortRails(rails: HomeRailConfig[]): HomeRailConfig[] {
     return [...rails].sort((left, right) => left.sortOrder - right.sortOrder);
   }
 
   private cloneRails(rails: HomeRailConfig[]): HomeRailConfig[] {
-    return rails.map((rail) => ({ ...rail }));
+    return rails.map((rail) => ({
+      ...rail,
+      config: {
+        ...rail.config,
+        tagIds: [...rail.config.tagIds],
+        tagNames: [...rail.config.tagNames],
+        studioIds: [...rail.config.studioIds],
+        studioNames: [...rail.config.studioNames],
+      },
+    }));
   }
 
-  private findRailViewport(railKey: HomeRailKey): HTMLDivElement | null {
+  private buildFormFromRail(rail: HomeRailConfig): HomeRailFormDraft {
+    return {
+      title: rail.title,
+      subtitle: rail.subtitle ?? '',
+      enabled: rail.enabled,
+      sort: rail.config.sort,
+      direction: rail.config.direction,
+      favorites: rail.config.favorites ?? 'NONE',
+      tagMode: rail.config.tagMode ?? HomePageComponent.DEFAULT_TAG_MODE,
+      limit: rail.config.limit,
+      selectedTags: rail.config.tagIds.map((id, index) => ({
+        id,
+        name: rail.config.tagNames[index] ?? id,
+        description: null,
+        aliases: [],
+      })),
+      selectedStudios: rail.config.studioIds.map((id, index) => ({
+        id,
+        label: rail.config.studioNames[index] ?? id,
+      })),
+    };
+  }
+
+  private createEmptyRailForm(): HomeRailFormDraft {
+    return {
+      title: '',
+      subtitle: '',
+      enabled: true,
+      sort: HomePageComponent.DEFAULT_SORT,
+      direction: HomePageComponent.DEFAULT_DIRECTION,
+      favorites: 'NONE',
+      tagMode: HomePageComponent.DEFAULT_TAG_MODE,
+      limit: HomePageComponent.DEFAULT_LIMIT,
+      selectedTags: [],
+      selectedStudios: [],
+    };
+  }
+
+  private buildRailPayload(form: HomeRailFormDraft): SaveHomeRailPayload {
+    return {
+      title: form.title.trim(),
+      subtitle: form.subtitle.trim() || null,
+      enabled: form.enabled,
+      config: {
+        sort: form.sort,
+        direction: form.direction,
+        favorites: form.favorites === 'NONE' ? null : form.favorites,
+        tagIds: form.selectedTags.map((tag) => tag.id),
+        tagNames: form.selectedTags.map((tag) => tag.name),
+        tagMode:
+          form.selectedTags.length > 0 ? form.tagMode : null,
+        studioIds: form.selectedStudios.map((studio) => studio.id),
+        studioNames: form.selectedStudios.map((studio) => studio.label),
+        limit: Math.min(
+          Math.max(Math.round(Number(form.limit) || HomePageComponent.DEFAULT_LIMIT), HomePageComponent.LIMIT_MIN),
+          HomePageComponent.LIMIT_MAX,
+        ),
+      },
+    };
+  }
+
+  private setupTagSearch(): void {
+    this.tagSearchSubscription = this.tagSearchTerms
+      .pipe(
+        map((value) => value.trim()),
+        debounceTime(HomePageComponent.SEARCH_DEBOUNCE_MS),
+        distinctUntilChanged(),
+        switchMap((query) => {
+          if (!query) {
+            this.tagOptions.set([]);
+            this.tagSearchError.set(null);
+            this.rebuildRailFormTagSelectOptions([]);
+            return of<SceneTagOption[]>([]);
+          }
+
+          this.tagSearchLoading.set(true);
+          this.tagSearchError.set(null);
+
+          return this.discoverService.searchSceneTags(query).pipe(
+            catchError(() => {
+              this.tagSearchError.set('Failed to load tag options.');
+              return of<SceneTagOption[]>([]);
+            }),
+            finalize(() => {
+              this.tagSearchLoading.set(false);
+            }),
+          );
+        }),
+      )
+      .subscribe((options) => {
+        this.tagOptions.set(options);
+        this.rebuildRailFormTagSelectOptions(options);
+      });
+  }
+
+  private setupStudioSearch(): void {
+    this.studioSearchSubscription = this.studioSearchTerms
+      .pipe(
+        map((value) => value.trim()),
+        debounceTime(HomePageComponent.SEARCH_DEBOUNCE_MS),
+        distinctUntilChanged(),
+        switchMap((query) => {
+          if (!query) {
+            this.studioOptions.set([]);
+            this.studioSearchError.set(null);
+            this.rebuildRailFormStudioSelectOptions([]);
+            return of<PerformerStudioOption[]>([]);
+          }
+
+          this.studioSearchLoading.set(true);
+          this.studioSearchError.set(null);
+
+          return this.discoverService.searchPerformerStudios(query).pipe(
+            catchError(() => {
+              this.studioSearchError.set('Failed to load studio options.');
+              return of<PerformerStudioOption[]>([]);
+            }),
+            finalize(() => {
+              this.studioSearchLoading.set(false);
+            }),
+          );
+        }),
+      )
+      .subscribe((options) => {
+        this.studioOptions.set(options);
+        this.rebuildRailFormStudioSelectOptions(options);
+      });
+  }
+
+  private rebuildRailFormTagSelectOptions(searchResults: SceneTagOption[]): void {
+    const merged = new Map<string, MultiSelectOption>();
+
+    for (const selected of this.railForm()?.selectedTags ?? []) {
+      merged.set(selected.id, {
+        label: selected.name,
+        value: selected.id,
+      });
+    }
+
+    for (const tag of searchResults) {
+      merged.set(tag.id, {
+        label: tag.name,
+        value: tag.id,
+      });
+    }
+
+    this.tagSelectOptions.set([...merged.values()]);
+  }
+
+  private rebuildRailFormStudioSelectOptions(options: PerformerStudioOption[]): void {
+    const selectedLabels = new Map(
+      (this.railForm()?.selectedStudios ?? []).map((studio) => [studio.id, studio.label]),
+    );
+    const grouped = options.map((network) => {
+      const groupItems: MultiSelectOption[] = [
+        {
+          label: `${network.name} (Network)`,
+          value: network.id,
+        },
+        ...network.childStudios.map((child) => ({
+          label: child.name,
+          value: child.id,
+        })),
+      ];
+
+      return {
+        label: network.name,
+        items: groupItems,
+      } satisfies MultiSelectGroup;
+    });
+
+    const seen = new Set(grouped.flatMap((group) => group.items.map((item) => item.value)));
+    const selectedOnlyItems = (this.railForm()?.selectedStudios ?? [])
+      .filter((studio) => !seen.has(studio.id))
+      .map((studio) => ({
+        label: studio.label,
+        value: studio.id,
+      }));
+
+    if (selectedOnlyItems.length > 0) {
+      grouped.unshift({
+        label: 'Selected',
+        items: selectedOnlyItems,
+      });
+    }
+
+    this.studioSelectOptions.set(grouped);
+  }
+
+  private studioLabelMap(): Map<string, string> {
+    const labels = new Map<string, string>();
+
+    for (const option of this.studioOptions()) {
+      labels.set(option.id, option.name);
+      for (const child of option.childStudios) {
+        labels.set(child.id, child.name);
+      }
+    }
+
+    return labels;
+  }
+
+  private dedupeStrings(values: string[]): string[] {
+    const deduped = new Set<string>();
+    for (const value of values) {
+      deduped.add(value);
+    }
+    return [...deduped];
+  }
+
+  private findRailViewport(railId: string): HTMLDivElement | null {
     return (
       this.railViewports?.find(
-        (elementRef) => elementRef.nativeElement.dataset['railKey'] === railKey,
+        (elementRef) => elementRef.nativeElement.dataset['railId'] === railId,
       )?.nativeElement ?? null
     );
   }

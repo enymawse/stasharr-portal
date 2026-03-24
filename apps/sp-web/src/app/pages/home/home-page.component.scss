@@ -191,6 +191,18 @@ p {
   color: var(--danger);
 }
 
+.editor-note,
+.toolbar-hint {
+  color: color-mix(in srgb, var(--text-primary) 74%, #93b4d0);
+}
+
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
 .editor-list {
   display: grid;
   gap: 0.65rem;
@@ -212,8 +224,36 @@ p {
   gap: 0.2rem;
 }
 
+.editor-item-headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .editor-item-copy p {
   color: color-mix(in srgb, var(--text-primary) 74%, #93b4d0);
+}
+
+.editor-summary-line,
+.rail-summary-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  color: color-mix(in srgb, var(--text-primary) 70%, #8faeca);
+  font-size: 0.82rem;
+}
+
+.rail-kind-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
+  background: rgb(255 255 255 / 7%);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .mini-button {
@@ -225,10 +265,85 @@ p {
   cursor: pointer;
 }
 
+.mini-button.danger {
+  border-color: color-mix(in srgb, var(--danger) 72%, transparent);
+  color: color-mix(in srgb, var(--danger) 88%, white);
+}
+
 .mini-button:disabled,
 .state-button:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+.rail-form-shell {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.35rem;
+  padding: 1rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 76%, transparent);
+  background:
+    linear-gradient(135deg, rgb(9 17 27 / 82%), rgb(11 22 34 / 62%)),
+    radial-gradient(circle at top right, rgb(77 160 223 / 18%), transparent 38%);
+}
+
+.rail-form-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 0.8rem;
+}
+
+.rail-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.rail-form-pickers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.control-field {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.control-field > span {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9bc5e7;
+}
+
+.control-field input {
+  width: 100%;
+  min-width: 0;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 76%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 88%, #0f1c2a);
+  color: var(--text-primary);
+  padding: 0.72rem 0.8rem;
+}
+
+.control-field :is(p-select, p-multiselect) {
+  width: 100%;
+}
+
+.checkbox-field {
+  align-content: start;
+}
+
+.toggle-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary);
 }
 
 .rail-stack {
@@ -256,6 +371,10 @@ p {
 
 .rail-copy h2 {
   font-size: clamp(1.2rem, 2.2vw, 1.9rem);
+}
+
+.rail-summary-line {
+  margin-top: 0.2rem;
 }
 
 .scroll-button {
@@ -488,10 +607,16 @@ p {
   }
 
   .editor-head,
+  .rail-form-head,
   .editor-item,
   .editor-item-controls {
     flex-direction: column;
     align-items: start;
+  }
+
+  .rail-form-grid,
+  .rail-form-pickers {
+    grid-template-columns: 1fr;
   }
 
   .rail-head {

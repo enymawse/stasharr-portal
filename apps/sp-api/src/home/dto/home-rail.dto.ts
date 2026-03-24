@@ -1,18 +1,66 @@
+import {
+  SCENE_FAVORITES_FILTER_VALUES,
+  SCENE_FEED_SORT_VALUES,
+  SCENE_TAG_MATCH_MODE_VALUES,
+  SORT_DIRECTION_VALUES,
+  type SceneFavoritesFilter,
+  type SceneFeedSort,
+  type SceneTagMatchMode,
+  type SortDirection,
+} from '../../scenes/dto/scenes-query.dto';
+
 export const HOME_RAIL_KEY_VALUES = [
   'FAVORITE_STUDIOS',
   'FAVORITE_PERFORMERS',
 ] as const;
-
 export type HomeRailKey = (typeof HOME_RAIL_KEY_VALUES)[number];
 
-export const HOME_RAIL_FAVORITES_VALUES = ['STUDIO', 'PERFORMER'] as const;
-export type HomeRailFavorites = (typeof HOME_RAIL_FAVORITES_VALUES)[number];
+export const HOME_RAIL_KIND_VALUES = ['BUILTIN', 'CUSTOM'] as const;
+export type HomeRailKind = (typeof HOME_RAIL_KIND_VALUES)[number];
+
+export const HOME_RAIL_SOURCE_VALUES = ['STASHDB'] as const;
+export type HomeRailSource = (typeof HOME_RAIL_SOURCE_VALUES)[number];
+
+export const HOME_RAIL_CONTENT_TYPE_VALUES = ['SCENES'] as const;
+export type HomeRailContentType = (typeof HOME_RAIL_CONTENT_TYPE_VALUES)[number];
+
+export const HOME_RAIL_SCENE_LIMIT_MIN = 6;
+export const HOME_RAIL_SCENE_LIMIT_MAX = 30;
+export const HOME_RAIL_SCENE_LIMIT_DEFAULT = 16;
+
+export const HOME_RAIL_SCENE_SORT_VALUES = SCENE_FEED_SORT_VALUES;
+export const HOME_RAIL_DIRECTION_VALUES = SORT_DIRECTION_VALUES;
+export const HOME_RAIL_FAVORITES_VALUES = SCENE_FAVORITES_FILTER_VALUES;
+export const HOME_RAIL_TAG_MODE_VALUES = SCENE_TAG_MATCH_MODE_VALUES;
+
+export type HomeRailSceneSort = SceneFeedSort;
+export type HomeRailDirection = SortDirection;
+export type HomeRailFavorites = SceneFavoritesFilter;
+export type HomeRailTagMode = SceneTagMatchMode;
+
+export class HomeRailSceneConfigDto {
+  sort!: HomeRailSceneSort;
+  direction!: HomeRailDirection;
+  favorites!: HomeRailFavorites | null;
+  tagIds!: string[];
+  tagNames!: string[];
+  tagMode!: HomeRailTagMode | null;
+  studioIds!: string[];
+  studioNames!: string[];
+  limit!: number;
+}
 
 export class HomeRailDto {
-  key!: HomeRailKey;
+  id!: string;
+  key!: HomeRailKey | null;
+  kind!: HomeRailKind;
+  source!: HomeRailSource;
+  contentType!: HomeRailContentType;
   title!: string;
-  subtitle!: string;
+  subtitle!: string | null;
   enabled!: boolean;
   sortOrder!: number;
-  favorites!: HomeRailFavorites;
+  editable!: boolean;
+  deletable!: boolean;
+  config!: HomeRailSceneConfigDto;
 }
