@@ -6,6 +6,7 @@ import {
   HomeRailSource,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { StashAdapter } from '../providers/stash/stash.adapter';
 import { HomeService } from './home.service';
 
 const now = new Date('2026-03-24T00:00:00.000Z');
@@ -47,6 +48,8 @@ describe('HomeService', () => {
   const createMock = jest.fn();
   const findUniqueMock = jest.fn();
   const deleteMock = jest.fn();
+  const integrationFindUniqueMock = jest.fn();
+  const stashGetLocalSceneFeedMock = jest.fn();
 
   const prismaService = {
     homeRail: {
@@ -58,8 +61,15 @@ describe('HomeService', () => {
       findUnique: findUniqueMock,
       delete: deleteMock,
     },
+    integrationConfig: {
+      findUnique: integrationFindUniqueMock,
+    },
     $transaction: transactionMock,
   } as unknown as PrismaService;
+
+  const stashAdapter = {
+    getLocalSceneFeed: stashGetLocalSceneFeedMock,
+  } as unknown as StashAdapter;
 
   let service: HomeService;
 
@@ -68,7 +78,7 @@ describe('HomeService', () => {
     transactionMock.mockImplementation((operations: Array<Promise<unknown>>) =>
       Promise.all(operations),
     );
-    service = new HomeService(prismaService);
+    service = new HomeService(prismaService, stashAdapter);
   });
 
   it('bootstraps built-in rails and returns them in sort order', async () => {
@@ -91,15 +101,36 @@ describe('HomeService', () => {
         sortOrder: 1,
         config: null,
       }),
+      buildRail({
+        id: 'built-in-3',
+        key: HomeRailKey.RECENTLY_ADDED_LIBRARY,
+        kind: HomeRailKind.BUILTIN,
+        title: 'Recently Added to Library',
+        subtitle: 'Library subtitle',
+        sortOrder: 2,
+        source: HomeRailSource.STASH,
+        config: {
+          sort: 'CREATED_AT',
+          direction: 'DESC',
+          favorites: null,
+          tagIds: [],
+          tagNames: [],
+          tagMode: null,
+          studioIds: [],
+          studioNames: [],
+          limit: 16,
+        },
+      }),
     ]);
 
     const result = await service.getRails();
 
-    expect(upsertMock).toHaveBeenCalledTimes(2);
+    expect(upsertMock).toHaveBeenCalledTimes(3);
     expect(findManyMock).toHaveBeenCalledWith({ orderBy: { sortOrder: 'asc' } });
     expect(result.map((rail) => rail.key)).toEqual([
       'FAVORITE_STUDIOS',
       'FAVORITE_PERFORMERS',
+      'RECENTLY_ADDED_LIBRARY',
     ]);
     expect(result[0]).toMatchObject({
       kind: 'BUILTIN',
@@ -108,17 +139,21 @@ describe('HomeService', () => {
       config: { favorites: 'STUDIO', limit: 16 },
     });
     expect(result[1]?.config.favorites).toBe('PERFORMER');
+    expect(result[2]).toMatchObject({
+      source: 'STASH',
+      config: { sort: 'CREATED_AT', direction: 'DESC' },
+    });
   });
 
   it('creates a custom StashDB scenes rail', async () => {
     upsertMock.mockResolvedValue({});
-    findFirstMock.mockResolvedValue(buildRail({ id: 'built-in-2', sortOrder: 1 }));
+    findFirstMock.mockResolvedValue(buildRail({ id: 'built-in-3', sortOrder: 2 }));
     createMock.mockResolvedValue(
       buildRail({
         id: 'custom-1',
         title: 'Weekend Queue',
         subtitle: null,
-        sortOrder: 2,
+        sortOrder: 3,
         config: {
           sort: 'TRENDING',
           direction: 'ASC',
@@ -158,7 +193,7 @@ describe('HomeService', () => {
         contentType: 'SCENES',
         title: 'Weekend Queue',
         subtitle: null,
-        sortOrder: 2,
+        sortOrder: 3,
         config: {
           sort: 'TRENDING',
           direction: 'ASC',
@@ -260,6 +295,13 @@ describe('HomeService', () => {
         kind: HomeRailKind.BUILTIN,
         sortOrder: 2,
       }),
+      buildRail({
+        id: 'built-in-3',
+        key: HomeRailKey.RECENTLY_ADDED_LIBRARY,
+        kind: HomeRailKind.BUILTIN,
+        sortOrder: 3,
+        source: HomeRailSource.STASH,
+      }),
     ]);
     updateMock.mockResolvedValue({});
 
@@ -326,6 +368,13 @@ describe('HomeService', () => {
         kind: HomeRailKind.BUILTIN,
         sortOrder: 2,
       }),
+      buildRail({
+        id: 'built-in-3',
+        key: HomeRailKey.RECENTLY_ADDED_LIBRARY,
+        kind: HomeRailKind.BUILTIN,
+        sortOrder: 3,
+        source: HomeRailSource.STASH,
+      }),
     ];
     upsertMock.mockResolvedValue({});
     updateMock.mockResolvedValue({});
@@ -335,6 +384,7 @@ describe('HomeService', () => {
         rails[2],
         { ...rails[0], enabled: false, sortOrder: 1 },
         { ...rails[1], enabled: true, sortOrder: 2 },
+        { ...rails[3], enabled: true, sortOrder: 3, source: HomeRailSource.STASH },
       ]);
 
     const result = await service.updateRails({
@@ -342,6 +392,7 @@ describe('HomeService', () => {
         { id: 'built-in-2', enabled: true },
         { id: 'built-in-1', enabled: false },
         { id: 'custom-1', enabled: true },
+        { id: 'built-in-3', enabled: true },
       ],
     });
 
@@ -358,11 +409,11 @@ describe('HomeService', () => {
       where: { id: 'custom-1' },
       data: { enabled: true, sortOrder: 2 },
     });
-    expect(result.map((rail) => rail.id)).toEqual([
-      'built-in-2',
-      'built-in-1',
-      'custom-1',
-    ]);
+    expect(updateMock).toHaveBeenNthCalledWith(4, {
+      where: { id: 'built-in-3' },
+      data: { enabled: true, sortOrder: 3 },
+    });
+    expect(result.map((rail) => rail.id)).toEqual(['built-in-2', 'built-in-1', 'custom-1', 'built-in-3']);
   });
 
   it('rejects duplicate ids in the reorder payload', async () => {
@@ -370,6 +421,12 @@ describe('HomeService', () => {
     findManyMock.mockResolvedValue([
       buildRail({ id: 'built-in-1', key: HomeRailKey.FAVORITE_STUDIOS, kind: HomeRailKind.BUILTIN }),
       buildRail({ id: 'built-in-2', key: HomeRailKey.FAVORITE_PERFORMERS, kind: HomeRailKind.BUILTIN }),
+      buildRail({
+        id: 'built-in-3',
+        key: HomeRailKey.RECENTLY_ADDED_LIBRARY,
+        kind: HomeRailKind.BUILTIN,
+        source: HomeRailSource.STASH,
+      }),
     ]);
 
     await expect(
@@ -380,5 +437,103 @@ describe('HomeService', () => {
         ],
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('returns stash-backed rail items for the recently added library built-in', async () => {
+    upsertMock.mockResolvedValue({});
+    findUniqueMock.mockResolvedValue(
+      buildRail({
+        id: 'built-in-3',
+        key: HomeRailKey.RECENTLY_ADDED_LIBRARY,
+        kind: HomeRailKind.BUILTIN,
+        source: HomeRailSource.STASH,
+        title: 'Recently Added to Library',
+        config: {
+          sort: 'CREATED_AT',
+          direction: 'DESC',
+          favorites: null,
+          tagIds: [],
+          tagNames: [],
+          tagMode: null,
+          studioIds: [],
+          studioNames: [],
+          limit: 12,
+        },
+      }),
+    );
+    integrationFindUniqueMock.mockResolvedValue({
+      type: 'STASH',
+      enabled: true,
+      status: 'CONFIGURED',
+      baseUrl: 'http://stash.local',
+      apiKey: 'secret',
+    });
+    stashGetLocalSceneFeedMock.mockResolvedValue({
+      total: 1,
+      items: [
+        {
+          id: '411',
+          title: 'Fresh Library Scene',
+          description: null,
+          imageUrl: 'http://stash.local/images/411.jpg',
+          cardImageUrl: 'http://stash.local/images/411.jpg',
+          studioId: 'studio-1',
+          studio: 'Archive',
+          studioImageUrl: null,
+          releaseDate: '2026-03-24',
+          duration: 1800,
+          viewUrl: 'http://stash.local/scenes/411',
+        },
+      ],
+    });
+
+    const result = await service.getRailContent('built-in-3');
+
+    expect(integrationFindUniqueMock).toHaveBeenCalledWith({
+      where: { type: 'STASH' },
+    });
+    expect(stashGetLocalSceneFeedMock).toHaveBeenCalledWith(
+      {
+        baseUrl: 'http://stash.local',
+        apiKey: 'secret',
+      },
+      {
+        page: 1,
+        perPage: 12,
+        sort: 'CREATED_AT',
+        direction: 'DESC',
+      },
+    );
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({
+          id: '411',
+          source: 'STASH',
+          requestable: false,
+          viewUrl: 'http://stash.local/scenes/411',
+          status: { state: 'AVAILABLE' },
+        }),
+      ],
+      message: null,
+    });
+  });
+
+  it('returns a helpful message when stash is not configured for the built-in rail', async () => {
+    upsertMock.mockResolvedValue({});
+    findUniqueMock.mockResolvedValue(
+      buildRail({
+        id: 'built-in-3',
+        key: HomeRailKey.RECENTLY_ADDED_LIBRARY,
+        kind: HomeRailKind.BUILTIN,
+        source: HomeRailSource.STASH,
+      }),
+    );
+    integrationFindUniqueMock.mockResolvedValue(null);
+
+    await expect(service.getRailContent('built-in-3')).resolves.toEqual({
+      items: [],
+      message: 'Configure and enable your Stash integration to populate this rail.',
+    });
+    expect(stashGetLocalSceneFeedMock).not.toHaveBeenCalled();
   });
 });

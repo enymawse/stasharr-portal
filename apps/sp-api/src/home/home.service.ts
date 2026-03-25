@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -12,6 +13,10 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  StashAdapter,
+  type StashLocalSceneFeedItem,
+} from '../providers/stash/stash.adapter';
 import {
   HOME_RAIL_CONTENT_TYPE_VALUES,
   HOME_RAIL_DIRECTION_VALUES,
@@ -28,6 +33,7 @@ import {
 } from './dto/home-rail.dto';
 import { UpdateHomeRailsDto } from './dto/update-home-rails.dto';
 import { CreateHomeRailDto, UpdateHomeRailDto } from './dto/create-home-rail.dto';
+import { HomeRailContentDto, HomeRailItemDto } from './dto/home-rail-content.dto';
 
 const DEFAULT_HOME_RAILS: Array<{
   key: HomeRailKey;
@@ -79,11 +85,36 @@ const DEFAULT_HOME_RAILS: Array<{
       limit: HOME_RAIL_SCENE_LIMIT_DEFAULT,
     },
   },
+  {
+    key: HomeRailKey.RECENTLY_ADDED_LIBRARY,
+    title: 'Recently Added to Library',
+    subtitle: 'Fresh local-library scenes pulled from your configured Stash instance.',
+    enabled: true,
+    sortOrder: 2,
+    source: HomeRailSource.STASH,
+    contentType: HomeRailContentType.SCENES,
+    config: {
+      sort: 'CREATED_AT',
+      direction: 'DESC',
+      favorites: null,
+      tagIds: [],
+      tagNames: [],
+      tagMode: null,
+      studioIds: [],
+      studioNames: [],
+      limit: HOME_RAIL_SCENE_LIMIT_DEFAULT,
+    },
+  },
 ];
 
 @Injectable()
 export class HomeService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(HomeService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly stashAdapter: StashAdapter,
+  ) {}
 
   async getRails(): Promise<HomeRailDto[]> {
     await this.ensureDefaultRails();
@@ -158,6 +189,26 @@ export class HomeService {
     await this.reindexSortOrders();
   }
 
+  async getRailContent(id: string): Promise<HomeRailContentDto> {
+    await this.ensureDefaultRails();
+    const rail = await this.prisma.homeRail.findUnique({ where: { id } });
+    if (!rail) {
+      throw new NotFoundException('Home rail not found.');
+    }
+
+    if (rail.contentType !== HomeRailContentType.SCENES) {
+      throw new BadRequestException('Unsupported Home rail content type.');
+    }
+
+    if (rail.source !== HomeRailSource.STASH) {
+      throw new BadRequestException(
+        'This Home rail is loaded through the scenes feed endpoint instead.',
+      );
+    }
+
+    return this.getStashRailContent(rail);
+  }
+
   private async ensureDefaultRails(): Promise<void> {
     for (const rail of DEFAULT_HOME_RAILS) {
       await this.prisma.homeRail.upsert({
@@ -182,6 +233,64 @@ export class HomeService {
           config: rail.config as unknown as Prisma.InputJsonValue,
         },
       });
+    }
+  }
+
+  private async getStashRailContent(rail: HomeRail): Promise<HomeRailContentDto> {
+    if (rail.key !== HomeRailKey.RECENTLY_ADDED_LIBRARY) {
+      return {
+        items: [],
+        message: 'This Stash-backed Home rail is not supported yet.',
+      };
+    }
+
+    const integration = await this.prisma.integrationConfig.findUnique({
+      where: { type: 'STASH' },
+    });
+    const baseUrl = integration?.baseUrl?.trim();
+    if (
+      !integration ||
+      !integration.enabled ||
+      integration.status !== 'CONFIGURED' ||
+      !baseUrl
+    ) {
+      return {
+        items: [],
+        message: 'Configure and enable your Stash integration to populate this rail.',
+      };
+    }
+
+    const config = this.normalizeSceneRailConfig(
+      rail.config,
+      DEFAULT_HOME_RAILS.find((defaultRail) => defaultRail.key === rail.key)?.config ?? null,
+    );
+
+    try {
+      const feed = await this.stashAdapter.getLocalSceneFeed(
+        {
+          baseUrl,
+          apiKey: integration.apiKey,
+        },
+        {
+          page: 1,
+          perPage: config.limit,
+          sort: this.toStashFeedSort(config.sort),
+          direction: config.direction,
+        },
+      );
+
+      return {
+        items: feed.items.map((item) => this.toStashRailItem(item)),
+        message: null,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Failed to load Stash Home rail ${rail.id}. ${(error as Error)?.message ?? 'Unknown error.'}`,
+      );
+      return {
+        items: [],
+        message: 'Unable to load scenes from your Stash library right now.',
+      };
     }
   }
 
@@ -257,6 +366,39 @@ export class HomeService {
       deletable: rail.kind === HomeRailKind.CUSTOM,
       config: this.normalizeSceneRailConfig(rail.config, defaults?.config ?? null),
     };
+  }
+
+  private toStashRailItem(item: StashLocalSceneFeedItem): HomeRailItemDto {
+    return {
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      imageUrl: item.imageUrl,
+      cardImageUrl: item.cardImageUrl,
+      studioId: item.studioId,
+      studio: item.studio,
+      studioImageUrl: item.studioImageUrl,
+      releaseDate: item.releaseDate,
+      duration: item.duration,
+      type: 'SCENE',
+      source: 'STASH',
+      status: { state: 'AVAILABLE' },
+      requestable: false,
+      viewUrl: item.viewUrl,
+    };
+  }
+
+  private toStashFeedSort(sort: HomeRailSceneConfigDto['sort']): 'CREATED_AT' | 'UPDATED_AT' | 'TITLE' {
+    switch (sort) {
+      case 'TITLE':
+        return 'TITLE';
+      case 'UPDATED_AT':
+        return 'UPDATED_AT';
+      case 'CREATED_AT':
+        return 'CREATED_AT';
+      default:
+        return 'CREATED_AT';
+    }
   }
 
   private normalizeSceneRailConfig(

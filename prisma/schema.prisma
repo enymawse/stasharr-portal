@@ -41,6 +41,7 @@ enum RequestStatus {
 enum HomeRailKey {
   FAVORITE_STUDIOS
   FAVORITE_PERFORMERS
+  RECENTLY_ADDED_LIBRARY
 }
 
 enum HomeRailKind {
@@ -50,6 +51,7 @@ enum HomeRailKind {
 
 enum HomeRailSource {
   STASHDB
+  STASH
 }
 
 enum HomeRailContentType {

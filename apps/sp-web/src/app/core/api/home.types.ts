@@ -1,4 +1,5 @@
 import {
+  SceneStatus,
   SceneFavoritesFilter,
   SceneFeedSort,
   SceneTagMatchMode,
@@ -6,9 +7,12 @@ import {
   SortDirection,
 } from './discover.types';
 
-export type HomeRailKey = 'FAVORITE_STUDIOS' | 'FAVORITE_PERFORMERS';
+export type HomeRailKey =
+  | 'FAVORITE_STUDIOS'
+  | 'FAVORITE_PERFORMERS'
+  | 'RECENTLY_ADDED_LIBRARY';
 export type HomeRailKind = 'BUILTIN' | 'CUSTOM';
-export type HomeRailSource = 'STASHDB';
+export type HomeRailSource = 'STASHDB' | 'STASH';
 export type HomeRailContentType = 'SCENES';
 
 export interface HomeSceneRailConfig {
@@ -36,6 +40,29 @@ export interface HomeRailConfig {
   editable: boolean;
   deletable: boolean;
   config: HomeSceneRailConfig;
+}
+
+export interface HomeRailItem {
+  id: string;
+  title: string;
+  description: string | null;
+  imageUrl: string | null;
+  cardImageUrl: string | null;
+  studioId: string | null;
+  studio: string | null;
+  studioImageUrl: string | null;
+  releaseDate: string | null;
+  duration: number | null;
+  type: 'SCENE';
+  source: HomeRailSource;
+  status: SceneStatus;
+  requestable: boolean;
+  viewUrl: string | null;
+}
+
+export interface HomeRailContentResponse {
+  items: HomeRailItem[];
+  message: string | null;
 }
 
 export interface UpdateHomeRailsPayload {

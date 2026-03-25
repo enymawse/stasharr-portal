@@ -27,7 +27,6 @@ import {
 } from 'rxjs';
 import { DiscoverService } from '../../core/api/discover.service';
 import {
-  DiscoverItem,
   PerformerStudioOption,
   SceneFavoritesFilter,
   SceneFeedSort,
@@ -38,8 +37,10 @@ import {
 } from '../../core/api/discover.types';
 import { HomeService } from '../../core/api/home.service';
 import {
+  HomeRailContentResponse,
   HomeRailConfig,
   HomeRailFormDraft,
+  HomeRailItem,
   HomeRailViewSummary,
   SaveHomeRailPayload,
 } from '../../core/api/home.types';
@@ -47,20 +48,20 @@ import { SceneRequestModalComponent } from '../../shared/scene-request-modal/sce
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
 interface HomeRailView extends HomeRailConfig {
-  items: DiscoverItem[];
+  items: HomeRailItem[];
   error: string | null;
-  seeAllQueryParams: Record<string, string>;
+  seeAllQueryParams: Record<string, string> | null;
   summary: HomeRailViewSummary;
 }
 
 interface RailLoadResult {
   id: string;
-  items: DiscoverItem[];
+  items: HomeRailItem[];
   error: string | null;
 }
 
 interface RailContentState {
-  itemsById: Record<string, DiscoverItem[]>;
+  itemsById: Record<string, HomeRailItem[]>;
   errorsById: Record<string, string>;
 }
 
@@ -175,7 +176,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
   protected readonly studioSelectOptions = signal<MultiSelectGroup[]>([]);
   protected readonly formStudioSelectedIdsModel = signal<string[]>([]);
 
-  protected readonly railItemsById = signal<Record<string, DiscoverItem[]>>({});
+  protected readonly railItemsById = signal<Record<string, HomeRailItem[]>>({});
   protected readonly railErrorsById = signal<Record<string, string>>({});
   protected readonly requestModalOpen = signal(false);
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
@@ -239,7 +240,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
         ...rail,
         items: this.railItemsById()[rail.id] ?? [],
         error: this.railErrorsById()[rail.id] ?? null,
-        seeAllQueryParams: this.buildSeeAllQueryParams(rail.config),
+        seeAllQueryParams: this.canSeeAll(rail) ? this.buildSeeAllQueryParams(rail.config) : null,
         summary: this.summarizeRail(rail),
       }));
   }
@@ -608,7 +609,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return 'No matching studios.';
   }
 
-  protected railImageUrl(item: DiscoverItem): string | null {
+  protected railImageUrl(item: HomeRailItem): string | null {
     return item.cardImageUrl ?? item.imageUrl;
   }
 
@@ -616,11 +617,11 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return this.router.url;
   }
 
-  protected isRequestable(item: DiscoverItem): boolean {
-    return item.status.state === 'NOT_REQUESTED';
+  protected isRequestable(item: HomeRailItem): boolean {
+    return item.requestable && item.status.state === 'NOT_REQUESTED';
   }
 
-  protected openRequestModal(item: DiscoverItem): void {
+  protected openRequestModal(item: HomeRailItem): void {
     if (!this.isRequestable(item)) {
       return;
     }
@@ -639,7 +640,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
 
   protected onRequestSubmitted(stashId: string): void {
     this.railItemsById.update((current) => {
-      const next: Record<string, DiscoverItem[]> = { ...current };
+      const next: Record<string, HomeRailItem[]> = { ...current };
       for (const [railId, items] of Object.entries(current)) {
         next[railId] = items.map((item) =>
           item.id === stashId
@@ -671,6 +672,14 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return rail.kind === 'BUILTIN' ? 'Built-in' : 'Custom';
   }
 
+  protected canSeeAll(rail: HomeRailConfig): boolean {
+    return rail.source === 'STASHDB';
+  }
+
+  protected isInternalSceneRoute(item: HomeRailItem): boolean {
+    return item.source === 'STASHDB';
+  }
+
   private loadRailContent(rails: HomeRailConfig[]) {
     const enabledRails = rails.filter((rail) => rail.enabled);
     if (enabledRails.length === 0) {
@@ -682,25 +691,9 @@ export class HomePageComponent implements OnInit, OnDestroy {
 
     return forkJoin(
       enabledRails.map((rail) =>
-        this.discoverService
-          .getScenesFeed(
-            1,
-            rail.config.limit,
-            rail.config.sort,
-            rail.config.direction,
-            rail.config.tagIds,
-            rail.config.tagIds.length > 0 ? rail.config.tagMode ?? 'OR' : undefined,
-            rail.config.favorites ?? undefined,
-            rail.config.studioIds,
-          )
+        this.loadSingleRail(rail)
           .pipe(
-            map(
-              (response): RailLoadResult => ({
-                id: rail.id,
-                items: response.items,
-                error: null,
-              }),
-            ),
+            map((response): RailLoadResult => response),
             catchError(() =>
               of<RailLoadResult>({
                 id: rail.id,
@@ -712,7 +705,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
       ),
     ).pipe(
       map((results) => {
-        const itemsById: Record<string, DiscoverItem[]> = {};
+        const itemsById: Record<string, HomeRailItem[]> = {};
         const errorsById: Record<string, string> = {};
 
         for (const result of results) {
@@ -732,6 +725,45 @@ export class HomePageComponent implements OnInit, OnDestroy {
 
   private railLoadErrorMessage(rail: HomeRailConfig): string {
     return `Unable to load ${rail.title.toLowerCase()} right now.`;
+  }
+
+  private loadSingleRail(rail: HomeRailConfig) {
+    if (rail.source === 'STASH') {
+      return this.homeService.getRailItems(rail.id).pipe(
+        map(
+          (response: HomeRailContentResponse): RailLoadResult => ({
+            id: rail.id,
+            items: response.items,
+            error: response.message,
+          }),
+        ),
+      );
+    }
+
+    return this.discoverService
+      .getScenesFeed(
+        1,
+        rail.config.limit,
+        rail.config.sort,
+        rail.config.direction,
+        rail.config.tagIds,
+        rail.config.tagIds.length > 0 ? rail.config.tagMode ?? 'OR' : undefined,
+        rail.config.favorites ?? undefined,
+        rail.config.studioIds,
+      )
+      .pipe(
+        map(
+          (response): RailLoadResult => ({
+            id: rail.id,
+            items: response.items.map((item) => ({
+              ...item,
+              requestable: item.status.state === 'NOT_REQUESTED',
+              viewUrl: null,
+            })),
+            error: null,
+          }),
+        ),
+      );
   }
 
   private buildSeeAllQueryParams(config: HomeRailConfig['config']): Record<string, string> {
@@ -757,13 +789,18 @@ export class HomePageComponent implements OnInit, OnDestroy {
   }
 
   private summarizeRail(rail: HomeRailConfig): HomeRailViewSummary {
+    const favoritesLabel =
+      rail.source === 'STASH'
+        ? 'Local Library'
+        : (HomePageComponent.FAVORITES_OPTIONS.find(
+            (option) => option.value === (rail.config.favorites ?? 'NONE'),
+          )?.label ?? 'No Favorites Filter');
+
     return {
       sortLabel:
         HomePageComponent.SORT_OPTIONS.find((option) => option.value === rail.config.sort)?.label ??
         rail.config.sort,
-      favoritesLabel:
-        HomePageComponent.FAVORITES_OPTIONS.find((option) => option.value === (rail.config.favorites ?? 'NONE'))
-          ?.label ?? 'No Favorites Filter',
+      favoritesLabel,
       tagCount: rail.config.tagIds.length,
       studioCount: rail.config.studioIds.length,
       limit: rail.config.limit,

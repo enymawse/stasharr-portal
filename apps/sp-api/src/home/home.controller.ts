@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
 import { CreateHomeRailDto, UpdateHomeRailDto } from './dto/create-home-rail.dto';
+import { HomeRailContentDto } from './dto/home-rail-content.dto';
 import { HomeRailDto } from './dto/home-rail.dto';
 import { UpdateHomeRailsDto } from './dto/update-home-rails.dto';
 import { HomeService } from './home.service';
@@ -11,6 +12,11 @@ export class HomeController {
   @Get('rails')
   getRails(): Promise<HomeRailDto[]> {
     return this.homeService.getRails();
+  }
+
+  @Get('rails/:id/items')
+  getRailContent(@Param('id') id: string): Promise<HomeRailContentDto> {
+    return this.homeService.getRailContent(id);
   }
 
   @Put('rails')

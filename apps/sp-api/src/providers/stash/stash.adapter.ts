@@ -13,17 +13,67 @@ export interface StashSceneMatch {
   label: string;
 }
 
+export const STASH_SCENE_FEED_SORT_VALUES = [
+  'CREATED_AT',
+  'UPDATED_AT',
+  'TITLE',
+] as const;
+export type StashSceneFeedSort = (typeof STASH_SCENE_FEED_SORT_VALUES)[number];
+
+export const STASH_SCENE_FEED_DIRECTION_VALUES = ['ASC', 'DESC'] as const;
+export type StashSceneFeedDirection = (typeof STASH_SCENE_FEED_DIRECTION_VALUES)[number];
+
+export interface StashLocalSceneFeedConfig {
+  page: number;
+  perPage: number;
+  sort: StashSceneFeedSort;
+  direction: StashSceneFeedDirection;
+}
+
+export interface StashLocalSceneFeedItem {
+  id: string;
+  title: string;
+  description: string | null;
+  imageUrl: string | null;
+  cardImageUrl: string | null;
+  studioId: string | null;
+  studio: string | null;
+  studioImageUrl: string | null;
+  releaseDate: string | null;
+  duration: number | null;
+  viewUrl: string;
+}
+
+export interface StashLocalSceneFeed {
+  total: number;
+  items: StashLocalSceneFeedItem[];
+}
+
+interface StashLocalSceneRecord {
+  id?: unknown;
+  title?: unknown;
+  details?: unknown;
+  date?: unknown;
+  paths?: {
+    screenshot?: unknown;
+  } | null;
+  studio?: {
+    id?: unknown;
+    name?: unknown;
+    image_path?: unknown;
+  } | null;
+  files?: Array<{
+    width?: unknown;
+    height?: unknown;
+    duration?: unknown;
+  }>;
+}
+
 interface StashGraphqlResponse {
   data?: {
     findScenes?: {
       count?: unknown;
-      scenes?: Array<{
-        id?: unknown;
-        files?: Array<{
-          width?: unknown;
-          height?: unknown;
-        }>;
-      }>;
+      scenes?: StashLocalSceneRecord[];
     };
   };
   errors?: Array<{ message?: unknown }>;
@@ -106,6 +156,62 @@ export class StashAdapter {
       });
   }
 
+  async getLocalSceneFeed(
+    config: StashAdapterBaseConfig,
+    feedConfig: StashLocalSceneFeedConfig,
+  ): Promise<StashLocalSceneFeed> {
+    const page = this.normalizePositiveInteger(feedConfig.page, 1);
+    const perPage = this.normalizePositiveInteger(feedConfig.perPage, 16);
+    const sort = this.resolveFeedSort(feedConfig.sort);
+    const direction = this.resolveFeedDirection(feedConfig.direction);
+
+    const query = `
+      query FindScenes($filter: FindFilterType) {
+        findScenes(filter: $filter) {
+          count
+          scenes {
+            id
+            title
+            details
+            date
+            paths {
+              screenshot
+            }
+            studio {
+              id
+              name
+              image_path
+            }
+            files {
+              width
+              height
+              duration
+            }
+          }
+        }
+      }
+    `;
+
+    const payload = await this.executeQuery(config, query, {
+      filter: {
+        page,
+        per_page: perPage,
+        sort,
+        direction,
+      },
+    });
+
+    const scenes = payload.data?.findScenes?.scenes ?? [];
+    const total = typeof payload.data?.findScenes?.count === 'number' ? payload.data.findScenes.count : 0;
+
+    return {
+      total,
+      items: scenes
+        .map((scene) => this.toLocalSceneFeedItem(scene, config.baseUrl))
+        .filter((scene): scene is StashLocalSceneFeedItem => scene !== null),
+    };
+  }
+
   private pickBestResolution(
     files: Array<{ width?: unknown; height?: unknown }>,
   ): { width: number | null; height: number | null } {
@@ -144,6 +250,95 @@ export class StashAdapter {
     }
 
     return `Scene #${id}`;
+  }
+
+  private toLocalSceneFeedItem(
+    scene: StashLocalSceneRecord,
+    baseUrl: string,
+  ): StashLocalSceneFeedItem | null {
+    if (typeof scene.id !== 'string' || scene.id.trim().length === 0) {
+      return null;
+    }
+
+    const title = typeof scene.title === 'string' && scene.title.trim().length > 0
+      ? scene.title.trim()
+      : `Scene #${scene.id}`;
+    const description =
+      typeof scene.details === 'string' && scene.details.trim().length > 0
+        ? scene.details.trim()
+        : null;
+    const releaseDate =
+      typeof scene.date === 'string' && scene.date.trim().length > 0
+        ? scene.date.trim()
+        : null;
+    const imageUrl =
+      scene.paths && typeof scene.paths.screenshot === 'string' && scene.paths.screenshot.trim().length > 0
+        ? scene.paths.screenshot.trim()
+        : null;
+    const studioId =
+      scene.studio && typeof scene.studio.id === 'string' && scene.studio.id.trim().length > 0
+        ? scene.studio.id.trim()
+        : null;
+    const studio =
+      scene.studio && typeof scene.studio.name === 'string' && scene.studio.name.trim().length > 0
+        ? scene.studio.name.trim()
+        : null;
+    const studioImageUrl =
+      scene.studio &&
+      typeof scene.studio.image_path === 'string' &&
+      scene.studio.image_path.trim().length > 0
+        ? scene.studio.image_path.trim()
+        : null;
+    const { width, height } = this.pickBestResolution(scene.files ?? []);
+    const duration = this.pickFirstDuration(scene.files ?? []);
+
+    return {
+      id: scene.id,
+      title,
+      description,
+      imageUrl,
+      cardImageUrl: imageUrl,
+      studioId,
+      studio,
+      studioImageUrl,
+      releaseDate,
+      duration,
+      viewUrl: this.resolveSceneViewUrl(baseUrl, scene.id),
+    };
+  }
+
+  private pickFirstDuration(
+    files: Array<{ duration?: unknown }>,
+  ): number | null {
+    for (const file of files) {
+      if (typeof file.duration === 'number' && Number.isFinite(file.duration)) {
+        return file.duration;
+      }
+    }
+
+    return null;
+  }
+
+  private resolveFeedSort(sort: StashSceneFeedSort): string {
+    switch (sort) {
+      case 'CREATED_AT':
+        return 'created_at';
+      case 'UPDATED_AT':
+        return 'updated_at';
+      case 'TITLE':
+        return 'title';
+      default:
+        return 'created_at';
+    }
+  }
+
+  private resolveFeedDirection(direction: StashSceneFeedDirection): string {
+    return direction === 'ASC' ? 'ASC' : 'DESC';
+  }
+
+  private normalizePositiveInteger(value: number, fallback: number): number {
+    const normalized = Math.floor(Number(value));
+    return normalized > 0 ? normalized : fallback;
   }
 
   private async executeQuery(

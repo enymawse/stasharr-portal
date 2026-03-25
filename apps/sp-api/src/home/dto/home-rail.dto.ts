@@ -12,13 +12,14 @@ import {
 export const HOME_RAIL_KEY_VALUES = [
   'FAVORITE_STUDIOS',
   'FAVORITE_PERFORMERS',
+  'RECENTLY_ADDED_LIBRARY',
 ] as const;
 export type HomeRailKey = (typeof HOME_RAIL_KEY_VALUES)[number];
 
 export const HOME_RAIL_KIND_VALUES = ['BUILTIN', 'CUSTOM'] as const;
 export type HomeRailKind = (typeof HOME_RAIL_KIND_VALUES)[number];
 
-export const HOME_RAIL_SOURCE_VALUES = ['STASHDB'] as const;
+export const HOME_RAIL_SOURCE_VALUES = ['STASHDB', 'STASH'] as const;
 export type HomeRailSource = (typeof HOME_RAIL_SOURCE_VALUES)[number];
 
 export const HOME_RAIL_CONTENT_TYPE_VALUES = ['SCENES'] as const;

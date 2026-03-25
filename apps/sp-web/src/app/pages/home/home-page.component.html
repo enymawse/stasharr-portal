@@ -5,9 +5,9 @@
         <p class="eyebrow">Home</p>
         <h1>Your rails, now driven by saved scene filters.</h1>
         <p class="lede">
-          Keep the built-in favorites rails, add as many custom StashDB scene rails as you
-          want, and shape Home into a personal browsing screen instead of a fixed landing
-          page.
+          Keep the built-in favorites rails, mix in your local library, add custom StashDB
+          scene rails, and shape Home into a personal browsing screen instead of a fixed
+          landing page.
         </p>
         <div class="hero-actions">
           <button type="button" class="hero-link secondary" (click)="openEditor()">
@@ -74,9 +74,9 @@
         </div>
 
         <p class="editor-note">
-          Built-in rails stay fixed to their favorite-based query. Custom rails save their
-          filter definition immediately when you create or edit them. Enable/disable and
-          ordering changes are staged until you save this editor.
+          Built-in rails stay fixed to their saved favorites or library query. Custom rails
+          save their filter definition immediately when you create or edit them.
+          Enable/disable and ordering changes are staged until you save this editor.
         </p>
 
         @if (saveError(); as saveError) {
@@ -435,13 +435,15 @@
 
                 <div class="rail-actions">
                   @if (rail.items.length > 0) {
-                    <a
-                      class="see-all-link"
-                      [routerLink]="['/scenes']"
-                      [queryParams]="rail.seeAllQueryParams"
-                    >
-                      See all
-                    </a>
+                    @if (rail.seeAllQueryParams) {
+                      <a
+                        class="see-all-link"
+                        [routerLink]="['/scenes']"
+                        [queryParams]="rail.seeAllQueryParams"
+                      >
+                        See all
+                      </a>
+                    }
                     <button
                       type="button"
                       class="scroll-button"
@@ -468,12 +470,22 @@
                     @for (item of rail.items; track item.id) {
                       <article class="rail-card">
                         <div class="media">
-                          <a
-                            class="media-link-stretch"
-                            [routerLink]="['/scene', item.id]"
-                            [queryParams]="{ returnTo: currentRouteUrl() }"
-                            [attr.aria-label]="item.title"
-                          ></a>
+                          @if (isInternalSceneRoute(item)) {
+                            <a
+                              class="media-link-stretch"
+                              [routerLink]="['/scene', item.id]"
+                              [queryParams]="{ returnTo: currentRouteUrl() }"
+                              [attr.aria-label]="item.title"
+                            ></a>
+                          } @else {
+                            <a
+                              class="media-link-stretch"
+                              [href]="item.viewUrl"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              [attr.aria-label]="item.title"
+                            ></a>
+                          }
 
                           @if (railImageUrl(item); as imageUrl) {
                             <img

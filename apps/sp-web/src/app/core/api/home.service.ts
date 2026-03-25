@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
+  HomeRailContentResponse,
   HomeRailConfig,
   SaveHomeRailPayload,
   UpdateHomeRailsPayload,
@@ -15,6 +16,12 @@ export class HomeService {
 
   getRails(): Observable<HomeRailConfig[]> {
     return this.http.get<HomeRailConfig[]>('/api/home/rails');
+  }
+
+  getRailItems(id: string): Observable<HomeRailContentResponse> {
+    return this.http.get<HomeRailContentResponse>(
+      `/api/home/rails/${encodeURIComponent(id)}/items`,
+    );
   }
 
   updateRails(payload: UpdateHomeRailsPayload): Observable<HomeRailConfig[]> {
