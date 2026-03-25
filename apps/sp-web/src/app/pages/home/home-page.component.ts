@@ -41,18 +41,21 @@ import {
   HomeRailConfig,
   HomeRailFormDraft,
   HomeRailItem,
+  HomeRailSource,
+  HomeStashSceneSort,
+  HomeStashdbSceneRailConfig,
   HomeRailViewSummary,
   SaveHomeRailPayload,
 } from '../../core/api/home.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
-interface HomeRailView extends HomeRailConfig {
+type HomeRailView = HomeRailConfig & {
   items: HomeRailItem[];
   error: string | null;
   seeAllQueryParams: Record<string, string> | null;
   summary: HomeRailViewSummary;
-}
+};
 
 interface RailLoadResult {
   id: string;
@@ -106,6 +109,18 @@ export class HomePageComponent implements OnInit, OnDestroy {
     { value: 'TRENDING', label: 'Trending' },
     { value: 'CREATED_AT', label: 'Created At' },
     { value: 'UPDATED_AT', label: 'Updated At' },
+  ];
+  protected static readonly STASH_SORT_OPTIONS: Array<{
+    value: HomeStashSceneSort;
+    label: string;
+  }> = [
+    { value: 'CREATED_AT', label: 'Recently Added' },
+    { value: 'UPDATED_AT', label: 'Recently Updated' },
+    { value: 'TITLE', label: 'Title' },
+  ];
+  protected static readonly SOURCE_OPTIONS: Array<{ value: HomeRailSource; label: string }> = [
+    { value: 'STASHDB', label: 'StashDB' },
+    { value: 'STASH', label: 'Stash' },
   ];
   protected static readonly DIRECTION_OPTIONS: Array<{
     value: SortDirection;
@@ -182,7 +197,9 @@ export class HomePageComponent implements OnInit, OnDestroy {
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
 
   protected readonly sortOptions = HomePageComponent.SORT_OPTIONS;
+  protected readonly stashSortOptions = HomePageComponent.STASH_SORT_OPTIONS;
   protected readonly directionOptions = HomePageComponent.DIRECTION_OPTIONS;
+  protected readonly sourceOptions = HomePageComponent.SOURCE_OPTIONS;
   protected readonly favoritesOptions = HomePageComponent.FAVORITES_OPTIONS;
   protected readonly tagMatchOptions = HomePageComponent.TAG_MATCH_OPTIONS;
 
@@ -515,9 +532,43 @@ export class HomePageComponent implements OnInit, OnDestroy {
 
   protected updateRailForm<K extends keyof Pick<
     HomeRailFormDraft,
-    'title' | 'subtitle' | 'enabled' | 'sort' | 'direction' | 'favorites' | 'tagMode' | 'limit'
+    'source' | 'title' | 'subtitle' | 'enabled' | 'sort' | 'direction' | 'favorites' | 'tagMode' | 'limit'
   >>(field: K, value: HomeRailFormDraft[K]): void {
     this.railForm.update((current) => (current ? { ...current, [field]: value } : current));
+  }
+
+  protected updateRailSource(nextSource: HomeRailSource): void {
+    this.railForm.update((current) => {
+      if (!current) {
+        return current;
+      }
+
+      if (current.source === nextSource) {
+        return current;
+      }
+
+      if (nextSource === 'STASH') {
+        return {
+          ...current,
+          source: 'STASH',
+          sort: 'CREATED_AT',
+          favorites: 'NONE',
+          tagMode: HomePageComponent.DEFAULT_TAG_MODE,
+          selectedTags: [],
+          selectedStudios: [],
+        };
+      }
+
+      return {
+        ...current,
+        source: 'STASHDB',
+        sort: 'DATE',
+      };
+    });
+    this.formTagSelectedIdsModel.set([]);
+    this.formStudioSelectedIdsModel.set([]);
+    this.rebuildRailFormTagSelectOptions([]);
+    this.rebuildRailFormStudioSelectOptions([]);
   }
 
   protected onRailFormTagSelectionChanged(nextValue: string[] | null): void {
@@ -672,6 +723,34 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return rail.kind === 'BUILTIN' ? 'Built-in' : 'Custom';
   }
 
+  protected sourceLabel(source: HomeRailSource): string {
+    return source === 'STASH' ? 'Stash' : 'StashDB';
+  }
+
+  protected isStashRail(rail: HomeRailConfig): rail is Extract<HomeRailConfig, { source: 'STASH' }> {
+    return rail.source === 'STASH';
+  }
+
+  protected isStashForm(): boolean {
+    return this.railForm()?.source === 'STASH';
+  }
+
+  protected railFormSortOptions() {
+    return this.isStashForm() ? this.stashSortOptions : this.sortOptions;
+  }
+
+  protected railFavoritesValue(rail: HomeRailConfig): string | null {
+    return this.isStashdbConfig(rail.config) ? rail.config.favorites : null;
+  }
+
+  protected railTagCount(rail: HomeRailConfig): number {
+    return this.isStashdbConfig(rail.config) ? rail.config.tagIds.length : 0;
+  }
+
+  protected railStudioCount(rail: HomeRailConfig): number {
+    return this.isStashdbConfig(rail.config) ? rail.config.studioIds.length : 0;
+  }
+
   protected canSeeAll(rail: HomeRailConfig): boolean {
     return rail.source === 'STASHDB';
   }
@@ -772,15 +851,15 @@ export class HomePageComponent implements OnInit, OnDestroy {
       dir: config.direction,
     };
 
-    if (config.favorites) {
+    if ('favorites' in config && config.favorites) {
       params['fav'] = config.favorites;
     }
-    if (config.tagIds.length > 0) {
+    if ('tagIds' in config && config.tagIds.length > 0) {
       params['tags'] = config.tagIds.join(',');
       params['tagNames'] = config.tagNames.join(',');
       params['mode'] = config.tagMode ?? 'OR';
     }
-    if (config.studioIds.length > 0) {
+    if ('studioIds' in config && config.studioIds.length > 0) {
       params['studios'] = config.studioIds.join(',');
       params['studioNames'] = config.studioNames.join(',');
     }
@@ -789,20 +868,11 @@ export class HomePageComponent implements OnInit, OnDestroy {
   }
 
   private summarizeRail(rail: HomeRailConfig): HomeRailViewSummary {
-    const favoritesLabel =
-      rail.source === 'STASH'
-        ? 'Local Library'
-        : (HomePageComponent.FAVORITES_OPTIONS.find(
-            (option) => option.value === (rail.config.favorites ?? 'NONE'),
-          )?.label ?? 'No Favorites Filter');
-
     return {
-      sortLabel:
-        HomePageComponent.SORT_OPTIONS.find((option) => option.value === rail.config.sort)?.label ??
-        rail.config.sort,
-      favoritesLabel,
-      tagCount: rail.config.tagIds.length,
-      studioCount: rail.config.studioIds.length,
+      sortLabel: this.sortLabelForRail(rail),
+      favoritesLabel: this.favoritesLabelForRail(rail),
+      tagCount: this.isStashdbConfig(rail.config) ? rail.config.tagIds.length : 0,
+      studioCount: this.isStashdbConfig(rail.config) ? rail.config.studioIds.length : 0,
       limit: rail.config.limit,
     };
   }
@@ -812,38 +882,57 @@ export class HomePageComponent implements OnInit, OnDestroy {
   }
 
   private cloneRails(rails: HomeRailConfig[]): HomeRailConfig[] {
-    return rails.map((rail) => ({
-      ...rail,
-      config: {
-        ...rail.config,
-        tagIds: [...rail.config.tagIds],
-        tagNames: [...rail.config.tagNames],
-        studioIds: [...rail.config.studioIds],
-        studioNames: [...rail.config.studioNames],
-      },
-    }));
+    return rails.map((rail): HomeRailConfig => {
+      if (rail.source === 'STASHDB') {
+        return {
+          ...rail,
+          config: {
+            ...rail.config,
+            tagIds: [...rail.config.tagIds],
+            tagNames: [...rail.config.tagNames],
+            studioIds: [...rail.config.studioIds],
+            studioNames: [...rail.config.studioNames],
+          },
+        };
+      }
+
+      return {
+        ...rail,
+        config: {
+          ...rail.config,
+        },
+      };
+    });
   }
 
   private buildFormFromRail(rail: HomeRailConfig): HomeRailFormDraft {
+    const config = rail.config;
     return {
       title: rail.title,
       subtitle: rail.subtitle ?? '',
       enabled: rail.enabled,
-      sort: rail.config.sort,
-      direction: rail.config.direction,
-      favorites: rail.config.favorites ?? 'NONE',
-      tagMode: rail.config.tagMode ?? HomePageComponent.DEFAULT_TAG_MODE,
-      limit: rail.config.limit,
-      selectedTags: rail.config.tagIds.map((id, index) => ({
-        id,
-        name: rail.config.tagNames[index] ?? id,
-        description: null,
-        aliases: [],
-      })),
-      selectedStudios: rail.config.studioIds.map((id, index) => ({
-        id,
-        label: rail.config.studioNames[index] ?? id,
-      })),
+      source: rail.source,
+      sort: config.sort,
+      direction: config.direction,
+      favorites: this.isStashdbConfig(config) ? config.favorites ?? 'NONE' : 'NONE',
+      tagMode: this.isStashdbConfig(config)
+        ? config.tagMode ?? HomePageComponent.DEFAULT_TAG_MODE
+        : HomePageComponent.DEFAULT_TAG_MODE,
+      limit: config.limit,
+      selectedTags: this.isStashdbConfig(config)
+        ? config.tagIds.map((id, index) => ({
+              id,
+              name: config.tagNames[index] ?? id,
+              description: null,
+              aliases: [],
+            }))
+          : [],
+      selectedStudios: this.isStashdbConfig(config)
+        ? config.studioIds.map((id, index) => ({
+              id,
+              label: config.studioNames[index] ?? id,
+            }))
+          : [],
     };
   }
 
@@ -852,6 +941,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
       title: '',
       subtitle: '',
       enabled: true,
+      source: 'STASHDB',
       sort: HomePageComponent.DEFAULT_SORT,
       direction: HomePageComponent.DEFAULT_DIRECTION,
       favorites: 'NONE',
@@ -863,7 +953,28 @@ export class HomePageComponent implements OnInit, OnDestroy {
   }
 
   private buildRailPayload(form: HomeRailFormDraft): SaveHomeRailPayload {
+    if (form.source === 'STASH') {
+      return {
+        source: 'STASH',
+        title: form.title.trim(),
+        subtitle: form.subtitle.trim() || null,
+        enabled: form.enabled,
+        config: {
+          sort: form.sort as HomeStashSceneSort,
+          direction: form.direction,
+          limit: Math.min(
+            Math.max(
+              Math.round(Number(form.limit) || HomePageComponent.DEFAULT_LIMIT),
+              HomePageComponent.LIMIT_MIN,
+            ),
+            HomePageComponent.LIMIT_MAX,
+          ),
+        },
+      };
+    }
+
     return {
+      source: 'STASHDB',
       title: form.title.trim(),
       subtitle: form.subtitle.trim() || null,
       enabled: form.enabled,
@@ -1040,5 +1151,29 @@ export class HomePageComponent implements OnInit, OnDestroy {
         (elementRef) => elementRef.nativeElement.dataset['railId'] === railId,
       )?.nativeElement ?? null
     );
+  }
+
+  private isStashdbConfig(
+    config: HomeRailConfig['config'],
+  ): config is HomeStashdbSceneRailConfig {
+    return 'favorites' in config;
+  }
+
+  private favoritesLabelForRail(rail: HomeRailConfig): string {
+    const config = rail.config;
+    if (!this.isStashdbConfig(config)) {
+      return 'Local Library';
+    }
+
+    return (
+      HomePageComponent.FAVORITES_OPTIONS.find(
+        (option) => option.value === (config.favorites ?? 'NONE'),
+      )?.label ?? 'No Favorites Filter'
+    );
+  }
+
+  private sortLabelForRail(rail: HomeRailConfig): string {
+    const options = rail.source === 'STASH' ? this.stashSortOptions : this.sortOptions;
+    return options.find((option) => option.value === rail.config.sort)?.label ?? rail.config.sort;
   }
 }

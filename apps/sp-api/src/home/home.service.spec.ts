@@ -169,6 +169,7 @@ describe('HomeService', () => {
     );
 
     const result = await service.createRail({
+      source: 'STASHDB',
       title: ' Weekend Queue ',
       subtitle: '  ',
       enabled: true,
@@ -243,6 +244,7 @@ describe('HomeService', () => {
     );
 
     const result = await service.updateRail('custom-1', {
+      source: 'STASHDB',
       title: 'Fresh Picks',
       subtitle: 'Updated subtitle',
       enabled: false,
@@ -301,6 +303,11 @@ describe('HomeService', () => {
         kind: HomeRailKind.BUILTIN,
         sortOrder: 3,
         source: HomeRailSource.STASH,
+        config: {
+          sort: 'CREATED_AT',
+          direction: 'DESC',
+          limit: 16,
+        },
       }),
     ]);
     updateMock.mockResolvedValue({});
@@ -335,6 +342,7 @@ describe('HomeService', () => {
 
     await expect(
       service.updateRail('missing', {
+        source: 'STASHDB',
         title: 'Missing',
         subtitle: null,
         enabled: true,
@@ -351,6 +359,157 @@ describe('HomeService', () => {
         },
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('creates a custom Stash rail with the constrained local-library config', async () => {
+    upsertMock.mockResolvedValue({});
+    findFirstMock.mockResolvedValue(buildRail({ id: 'built-in-3', sortOrder: 2 }));
+    createMock.mockResolvedValue(
+      buildRail({
+        id: 'custom-stash-1',
+        source: HomeRailSource.STASH,
+        title: 'Newest Library Scenes',
+        subtitle: null,
+        sortOrder: 3,
+        config: {
+          sort: 'CREATED_AT',
+          direction: 'DESC',
+          limit: 22,
+        },
+      }),
+    );
+
+    const result = await service.createRail({
+      source: 'STASH',
+      title: ' Newest Library Scenes ',
+      subtitle: '',
+      enabled: true,
+      config: {
+        sort: 'CREATED_AT',
+        direction: 'DESC',
+        limit: 22,
+      },
+    });
+
+    expect(createMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        source: 'STASH',
+        title: 'Newest Library Scenes',
+        config: {
+          sort: 'CREATED_AT',
+          direction: 'DESC',
+          limit: 22,
+        },
+      }),
+    });
+    expect(result).toMatchObject({
+      id: 'custom-stash-1',
+      source: 'STASH',
+      config: {
+        sort: 'CREATED_AT',
+        direction: 'DESC',
+        limit: 22,
+      },
+    });
+  });
+
+  it('updates a custom Stash rail and keeps source immutable', async () => {
+    upsertMock.mockResolvedValue({});
+    findUniqueMock.mockResolvedValue(
+      buildRail({
+        id: 'custom-stash-1',
+        source: HomeRailSource.STASH,
+        config: {
+          sort: 'UPDATED_AT',
+          direction: 'ASC',
+          limit: 10,
+        },
+      }),
+    );
+    updateMock.mockResolvedValue(
+      buildRail({
+        id: 'custom-stash-1',
+        source: HomeRailSource.STASH,
+        title: 'Library A-Z',
+        config: {
+          sort: 'TITLE',
+          direction: 'ASC',
+          limit: 12,
+        },
+      }),
+    );
+
+    const result = await service.updateRail('custom-stash-1', {
+      source: 'STASH',
+      title: 'Library A-Z',
+      subtitle: null,
+      enabled: true,
+      config: {
+        sort: 'TITLE',
+        direction: 'ASC',
+        limit: 12,
+      },
+    });
+
+    expect(updateMock).toHaveBeenCalledWith({
+      where: { id: 'custom-stash-1' },
+      data: expect.objectContaining({
+        title: 'Library A-Z',
+        config: {
+          sort: 'TITLE',
+          direction: 'ASC',
+          limit: 12,
+        },
+      }),
+    });
+    expect(result).toMatchObject({
+      source: 'STASH',
+      config: {
+        sort: 'TITLE',
+        direction: 'ASC',
+        limit: 12,
+      },
+    });
+  });
+
+  it('rejects unsupported Stash-only config pollution and source switching', async () => {
+    upsertMock.mockResolvedValue({});
+
+    await expect(
+      service.createRail({
+        source: 'STASH',
+        title: 'Bad Stash Rail',
+        subtitle: null,
+        enabled: true,
+        config: {
+          sort: 'CREATED_AT',
+          direction: 'DESC',
+          favorites: 'ALL',
+          tagIds: ['tag-1'],
+          tagNames: ['Feature'],
+          tagMode: 'AND',
+          studioIds: [],
+          studioNames: [],
+          limit: 16,
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    findUniqueMock.mockResolvedValue(buildRail({ id: 'custom-1' }));
+
+    await expect(
+      service.updateRail('custom-1', {
+        source: 'STASH',
+        title: 'Crossed wires',
+        subtitle: null,
+        enabled: true,
+        config: {
+          sort: 'CREATED_AT',
+          direction: 'DESC',
+          limit: 16,
+        },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('updates enabled state and order by persisted rail id', async () => {
@@ -374,6 +533,11 @@ describe('HomeService', () => {
         kind: HomeRailKind.BUILTIN,
         sortOrder: 3,
         source: HomeRailSource.STASH,
+        config: {
+          sort: 'CREATED_AT',
+          direction: 'DESC',
+          limit: 16,
+        },
       }),
     ];
     upsertMock.mockResolvedValue({});
@@ -426,6 +590,11 @@ describe('HomeService', () => {
         key: HomeRailKey.RECENTLY_ADDED_LIBRARY,
         kind: HomeRailKind.BUILTIN,
         source: HomeRailSource.STASH,
+        config: {
+          sort: 'CREATED_AT',
+          direction: 'DESC',
+          limit: 16,
+        },
       }),
     ]);
 
@@ -451,12 +620,6 @@ describe('HomeService', () => {
         config: {
           sort: 'CREATED_AT',
           direction: 'DESC',
-          favorites: null,
-          tagIds: [],
-          tagNames: [],
-          tagMode: null,
-          studioIds: [],
-          studioNames: [],
           limit: 12,
         },
       }),
@@ -538,5 +701,51 @@ describe('HomeService', () => {
       message: 'Configure and enable your Stash integration to populate this rail.',
     });
     expect(stashGetLocalSceneFeedMock).not.toHaveBeenCalled();
+  });
+
+  it('loads content for a custom Stash rail through the same local-library path', async () => {
+    upsertMock.mockResolvedValue({});
+    findUniqueMock.mockResolvedValue(
+      buildRail({
+        id: 'custom-stash-2',
+        key: null,
+        kind: HomeRailKind.CUSTOM,
+        source: HomeRailSource.STASH,
+        title: 'Recently Updated Library',
+        config: {
+          sort: 'UPDATED_AT',
+          direction: 'DESC',
+          limit: 9,
+        },
+      }),
+    );
+    integrationFindUniqueMock.mockResolvedValue({
+      type: 'STASH',
+      enabled: true,
+      status: 'CONFIGURED',
+      baseUrl: 'http://stash.local',
+      apiKey: 'secret',
+    });
+    stashGetLocalSceneFeedMock.mockResolvedValue({
+      total: 0,
+      items: [],
+    });
+
+    await expect(service.getRailContent('custom-stash-2')).resolves.toEqual({
+      items: [],
+      message: null,
+    });
+    expect(stashGetLocalSceneFeedMock).toHaveBeenCalledWith(
+      {
+        baseUrl: 'http://stash.local',
+        apiKey: 'secret',
+      },
+      {
+        page: 1,
+        perPage: 9,
+        sort: 'UPDATED_AT',
+        direction: 'DESC',
+      },
+    );
   });
 });

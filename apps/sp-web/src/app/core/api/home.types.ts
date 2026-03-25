@@ -14,8 +14,9 @@ export type HomeRailKey =
 export type HomeRailKind = 'BUILTIN' | 'CUSTOM';
 export type HomeRailSource = 'STASHDB' | 'STASH';
 export type HomeRailContentType = 'SCENES';
+export type HomeStashSceneSort = 'CREATED_AT' | 'UPDATED_AT' | 'TITLE';
 
-export interface HomeSceneRailConfig {
+export interface HomeStashdbSceneRailConfig {
   sort: SceneFeedSort;
   direction: SortDirection;
   favorites: SceneFavoritesFilter | null;
@@ -27,11 +28,17 @@ export interface HomeSceneRailConfig {
   limit: number;
 }
 
-export interface HomeRailConfig {
+export interface HomeStashSceneRailConfig {
+  sort: HomeStashSceneSort;
+  direction: SortDirection;
+  limit: number;
+}
+
+interface BaseHomeRailConfig<TSource extends HomeRailSource, TConfig> {
   id: string;
   key: HomeRailKey | null;
   kind: HomeRailKind;
-  source: HomeRailSource;
+  source: TSource;
   contentType: HomeRailContentType;
   title: string;
   subtitle: string | null;
@@ -39,8 +46,12 @@ export interface HomeRailConfig {
   sortOrder: number;
   editable: boolean;
   deletable: boolean;
-  config: HomeSceneRailConfig;
+  config: TConfig;
 }
+
+export type HomeRailConfig =
+  | BaseHomeRailConfig<'STASHDB', HomeStashdbSceneRailConfig>
+  | BaseHomeRailConfig<'STASH', HomeStashSceneRailConfig>;
 
 export interface HomeRailItem {
   id: string;
@@ -73,13 +84,15 @@ export interface UpdateHomeRailsPayload {
 }
 
 export interface SaveHomeRailPayload {
+  source: HomeRailSource;
   title: string;
   subtitle: string | null;
   enabled: boolean;
-  config: HomeSceneRailConfig;
+  config: HomeStashdbSceneRailConfig | HomeStashSceneRailConfig;
 }
 
 export interface HomeRailFormDraft {
+  source: HomeRailSource;
   title: string;
   subtitle: string;
   enabled: boolean;

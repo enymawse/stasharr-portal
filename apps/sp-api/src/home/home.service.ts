@@ -24,12 +24,15 @@ import {
   HOME_RAIL_SCENE_LIMIT_DEFAULT,
   HOME_RAIL_SCENE_LIMIT_MAX,
   HOME_RAIL_SCENE_LIMIT_MIN,
-  HOME_RAIL_SCENE_SORT_VALUES,
   HOME_RAIL_SOURCE_VALUES,
+  HOME_RAIL_STASH_SCENE_SORT_VALUES,
+  HOME_RAIL_STASHDB_SCENE_SORT_VALUES,
   HOME_RAIL_TAG_MODE_VALUES,
   HomeRailDto,
   type HomeRailKey as HomeRailDtoKey,
   type HomeRailSceneConfigDto,
+  type HomeRailStashSceneConfigDto,
+  type HomeRailStashdbSceneConfigDto,
 } from './dto/home-rail.dto';
 import { UpdateHomeRailsDto } from './dto/update-home-rails.dto';
 import { CreateHomeRailDto, UpdateHomeRailDto } from './dto/create-home-rail.dto';
@@ -96,12 +99,6 @@ const DEFAULT_HOME_RAILS: Array<{
     config: {
       sort: 'CREATED_AT',
       direction: 'DESC',
-      favorites: null,
-      tagIds: [],
-      tagNames: [],
-      tagMode: null,
-      studioIds: [],
-      studioNames: [],
       limit: HOME_RAIL_SCENE_LIMIT_DEFAULT,
     },
   },
@@ -152,13 +149,13 @@ export class HomeService {
       data: {
         key: null,
         kind: HomeRailKind.CUSTOM,
-        source: HomeRailSource.STASHDB,
+        source: payload.source,
         contentType: HomeRailContentType.SCENES,
         title: payload.title.trim(),
         subtitle: this.normalizeSubtitle(payload.subtitle),
         enabled: payload.enabled,
         sortOrder: (lastRail?.sortOrder ?? -1) + 1,
-        config: this.normalizeSceneRailConfig(payload.config) as unknown as Prisma.InputJsonValue,
+        config: this.normalizeSceneRailConfig(payload.source, payload.config) as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -167,7 +164,10 @@ export class HomeService {
 
   async updateRail(id: string, payload: UpdateHomeRailDto): Promise<HomeRailDto> {
     await this.ensureDefaultRails();
-    await this.requireCustomRail(id);
+    const existingRail = await this.requireCustomRail(id);
+    if (payload.source !== existingRail.source) {
+      throw new BadRequestException('Custom Home rail source cannot be changed after creation.');
+    }
 
     const updated = await this.prisma.homeRail.update({
       where: { id },
@@ -175,7 +175,7 @@ export class HomeService {
         title: payload.title.trim(),
         subtitle: this.normalizeSubtitle(payload.subtitle),
         enabled: payload.enabled,
-        config: this.normalizeSceneRailConfig(payload.config) as unknown as Prisma.InputJsonValue,
+        config: this.normalizeSceneRailConfig(existingRail.source, payload.config) as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -237,13 +237,6 @@ export class HomeService {
   }
 
   private async getStashRailContent(rail: HomeRail): Promise<HomeRailContentDto> {
-    if (rail.key !== HomeRailKey.RECENTLY_ADDED_LIBRARY) {
-      return {
-        items: [],
-        message: 'This Stash-backed Home rail is not supported yet.',
-      };
-    }
-
     const integration = await this.prisma.integrationConfig.findUnique({
       where: { type: 'STASH' },
     });
@@ -261,9 +254,10 @@ export class HomeService {
     }
 
     const config = this.normalizeSceneRailConfig(
+      rail.source,
       rail.config,
       DEFAULT_HOME_RAILS.find((defaultRail) => defaultRail.key === rail.key)?.config ?? null,
-    );
+    ) as HomeRailStashSceneConfigDto;
 
     try {
       const feed = await this.stashAdapter.getLocalSceneFeed(
@@ -364,7 +358,7 @@ export class HomeService {
       sortOrder: rail.sortOrder,
       editable: rail.kind === HomeRailKind.CUSTOM,
       deletable: rail.kind === HomeRailKind.CUSTOM,
-      config: this.normalizeSceneRailConfig(rail.config, defaults?.config ?? null),
+      config: this.normalizeSceneRailConfig(rail.source, rail.config, defaults?.config ?? null),
     };
   }
 
@@ -403,7 +397,7 @@ export class HomeService {
     return `/api/media/stash/studios/${encodeURIComponent(studioId)}/logo`;
   }
 
-  private toStashFeedSort(sort: HomeRailSceneConfigDto['sort']): 'CREATED_AT' | 'UPDATED_AT' | 'TITLE' {
+  private toStashFeedSort(sort: HomeRailStashSceneConfigDto['sort']): 'CREATED_AT' | 'UPDATED_AT' | 'TITLE' {
     switch (sort) {
       case 'TITLE':
         return 'TITLE';
@@ -417,29 +411,46 @@ export class HomeService {
   }
 
   private normalizeSceneRailConfig(
+    source: HomeRailSource,
     input: unknown,
     fallback: Partial<HomeRailSceneConfigDto> | null = null,
   ): HomeRailSceneConfigDto {
     const record = this.asRecord(input);
-    const sort = this.parseInSet(record.sort, HOME_RAIL_SCENE_SORT_VALUES, fallback?.sort ?? 'DATE');
+    if (source === HomeRailSource.STASH) {
+      return this.normalizeStashSceneRailConfig(record, fallback);
+    }
+
+    return this.normalizeStashdbSceneRailConfig(record, fallback);
+  }
+
+  private normalizeStashdbSceneRailConfig(
+    record: Record<string, unknown>,
+    fallback: Partial<HomeRailSceneConfigDto> | null,
+  ): HomeRailStashdbSceneConfigDto {
+    const fallbackConfig = this.asStashdbSceneConfig(fallback);
+    const sort = this.parseInSet(
+      record.sort,
+      HOME_RAIL_STASHDB_SCENE_SORT_VALUES,
+      fallbackConfig?.sort ?? 'DATE',
+    );
     const direction = this.parseInSet(
       record.direction,
       HOME_RAIL_DIRECTION_VALUES,
-      fallback?.direction ?? 'DESC',
+      fallbackConfig?.direction ?? 'DESC',
     );
     const favorites = this.parseOptionalInSet(
       record.favorites,
       HOME_RAIL_FAVORITES_VALUES,
-      fallback?.favorites ?? null,
+      fallbackConfig?.favorites ?? null,
     );
     const tags = this.normalizeNamedIds(record.tagIds, record.tagNames);
     const studios = this.normalizeNamedIds(record.studioIds, record.studioNames);
-    const fallbackTagMode = tags.ids.length > 0 ? fallback?.tagMode ?? 'OR' : null;
+    const fallbackTagMode = tags.ids.length > 0 ? fallbackConfig?.tagMode ?? 'OR' : null;
     const tagMode =
       tags.ids.length > 0
         ? this.parseOptionalInSet(record.tagMode, HOME_RAIL_TAG_MODE_VALUES, fallbackTagMode)
         : null;
-    const limit = this.parseLimit(record.limit, fallback?.limit ?? HOME_RAIL_SCENE_LIMIT_DEFAULT);
+    const limit = this.parseLimit(record.limit, fallbackConfig?.limit ?? HOME_RAIL_SCENE_LIMIT_DEFAULT);
 
     return {
       sort,
@@ -450,6 +461,39 @@ export class HomeService {
       tagMode,
       studioIds: studios.ids,
       studioNames: studios.names,
+      limit,
+    };
+  }
+
+  private normalizeStashSceneRailConfig(
+    record: Record<string, unknown>,
+    fallback: Partial<HomeRailSceneConfigDto> | null,
+  ): HomeRailStashSceneConfigDto {
+    this.ensureEmptyArrayField(record.tagIds, 'tagIds');
+    this.ensureEmptyArrayField(record.tagNames, 'tagNames');
+    this.ensureEmptyArrayField(record.studioIds, 'studioIds');
+    this.ensureEmptyArrayField(record.studioNames, 'studioNames');
+    this.ensureNullishField(record.favorites, 'favorites');
+    this.ensureNullishField(record.tagMode, 'tagMode');
+
+    const fallbackConfig = this.asStashSceneConfig(fallback);
+    const sort = this.parseOptionalStrictInSet(
+      record.sort,
+      HOME_RAIL_STASH_SCENE_SORT_VALUES,
+      fallbackConfig?.sort ?? 'CREATED_AT',
+      'sort',
+    );
+    const direction = this.parseOptionalStrictInSet(
+      record.direction,
+      HOME_RAIL_DIRECTION_VALUES,
+      fallbackConfig?.direction ?? 'DESC',
+      'direction',
+    );
+    const limit = this.parseLimit(record.limit, fallbackConfig?.limit ?? HOME_RAIL_SCENE_LIMIT_DEFAULT);
+
+    return {
+      sort,
+      direction,
       limit,
     };
   }
@@ -483,6 +527,26 @@ export class HomeService {
     };
   }
 
+  private ensureEmptyArrayField(value: unknown, fieldName: string): void {
+    if (value === null || value === undefined) {
+      return;
+    }
+
+    if (Array.isArray(value) && value.length === 0) {
+      return;
+    }
+
+    throw new BadRequestException(`Field ${fieldName} is not supported for STASH Home rails.`);
+  }
+
+  private ensureNullishField(value: unknown, fieldName: string): void {
+    if (value === null || value === undefined || value === '') {
+      return;
+    }
+
+    throw new BadRequestException(`Field ${fieldName} is not supported for STASH Home rails.`);
+  }
+
   private parseLimit(value: unknown, fallback: number): number {
     const next = Number(value);
     if (!Number.isInteger(next)) {
@@ -490,6 +554,30 @@ export class HomeService {
     }
 
     return Math.min(Math.max(next, HOME_RAIL_SCENE_LIMIT_MIN), HOME_RAIL_SCENE_LIMIT_MAX);
+  }
+
+  private asStashdbSceneConfig(
+    value: Partial<HomeRailSceneConfigDto> | null,
+  ): Partial<HomeRailStashdbSceneConfigDto> | null {
+    if (!value || 'favorites' in value || 'tagIds' in value || 'studioIds' in value) {
+      return value as Partial<HomeRailStashdbSceneConfigDto> | null;
+    }
+
+    return null;
+  }
+
+  private asStashSceneConfig(
+    value: Partial<HomeRailSceneConfigDto> | null,
+  ): Partial<HomeRailStashSceneConfigDto> | null {
+    if (!value) {
+      return null;
+    }
+
+    return {
+      sort: value.sort as HomeRailStashSceneConfigDto['sort'],
+      direction: value.direction,
+      limit: value.limit,
+    };
   }
 
   private parseOptionalInSet<const T extends readonly string[]>(
@@ -502,6 +590,23 @@ export class HomeService {
     }
 
     return this.parseInSet(value, validValues, fallback ?? validValues[0]);
+  }
+
+  private parseOptionalStrictInSet<const T extends readonly string[]>(
+    value: unknown,
+    validValues: T,
+    fallback: T[number],
+    fieldName: string,
+  ): T[number] {
+    if (value === null || value === undefined || value === '') {
+      return fallback;
+    }
+
+    if (typeof value === 'string' && validValues.includes(value as T[number])) {
+      return value as T[number];
+    }
+
+    throw new BadRequestException(`Unsupported ${fieldName} value for this Home rail source.`);
   }
 
   private parseInSet<const T extends readonly string[]>(

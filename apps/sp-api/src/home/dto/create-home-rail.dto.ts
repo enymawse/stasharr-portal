@@ -17,17 +17,20 @@ import {
   HOME_RAIL_SCENE_LIMIT_DEFAULT,
   HOME_RAIL_SCENE_LIMIT_MAX,
   HOME_RAIL_SCENE_LIMIT_MIN,
-  HOME_RAIL_SCENE_SORT_VALUES,
+  HOME_RAIL_SOURCE_VALUES,
   HOME_RAIL_TAG_MODE_VALUES,
   type HomeRailDirection,
   type HomeRailFavorites,
-  type HomeRailSceneSort,
+  type HomeRailSource,
+  type HomeRailStashSceneSort,
+  type HomeRailStashdbSceneSort,
   type HomeRailTagMode,
 } from './home-rail.dto';
 
 class HomeRailSceneConfigInputDto {
-  @IsIn(HOME_RAIL_SCENE_SORT_VALUES)
-  sort!: HomeRailSceneSort;
+  @IsString()
+  @IsNotEmpty()
+  sort!: HomeRailStashdbSceneSort | HomeRailStashSceneSort;
 
   @IsIn(HOME_RAIL_DIRECTION_VALUES)
   direction!: HomeRailDirection;
@@ -68,6 +71,9 @@ class HomeRailSceneConfigInputDto {
 }
 
 export class CreateHomeRailDto {
+  @IsIn(HOME_RAIL_SOURCE_VALUES)
+  source!: HomeRailSource;
+
   @IsString()
   @IsNotEmpty()
   title!: string;
@@ -86,6 +92,9 @@ export class CreateHomeRailDto {
 }
 
 export class UpdateHomeRailDto {
+  @IsIn(HOME_RAIL_SOURCE_VALUES)
+  source!: HomeRailSource;
+
   @IsString()
   @IsNotEmpty()
   title!: string;

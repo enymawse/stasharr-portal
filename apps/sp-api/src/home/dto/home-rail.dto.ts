@@ -29,18 +29,24 @@ export const HOME_RAIL_SCENE_LIMIT_MIN = 6;
 export const HOME_RAIL_SCENE_LIMIT_MAX = 30;
 export const HOME_RAIL_SCENE_LIMIT_DEFAULT = 16;
 
-export const HOME_RAIL_SCENE_SORT_VALUES = SCENE_FEED_SORT_VALUES;
+export const HOME_RAIL_STASHDB_SCENE_SORT_VALUES = SCENE_FEED_SORT_VALUES;
+export const HOME_RAIL_STASH_SCENE_SORT_VALUES = [
+  'CREATED_AT',
+  'UPDATED_AT',
+  'TITLE',
+] as const;
 export const HOME_RAIL_DIRECTION_VALUES = SORT_DIRECTION_VALUES;
 export const HOME_RAIL_FAVORITES_VALUES = SCENE_FAVORITES_FILTER_VALUES;
 export const HOME_RAIL_TAG_MODE_VALUES = SCENE_TAG_MATCH_MODE_VALUES;
 
-export type HomeRailSceneSort = SceneFeedSort;
+export type HomeRailStashdbSceneSort = SceneFeedSort;
+export type HomeRailStashSceneSort = (typeof HOME_RAIL_STASH_SCENE_SORT_VALUES)[number];
 export type HomeRailDirection = SortDirection;
 export type HomeRailFavorites = SceneFavoritesFilter;
 export type HomeRailTagMode = SceneTagMatchMode;
 
-export class HomeRailSceneConfigDto {
-  sort!: HomeRailSceneSort;
+export class HomeRailStashdbSceneConfigDto {
+  sort!: HomeRailStashdbSceneSort;
   direction!: HomeRailDirection;
   favorites!: HomeRailFavorites | null;
   tagIds!: string[];
@@ -50,6 +56,16 @@ export class HomeRailSceneConfigDto {
   studioNames!: string[];
   limit!: number;
 }
+
+export class HomeRailStashSceneConfigDto {
+  sort!: HomeRailStashSceneSort;
+  direction!: HomeRailDirection;
+  limit!: number;
+}
+
+export type HomeRailSceneConfigDto =
+  | HomeRailStashdbSceneConfigDto
+  | HomeRailStashSceneConfigDto;
 
 export class HomeRailDto {
   id!: string;

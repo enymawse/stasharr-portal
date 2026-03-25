@@ -56,7 +56,7 @@
         <div class="editor-head">
           <div>
             <p class="eyebrow">Customize Home</p>
-            <h2>Reorder built-ins and add custom StashDB scene rails</h2>
+            <h2>Reorder built-ins and add custom StashDB or Stash scene rails</h2>
           </div>
           <div class="editor-actions">
             <button type="button" class="state-button secondary" (click)="cancelEditor()">
@@ -112,17 +112,18 @@
                 </div>
                 <p>{{ rail.subtitle || 'No subtitle' }}</p>
                 <div class="editor-summary-line">
+                  <span>{{ sourceLabel(rail.source) }}</span>
                   <span>{{ rail.config.sort }}</span>
                   <span>{{ rail.config.direction }}</span>
                   <span>Limit {{ rail.config.limit }}</span>
-                  @if (rail.config.favorites) {
-                    <span>{{ rail.config.favorites }}</span>
+                  @if (railFavoritesValue(rail); as favorites) {
+                    <span>{{ favorites }}</span>
                   }
-                  @if (rail.config.tagIds.length > 0) {
-                    <span>{{ rail.config.tagIds.length }} tags</span>
+                  @if (railTagCount(rail) > 0) {
+                    <span>{{ railTagCount(rail) }} tags</span>
                   }
-                  @if (rail.config.studioIds.length > 0) {
-                    <span>{{ rail.config.studioIds.length }} studios</span>
+                  @if (railStudioCount(rail) > 0) {
+                    <span>{{ railStudioCount(rail) }} studios</span>
                   }
                 </div>
               </div>
@@ -188,8 +189,8 @@
                 <h3>
                   {{
                     editingRailId()
-                      ? 'Update custom StashDB scene rail'
-                      : 'Create a custom StashDB scene rail'
+                      ? 'Update custom Home scene rail'
+                      : 'Create a custom Home scene rail'
                   }}
                 </h3>
               </div>
@@ -220,12 +221,38 @@
 
             <div class="rail-form-grid">
               <label class="control-field">
+                <span>Source</span>
+                <p-select
+                  inputId="home-rail-source"
+                  [ngModel]="form.source"
+                  (ngModelChange)="updateRailSource($event)"
+                  [options]="sourceOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  [appendTo]="'body'"
+                  panelStyleClass="home-rail-select-panel"
+                  [disabled]="!!editingRailId()"
+                />
+              </label>
+
+              @if (editingRailId()) {
+                <p class="editor-note source-note">
+                  Source is fixed after creation. Create a new rail if you want to switch between
+                  StashDB and Stash.
+                </p>
+              }
+
+              <label class="control-field">
                 <span>Title</span>
                 <input
                   type="text"
                   [ngModel]="form.title"
                   (ngModelChange)="updateRailForm('title', $event)"
-                  placeholder="Weekend queue, New tags, Favorite studios..."
+                  [placeholder]="
+                    form.source === 'STASH'
+                      ? 'Newest Library Scenes, Recently Updated Library...'
+                      : 'Weekend queue, New tags, Favorite studios...'
+                  "
                 />
               </label>
 
@@ -269,7 +296,7 @@
                   inputId="home-rail-sort"
                   [ngModel]="form.sort"
                   (ngModelChange)="updateRailForm('sort', $event)"
-                  [options]="sortOptions"
+                  [options]="railFormSortOptions()"
                   optionLabel="label"
                   optionValue="value"
                   [appendTo]="'body'"
@@ -291,93 +318,102 @@
                 />
               </label>
 
-              <label class="control-field">
-                <span>Favorites</span>
-                <p-select
-                  inputId="home-rail-favorites"
-                  [ngModel]="form.favorites"
-                  (ngModelChange)="updateRailForm('favorites', $event)"
-                  [options]="favoritesOptions"
-                  optionLabel="label"
-                  optionValue="value"
-                  [appendTo]="'body'"
-                  panelStyleClass="home-rail-select-panel"
-                />
-              </label>
+              @if (form.source === 'STASHDB') {
+                <label class="control-field">
+                  <span>Favorites</span>
+                  <p-select
+                    inputId="home-rail-favorites"
+                    [ngModel]="form.favorites"
+                    (ngModelChange)="updateRailForm('favorites', $event)"
+                    [options]="favoritesOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    [appendTo]="'body'"
+                    panelStyleClass="home-rail-select-panel"
+                  />
+                </label>
 
-              <label class="control-field">
-                <span>Tag Mode</span>
-                <p-select
-                  inputId="home-rail-tag-mode"
-                  [ngModel]="form.tagMode"
-                  (ngModelChange)="updateRailForm('tagMode', $event)"
-                  [options]="tagMatchOptions"
-                  optionLabel="label"
-                  optionValue="value"
-                  [appendTo]="'body'"
-                  panelStyleClass="home-rail-select-panel"
-                />
-              </label>
+                <label class="control-field">
+                  <span>Tag Mode</span>
+                  <p-select
+                    inputId="home-rail-tag-mode"
+                    [ngModel]="form.tagMode"
+                    (ngModelChange)="updateRailForm('tagMode', $event)"
+                    [options]="tagMatchOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    [appendTo]="'body'"
+                    panelStyleClass="home-rail-select-panel"
+                  />
+                </label>
+              } @else {
+                <p class="editor-note source-note">
+                  Stash rails currently support local-library sorting only. More Stash filters can
+                  come later.
+                </p>
+              }
             </div>
 
-            <div class="rail-form-pickers">
-              <label class="control-field">
-                <span>Tags</span>
-                <p-multiselect
-                  inputId="home-rail-tags"
-                  [ngModel]="formTagSelectedIdsModel()"
-                  (ngModelChange)="onRailFormTagSelectionChanged($event)"
-                  (onFilter)="onRailFormTagFilterChanged($event.filter)"
-                  (onPanelHide)="onRailFormTagPanelHide()"
-                  [filter]="true"
-                  [filterValue]="tagSearchTerm()"
-                  filterPlaceHolder="Search tags"
-                  [loading]="tagSearchLoading()"
-                  [options]="tagSelectOptions()"
-                  optionLabel="label"
-                  optionValue="value"
-                  [showToggleAll]="false"
-                  display="chip"
-                  [emptyMessage]="tagSelectEmptyMessage()"
-                  [emptyFilterMessage]="tagSelectEmptyMessage()"
-                  [resetFilterOnHide]="true"
-                  [appendTo]="'body'"
-                  panelStyleClass="home-rail-tag-panel"
-                  placeholder="Select matching tags"
-                  scrollHeight="16rem"
-                />
-              </label>
+            @if (form.source === 'STASHDB') {
+              <div class="rail-form-pickers">
+                <label class="control-field">
+                  <span>Tags</span>
+                  <p-multiselect
+                    inputId="home-rail-tags"
+                    [ngModel]="formTagSelectedIdsModel()"
+                    (ngModelChange)="onRailFormTagSelectionChanged($event)"
+                    (onFilter)="onRailFormTagFilterChanged($event.filter)"
+                    (onPanelHide)="onRailFormTagPanelHide()"
+                    [filter]="true"
+                    [filterValue]="tagSearchTerm()"
+                    filterPlaceHolder="Search tags"
+                    [loading]="tagSearchLoading()"
+                    [options]="tagSelectOptions()"
+                    optionLabel="label"
+                    optionValue="value"
+                    [showToggleAll]="false"
+                    display="chip"
+                    [emptyMessage]="tagSelectEmptyMessage()"
+                    [emptyFilterMessage]="tagSelectEmptyMessage()"
+                    [resetFilterOnHide]="true"
+                    [appendTo]="'body'"
+                    panelStyleClass="home-rail-tag-panel"
+                    placeholder="Select matching tags"
+                    scrollHeight="16rem"
+                  />
+                </label>
 
-              <label class="control-field">
-                <span>Studios</span>
-                <p-multiselect
-                  inputId="home-rail-studios"
-                  [ngModel]="formStudioSelectedIdsModel()"
-                  (ngModelChange)="onRailFormStudioSelectionChanged($event)"
-                  (onFilter)="onRailFormStudioFilterChanged($event.filter)"
-                  (onPanelHide)="onRailFormStudioPanelHide()"
-                  [filter]="true"
-                  [filterValue]="studioSearchTerm()"
-                  filterPlaceHolder="Search studio networks"
-                  [loading]="studioSearchLoading()"
-                  [options]="studioSelectOptions()"
-                  [group]="true"
-                  optionGroupLabel="label"
-                  optionGroupChildren="items"
-                  optionLabel="label"
-                  optionValue="value"
-                  [showToggleAll]="false"
-                  display="chip"
-                  [emptyMessage]="studioSelectEmptyMessage()"
-                  [emptyFilterMessage]="studioSelectEmptyMessage()"
-                  [resetFilterOnHide]="true"
-                  [appendTo]="'body'"
-                  panelStyleClass="home-rail-studio-panel"
-                  placeholder="Choose studio networks or child studios"
-                  scrollHeight="16rem"
-                />
-              </label>
-            </div>
+                <label class="control-field">
+                  <span>Studios</span>
+                  <p-multiselect
+                    inputId="home-rail-studios"
+                    [ngModel]="formStudioSelectedIdsModel()"
+                    (ngModelChange)="onRailFormStudioSelectionChanged($event)"
+                    (onFilter)="onRailFormStudioFilterChanged($event.filter)"
+                    (onPanelHide)="onRailFormStudioPanelHide()"
+                    [filter]="true"
+                    [filterValue]="studioSearchTerm()"
+                    filterPlaceHolder="Search studio networks"
+                    [loading]="studioSearchLoading()"
+                    [options]="studioSelectOptions()"
+                    [group]="true"
+                    optionGroupLabel="label"
+                    optionGroupChildren="items"
+                    optionLabel="label"
+                    optionValue="value"
+                    [showToggleAll]="false"
+                    display="chip"
+                    [emptyMessage]="studioSelectEmptyMessage()"
+                    [emptyFilterMessage]="studioSelectEmptyMessage()"
+                    [resetFilterOnHide]="true"
+                    [appendTo]="'body'"
+                    panelStyleClass="home-rail-studio-panel"
+                    placeholder="Choose studio networks or child studios"
+                    scrollHeight="16rem"
+                  />
+                </label>
+              </div>
+            }
           </section>
         }
       </section>
