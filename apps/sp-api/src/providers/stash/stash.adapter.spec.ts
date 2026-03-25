@@ -360,4 +360,148 @@ describe('StashAdapter', () => {
       ],
     });
   });
+
+  it('opens a protected scene screenshot with the configured ApiKey header', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              findScene: {
+                id: '411',
+                paths: {
+                  screenshot: 'http://stash.local/images/411.jpg',
+                },
+              },
+            },
+          }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          'content-type': 'image/jpeg',
+          'cache-control': 'public, max-age=300',
+          'content-length': '12',
+        }),
+        body: new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new Uint8Array([1, 2, 3]));
+            controller.close();
+          },
+        }),
+      } as Response);
+
+    const result = await adapter.openSceneScreenshot('411', {
+      baseUrl: 'http://stash.local',
+      apiKey: 'secret',
+    });
+
+    expect(result).toMatchObject({
+      contentType: 'image/jpeg',
+      cacheControl: 'public, max-age=300',
+      contentLength: '12',
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'http://stash.local/images/411.jpg',
+      { headers: { ApiKey: 'secret' } },
+    );
+  });
+
+  it('opens a protected studio logo and rejects cross-origin asset urls', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              findStudio: {
+                id: 'studio-1',
+                image_path: 'http://stash.local/studios/archive.jpg',
+              },
+            },
+          }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'image/png' }),
+        body: new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.close();
+          },
+        }),
+      } as Response);
+
+    await expect(
+      adapter.openStudioLogo('studio-1', {
+        baseUrl: 'http://stash.local/base',
+        apiKey: null,
+      }),
+    ).resolves.toMatchObject({
+      contentType: 'image/png',
+    });
+
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findStudio: {
+              id: 'studio-1',
+              image_path: 'http://evil.example/logo.png',
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.openStudioLogo('studio-1', {
+        baseUrl: 'http://stash.local',
+        apiKey: 'secret',
+      }),
+    ).rejects.toBeInstanceOf(BadGatewayException);
+  });
+
+  it('returns null for missing protected assets or invalid ids', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: {
+              findScene: {
+                id: '411',
+                paths: {
+                  screenshot: 'http://stash.local/images/411.jpg',
+                },
+              },
+            },
+          }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        headers: new Headers(),
+        body: null,
+      } as Response);
+
+    await expect(
+      adapter.openSceneScreenshot('411', {
+        baseUrl: 'http://stash.local',
+      }),
+    ).resolves.toBeNull();
+
+    fetchMock.mockClear();
+
+    await expect(
+      adapter.openStudioLogo('../bad-id', {
+        baseUrl: 'http://stash.local',
+      }),
+    ).resolves.toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

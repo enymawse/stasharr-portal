@@ -49,6 +49,13 @@ export interface StashLocalSceneFeed {
   items: StashLocalSceneFeedItem[];
 }
 
+export interface StashProtectedAssetResponse {
+  body: ReadableStream<Uint8Array>;
+  contentType: string | null;
+  contentLength: string | null;
+  cacheControl: string | null;
+}
+
 interface StashLocalSceneRecord {
   id?: unknown;
   title?: unknown;
@@ -69,12 +76,26 @@ interface StashLocalSceneRecord {
   }>;
 }
 
+interface StashSceneAssetRecord {
+  id?: unknown;
+  paths?: {
+    screenshot?: unknown;
+  } | null;
+}
+
+interface StashStudioAssetRecord {
+  id?: unknown;
+  image_path?: unknown;
+}
+
 interface StashGraphqlResponse {
   data?: {
     findScenes?: {
       count?: unknown;
       scenes?: StashLocalSceneRecord[];
     };
+    findScene?: StashSceneAssetRecord | null;
+    findStudio?: StashStudioAssetRecord | null;
   };
   errors?: Array<{ message?: unknown }>;
 }
@@ -212,6 +233,62 @@ export class StashAdapter {
     };
   }
 
+  async openSceneScreenshot(
+    sceneId: string,
+    config: StashAdapterBaseConfig,
+  ): Promise<StashProtectedAssetResponse | null> {
+    const normalizedSceneId = this.normalizeEntityId(sceneId);
+    if (!normalizedSceneId) {
+      return null;
+    }
+
+    const query = `
+      query FindScene($id: ID!) {
+        findScene(id: $id) {
+          id
+          paths {
+            screenshot
+          }
+        }
+      }
+    `;
+
+    const payload = await this.executeQuery(config, query, { id: normalizedSceneId });
+    const screenshotUrl = this.parseAssetUrl(payload.data?.findScene?.paths?.screenshot);
+    if (!screenshotUrl) {
+      return null;
+    }
+
+    return this.fetchProtectedAsset(config, screenshotUrl);
+  }
+
+  async openStudioLogo(
+    studioId: string,
+    config: StashAdapterBaseConfig,
+  ): Promise<StashProtectedAssetResponse | null> {
+    const normalizedStudioId = this.normalizeEntityId(studioId);
+    if (!normalizedStudioId) {
+      return null;
+    }
+
+    const query = `
+      query FindStudio($id: ID!) {
+        findStudio(id: $id) {
+          id
+          image_path
+        }
+      }
+    `;
+
+    const payload = await this.executeQuery(config, query, { id: normalizedStudioId });
+    const imageUrl = this.parseAssetUrl(payload.data?.findStudio?.image_path);
+    if (!imageUrl) {
+      return null;
+    }
+
+    return this.fetchProtectedAsset(config, imageUrl);
+  }
+
   private pickBestResolution(
     files: Array<{ width?: unknown; height?: unknown }>,
   ): { width: number | null; height: number | null } {
@@ -250,6 +327,43 @@ export class StashAdapter {
     }
 
     return `Scene #${id}`;
+  }
+
+  private async fetchProtectedAsset(
+    config: StashAdapterBaseConfig,
+    assetUrl: string,
+  ): Promise<StashProtectedAssetResponse | null> {
+    const resolvedUrl = this.resolveProtectedAssetUrl(config.baseUrl, assetUrl);
+    const headers: Record<string, string> = {};
+    if (config.apiKey?.trim()) {
+      headers.ApiKey = config.apiKey.trim();
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(resolvedUrl, { headers });
+    } catch {
+      throw new BadGatewayException('Failed to reach Stash provider endpoint.');
+    }
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new BadGatewayException(`Stash provider returned ${response.status} for media request.`);
+    }
+
+    if (!response.body) {
+      throw new BadGatewayException('Stash provider returned an empty media response.');
+    }
+
+    return {
+      body: response.body,
+      contentType: response.headers.get('content-type'),
+      contentLength: response.headers.get('content-length'),
+      cacheControl: response.headers.get('cache-control'),
+    };
   }
 
   private toLocalSceneFeedItem(
@@ -317,6 +431,26 @@ export class StashAdapter {
     }
 
     return null;
+  }
+
+  private normalizeEntityId(id: string): string | null {
+    const normalized = id.trim();
+    return /^[A-Za-z0-9_-]+$/.test(normalized) ? normalized : null;
+  }
+
+  private parseAssetUrl(value: unknown): string | null {
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+  }
+
+  private resolveProtectedAssetUrl(baseUrl: string, assetUrl: string): string {
+    const base = new URL(baseUrl);
+    const candidate = new URL(assetUrl, base);
+
+    if (candidate.origin !== base.origin) {
+      throw new BadGatewayException('Stash provider returned an unexpected media URL.');
+    }
+
+    return candidate.toString();
   }
 
   private resolveFeedSort(sort: StashSceneFeedSort): string {

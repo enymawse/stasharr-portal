@@ -369,15 +369,22 @@ export class HomeService {
   }
 
   private toStashRailItem(item: StashLocalSceneFeedItem): HomeRailItemDto {
+    const sceneScreenshotUrl = item.imageUrl
+      ? this.buildStashSceneScreenshotProxyUrl(item.id)
+      : null;
+    const studioLogoUrl = item.studioImageUrl && item.studioId
+      ? this.buildStashStudioLogoProxyUrl(item.studioId)
+      : null;
+
     return {
       id: item.id,
       title: item.title,
       description: item.description,
-      imageUrl: item.imageUrl,
-      cardImageUrl: item.cardImageUrl,
+      imageUrl: sceneScreenshotUrl,
+      cardImageUrl: sceneScreenshotUrl,
       studioId: item.studioId,
       studio: item.studio,
-      studioImageUrl: item.studioImageUrl,
+      studioImageUrl: studioLogoUrl,
       releaseDate: item.releaseDate,
       duration: item.duration,
       type: 'SCENE',
@@ -386,6 +393,14 @@ export class HomeService {
       requestable: false,
       viewUrl: item.viewUrl,
     };
+  }
+
+  private buildStashSceneScreenshotProxyUrl(sceneId: string): string {
+    return `/api/media/stash/scenes/${encodeURIComponent(sceneId)}/screenshot`;
+  }
+
+  private buildStashStudioLogoProxyUrl(studioId: string): string {
+    return `/api/media/stash/studios/${encodeURIComponent(studioId)}/logo`;
   }
 
   private toStashFeedSort(sort: HomeRailSceneConfigDto['sort']): 'CREATED_AT' | 'UPDATED_AT' | 'TITLE' {
