@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -16,7 +17,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   StashAdapter,
   type StashLocalSceneFeedItem,
+  type StashLocalTagOption,
 } from '../providers/stash/stash.adapter';
+import { PerformerStudioOptionDto } from '../performers/dto/performer-studio-option.dto';
+import { SceneTagOptionDto } from '../scenes/dto/scene-tag-option.dto';
 import {
   HOME_RAIL_CONTENT_TYPE_VALUES,
   HOME_RAIL_DIRECTION_VALUES,
@@ -99,6 +103,14 @@ const DEFAULT_HOME_RAILS: Array<{
     config: {
       sort: 'CREATED_AT',
       direction: 'DESC',
+      titleQuery: null,
+      tagIds: [],
+      tagNames: [],
+      tagMode: null,
+      studioIds: [],
+      studioNames: [],
+      favoritePerformersOnly: false,
+      favoriteStudiosOnly: false,
       limit: HOME_RAIL_SCENE_LIMIT_DEFAULT,
     },
   },
@@ -209,6 +221,27 @@ export class HomeService {
     return this.getStashRailContent(rail);
   }
 
+  async searchStashTags(query?: string): Promise<SceneTagOptionDto[]> {
+    const normalizedQuery = query?.trim() ?? '';
+    if (!normalizedQuery) {
+      return [];
+    }
+
+    const config = await this.getRequiredStashConfig();
+    const tags = await this.stashAdapter.searchTags(normalizedQuery, config);
+    return tags.map((tag) => this.toTagOptionDto(tag));
+  }
+
+  async searchStashStudios(query?: string): Promise<PerformerStudioOptionDto[]> {
+    const normalizedQuery = query?.trim() ?? '';
+    if (!normalizedQuery) {
+      return [];
+    }
+
+    const config = await this.getRequiredStashConfig();
+    return this.stashAdapter.searchStudios(normalizedQuery, config);
+  }
+
   private async ensureDefaultRails(): Promise<void> {
     for (const rail of DEFAULT_HOME_RAILS) {
       await this.prisma.homeRail.upsert({
@@ -270,6 +303,12 @@ export class HomeService {
           perPage: config.limit,
           sort: this.toStashFeedSort(config.sort),
           direction: config.direction,
+          titleQuery: config.titleQuery,
+          tagIds: config.tagIds,
+          tagMode: config.tagMode,
+          studioIds: config.studioIds,
+          favoritePerformersOnly: config.favoritePerformersOnly,
+          favoriteStudiosOnly: config.favoriteStudiosOnly,
         },
       );
 
@@ -469,12 +508,7 @@ export class HomeService {
     record: Record<string, unknown>,
     fallback: Partial<HomeRailSceneConfigDto> | null,
   ): HomeRailStashSceneConfigDto {
-    this.ensureEmptyArrayField(record.tagIds, 'tagIds');
-    this.ensureEmptyArrayField(record.tagNames, 'tagNames');
-    this.ensureEmptyArrayField(record.studioIds, 'studioIds');
-    this.ensureEmptyArrayField(record.studioNames, 'studioNames');
     this.ensureNullishField(record.favorites, 'favorites');
-    this.ensureNullishField(record.tagMode, 'tagMode');
 
     const fallbackConfig = this.asStashSceneConfig(fallback);
     const sort = this.parseOptionalStrictInSet(
@@ -489,11 +523,43 @@ export class HomeService {
       fallbackConfig?.direction ?? 'DESC',
       'direction',
     );
+    const titleQuery = this.normalizeOptionalString(
+      record.titleQuery,
+      fallbackConfig?.titleQuery ?? null,
+    );
+    const tags = this.normalizeNamedIds(record.tagIds, record.tagNames);
+    const studios = this.normalizeNamedIds(record.studioIds, record.studioNames);
+    const fallbackTagMode = tags.ids.length > 0 ? fallbackConfig?.tagMode ?? 'OR' : null;
+    const tagMode =
+      tags.ids.length > 0
+        ? this.parseOptionalStrictNullableInSet(
+            record.tagMode,
+            HOME_RAIL_TAG_MODE_VALUES,
+            fallbackTagMode,
+            'tagMode',
+          )
+        : null;
+    const favoritePerformersOnly = this.parseBoolean(
+      record.favoritePerformersOnly,
+      fallbackConfig?.favoritePerformersOnly ?? false,
+    );
+    const favoriteStudiosOnly = this.parseBoolean(
+      record.favoriteStudiosOnly,
+      fallbackConfig?.favoriteStudiosOnly ?? false,
+    );
     const limit = this.parseLimit(record.limit, fallbackConfig?.limit ?? HOME_RAIL_SCENE_LIMIT_DEFAULT);
 
     return {
       sort,
       direction,
+      titleQuery,
+      tagIds: tags.ids,
+      tagNames: tags.names,
+      tagMode,
+      studioIds: studios.ids,
+      studioNames: studios.names,
+      favoritePerformersOnly,
+      favoriteStudiosOnly,
       limit,
     };
   }
@@ -527,24 +593,20 @@ export class HomeService {
     };
   }
 
-  private ensureEmptyArrayField(value: unknown, fieldName: string): void {
-    if (value === null || value === undefined) {
-      return;
-    }
-
-    if (Array.isArray(value) && value.length === 0) {
-      return;
-    }
-
-    throw new BadRequestException(`Field ${fieldName} is not supported for STASH Home rails.`);
-  }
-
   private ensureNullishField(value: unknown, fieldName: string): void {
     if (value === null || value === undefined || value === '') {
       return;
     }
 
     throw new BadRequestException(`Field ${fieldName} is not supported for STASH Home rails.`);
+  }
+
+  private parseBoolean(value: unknown, fallback: boolean): boolean {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    return fallback;
   }
 
   private parseLimit(value: unknown, fallback: number): number {
@@ -576,6 +638,23 @@ export class HomeService {
     return {
       sort: value.sort as HomeRailStashSceneConfigDto['sort'],
       direction: value.direction,
+      titleQuery:
+        'titleQuery' in value && typeof value.titleQuery === 'string'
+          ? value.titleQuery
+          : null,
+      tagIds: 'tagIds' in value && Array.isArray(value.tagIds) ? value.tagIds : [],
+      tagNames: 'tagNames' in value && Array.isArray(value.tagNames) ? value.tagNames : [],
+      tagMode:
+        'tagMode' in value && typeof value.tagMode === 'string'
+          ? (value.tagMode as HomeRailStashSceneConfigDto['tagMode'])
+          : null,
+      studioIds: 'studioIds' in value && Array.isArray(value.studioIds) ? value.studioIds : [],
+      studioNames:
+        'studioNames' in value && Array.isArray(value.studioNames) ? value.studioNames : [],
+      favoritePerformersOnly:
+        'favoritePerformersOnly' in value && value.favoritePerformersOnly === true,
+      favoriteStudiosOnly:
+        'favoriteStudiosOnly' in value && value.favoriteStudiosOnly === true,
       limit: value.limit,
     };
   }
@@ -598,6 +677,23 @@ export class HomeService {
     fallback: T[number],
     fieldName: string,
   ): T[number] {
+    if (value === null || value === undefined || value === '') {
+      return fallback;
+    }
+
+    if (typeof value === 'string' && validValues.includes(value as T[number])) {
+      return value as T[number];
+    }
+
+    throw new BadRequestException(`Unsupported ${fieldName} value for this Home rail source.`);
+  }
+
+  private parseOptionalStrictNullableInSet<const T extends readonly string[]>(
+    value: unknown,
+    validValues: T,
+    fallback: T[number] | null,
+    fieldName: string,
+  ): T[number] | null {
     if (value === null || value === undefined || value === '') {
       return fallback;
     }
@@ -632,9 +728,55 @@ export class HomeService {
     return normalized ? normalized : null;
   }
 
+  private normalizeOptionalString(value: unknown, fallback: string | null): string | null {
+    if (typeof value !== 'string') {
+      return fallback;
+    }
+
+    const normalized = value.trim();
+    return normalized ? normalized : null;
+  }
+
   private asRecord(value: unknown): Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
+  }
+
+  private toTagOptionDto(tag: StashLocalTagOption): SceneTagOptionDto {
+    return {
+      id: tag.id,
+      name: tag.name,
+      description: null,
+      aliases: [],
+    };
+  }
+
+  private async getRequiredStashConfig(): Promise<{ baseUrl: string; apiKey?: string | null }> {
+    const integration = await this.prisma.integrationConfig.findUnique({
+      where: { type: 'STASH' },
+    });
+
+    if (!integration) {
+      throw new ConflictException('STASH integration is not configured.');
+    }
+
+    if (!integration.enabled) {
+      throw new ConflictException('STASH integration is disabled.');
+    }
+
+    if (integration.status !== 'CONFIGURED') {
+      throw new ConflictException('STASH integration is not configured.');
+    }
+
+    const baseUrl = integration.baseUrl?.trim();
+    if (!baseUrl) {
+      throw new BadRequestException('STASH integration is missing a base URL.');
+    }
+
+    return {
+      baseUrl,
+      apiKey: integration.apiKey,
+    };
   }
 }

@@ -60,6 +60,14 @@ export class HomeRailStashdbSceneConfigDto {
 export class HomeRailStashSceneConfigDto {
   sort!: HomeRailStashSceneSort;
   direction!: HomeRailDirection;
+  titleQuery!: string | null;
+  tagIds!: string[];
+  tagNames!: string[];
+  tagMode!: HomeRailTagMode | null;
+  studioIds!: string[];
+  studioNames!: string[];
+  favoritePerformersOnly!: boolean;
+  favoriteStudiosOnly!: boolean;
   limit!: number;
 }
 

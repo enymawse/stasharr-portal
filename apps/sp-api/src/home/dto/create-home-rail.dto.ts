@@ -36,6 +36,10 @@ class HomeRailSceneConfigInputDto {
   direction!: HomeRailDirection;
 
   @IsOptional()
+  @IsString()
+  titleQuery?: string | null;
+
+  @IsOptional()
   @IsIn(HOME_RAIL_FAVORITES_VALUES)
   favorites?: HomeRailFavorites | null;
 
@@ -62,6 +66,16 @@ class HomeRailSceneConfigInputDto {
   @IsArray()
   @IsString({ each: true })
   studioNames?: string[];
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  favoritePerformersOnly?: boolean;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  favoriteStudiosOnly?: boolean;
 
   @Type(() => Number)
   @IsInt()

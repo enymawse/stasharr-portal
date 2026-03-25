@@ -22,12 +22,20 @@ export type StashSceneFeedSort = (typeof STASH_SCENE_FEED_SORT_VALUES)[number];
 
 export const STASH_SCENE_FEED_DIRECTION_VALUES = ['ASC', 'DESC'] as const;
 export type StashSceneFeedDirection = (typeof STASH_SCENE_FEED_DIRECTION_VALUES)[number];
+export const STASH_SCENE_FEED_TAG_MODE_VALUES = ['OR', 'AND'] as const;
+export type StashSceneFeedTagMode = (typeof STASH_SCENE_FEED_TAG_MODE_VALUES)[number];
 
 export interface StashLocalSceneFeedConfig {
   page: number;
   perPage: number;
   sort: StashSceneFeedSort;
   direction: StashSceneFeedDirection;
+  titleQuery?: string | null;
+  tagIds?: string[];
+  tagMode?: StashSceneFeedTagMode | null;
+  studioIds?: string[];
+  favoritePerformersOnly?: boolean;
+  favoriteStudiosOnly?: boolean;
 }
 
 export interface StashLocalSceneFeedItem {
@@ -49,8 +57,22 @@ export interface StashLocalSceneFeed {
   items: StashLocalSceneFeedItem[];
 }
 
+export interface StashLocalTagOption {
+  id: string;
+  name: string;
+}
+
+export interface StashLocalStudioOption {
+  id: string;
+  name: string;
+  childStudios: Array<{
+    id: string;
+    name: string;
+  }>;
+}
+
 export interface StashProtectedAssetResponse {
-  body: ReadableStream<Uint8Array>;
+  body: Buffer;
   contentType: string | null;
   contentLength: string | null;
   cacheControl: string | null;
@@ -88,6 +110,24 @@ interface StashStudioAssetRecord {
   image_path?: unknown;
 }
 
+interface StashTagRecord {
+  id?: unknown;
+  name?: unknown;
+}
+
+interface StashStudioSearchRecord {
+  id?: unknown;
+  name?: unknown;
+  parent_studio?: {
+    id?: unknown;
+    name?: unknown;
+  } | null;
+  child_studios?: Array<{
+    id?: unknown;
+    name?: unknown;
+  }> | null;
+}
+
 interface StashGraphqlResponse {
   data?: {
     findScenes?: {
@@ -96,6 +136,12 @@ interface StashGraphqlResponse {
     };
     findScene?: StashSceneAssetRecord | null;
     findStudio?: StashStudioAssetRecord | null;
+    findTags?: {
+      tags?: StashTagRecord[];
+    };
+    findStudios?: {
+      studios?: StashStudioSearchRecord[];
+    };
   };
   errors?: Array<{ message?: unknown }>;
 }
@@ -185,10 +231,11 @@ export class StashAdapter {
     const perPage = this.normalizePositiveInteger(feedConfig.perPage, 16);
     const sort = this.resolveFeedSort(feedConfig.sort);
     const direction = this.resolveFeedDirection(feedConfig.direction);
+    const sceneFilter = this.buildSceneFilter(feedConfig);
 
     const query = `
-      query FindScenes($filter: FindFilterType) {
-        findScenes(filter: $filter) {
+      query FindScenes($filter: FindFilterType, $sceneFilter: SceneFilterType) {
+        findScenes(filter: $filter, scene_filter: $sceneFilter) {
           count
           scenes {
             id
@@ -220,6 +267,7 @@ export class StashAdapter {
         sort,
         direction,
       },
+      sceneFilter,
     });
 
     const scenes = payload.data?.findScenes?.scenes ?? [];
@@ -231,6 +279,79 @@ export class StashAdapter {
         .map((scene) => this.toLocalSceneFeedItem(scene, config.baseUrl))
         .filter((scene): scene is StashLocalSceneFeedItem => scene !== null),
     };
+  }
+
+  async searchTags(
+    query: string,
+    config: StashAdapterBaseConfig,
+  ): Promise<StashLocalTagOption[]> {
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery) {
+      return [];
+    }
+
+    const gql = `
+      query FindTags($filter: FindFilterType) {
+        findTags(filter: $filter) {
+          tags {
+            id
+            name
+          }
+        }
+      }
+    `;
+
+    const payload = await this.executeQuery(config, gql, {
+      filter: {
+        q: normalizedQuery,
+        page: 1,
+        per_page: 25,
+      },
+    });
+
+    return (payload.data?.findTags?.tags ?? [])
+      .map((tag) => this.toTagOption(tag))
+      .filter((tag): tag is StashLocalTagOption => tag !== null)
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }
+
+  async searchStudios(
+    query: string,
+    config: StashAdapterBaseConfig,
+  ): Promise<StashLocalStudioOption[]> {
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery) {
+      return [];
+    }
+
+    const gql = `
+      query FindStudios($filter: FindFilterType) {
+        findStudios(filter: $filter) {
+          studios {
+            id
+            name
+            parent_studio {
+              id
+              name
+            }
+            child_studios {
+              id
+              name
+            }
+          }
+        }
+      }
+    `;
+
+    const payload = await this.executeQuery(config, gql, {
+      filter: {
+        q: normalizedQuery,
+        page: 1,
+        per_page: 25,
+      },
+    });
+
+    return this.toStudioOptions(payload.data?.findStudios?.studios ?? []);
   }
 
   async openSceneScreenshot(
@@ -354,14 +475,12 @@ export class StashAdapter {
       throw new BadGatewayException(`Stash provider returned ${response.status} for media request.`);
     }
 
-    if (!response.body) {
-      throw new BadGatewayException('Stash provider returned an empty media response.');
-    }
+    const buffer = Buffer.from(await response.arrayBuffer());
 
     return {
-      body: response.body,
+      body: buffer,
       contentType: response.headers.get('content-type'),
-      contentLength: response.headers.get('content-length'),
+      contentLength: String(buffer.byteLength),
       cacheControl: response.headers.get('cache-control'),
     };
   }
@@ -421,6 +540,135 @@ export class StashAdapter {
     };
   }
 
+  private buildSceneFilter(
+    feedConfig: StashLocalSceneFeedConfig,
+  ): Record<string, unknown> | undefined {
+    const titleQuery = this.normalizeOptionalString(feedConfig.titleQuery);
+    const tagIds = this.normalizeStringArray(feedConfig.tagIds);
+    const studioIds = this.normalizeStringArray(feedConfig.studioIds);
+    const favoritePerformersOnly = feedConfig.favoritePerformersOnly === true;
+    const favoriteStudiosOnly = feedConfig.favoriteStudiosOnly === true;
+    const filter: Record<string, unknown> = {};
+
+    if (titleQuery) {
+      filter['title'] = {
+        value: titleQuery,
+        modifier: 'INCLUDES',
+      };
+    }
+
+    if (tagIds.length > 0) {
+      filter['tags'] = {
+        value: tagIds,
+        modifier: feedConfig.tagMode === 'AND' ? 'INCLUDES_ALL' : 'INCLUDES',
+      };
+    }
+
+    if (studioIds.length > 0) {
+      filter['studios'] = {
+        value: studioIds,
+        modifier: 'INCLUDES',
+      };
+    }
+
+    if (favoritePerformersOnly) {
+      filter['performers_filter'] = {
+        filter_favorites: true,
+      };
+    }
+
+    if (favoriteStudiosOnly) {
+      filter['studios_filter'] = {
+        favorite: true,
+      };
+    }
+
+    return Object.keys(filter).length > 0 ? filter : undefined;
+  }
+
+  private toTagOption(tag: StashTagRecord): StashLocalTagOption | null {
+    const id = this.normalizeOptionalString(tag.id);
+    const name = this.normalizeOptionalString(tag.name);
+    if (!id || !name) {
+      return null;
+    }
+
+    return { id, name };
+  }
+
+  private toStudioOptions(studios: StashStudioSearchRecord[]): StashLocalStudioOption[] {
+    const grouped = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        childStudios: Map<string, string>;
+      }
+    >();
+
+    for (const studio of studios) {
+      const studioId = this.normalizeOptionalString(studio.id);
+      const studioName = this.normalizeOptionalString(studio.name);
+      if (!studioId || !studioName) {
+        continue;
+      }
+
+      const parentId = this.normalizeOptionalString(studio.parent_studio?.id);
+      const parentName = this.normalizeOptionalString(studio.parent_studio?.name);
+
+      if (parentId && parentName) {
+        const group = this.getOrCreateStudioGroup(grouped, parentId, parentName);
+        group.childStudios.set(studioId, studioName);
+        continue;
+      }
+
+      const group = this.getOrCreateStudioGroup(grouped, studioId, studioName);
+      for (const child of studio.child_studios ?? []) {
+        const childId = this.normalizeOptionalString(child.id);
+        const childName = this.normalizeOptionalString(child.name);
+        if (childId && childName) {
+          group.childStudios.set(childId, childName);
+        }
+      }
+    }
+
+    return [...grouped.values()]
+      .map((group) => ({
+        id: group.id,
+        name: group.name,
+        childStudios: [...group.childStudios.entries()]
+          .map(([id, name]) => ({ id, name }))
+          .sort((left, right) => left.name.localeCompare(right.name)),
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }
+
+  private getOrCreateStudioGroup(
+    groups: Map<
+      string,
+      {
+        id: string;
+        name: string;
+        childStudios: Map<string, string>;
+      }
+    >,
+    id: string,
+    name: string,
+  ) {
+    const existing = groups.get(id);
+    if (existing) {
+      return existing;
+    }
+
+    const created = {
+      id,
+      name,
+      childStudios: new Map<string, string>(),
+    };
+    groups.set(id, created);
+    return created;
+  }
+
   private pickFirstDuration(
     files: Array<{ duration?: unknown }>,
   ): number | null {
@@ -436,6 +684,22 @@ export class StashAdapter {
   private normalizeEntityId(id: string): string | null {
     const normalized = id.trim();
     return /^[A-Za-z0-9_-]+$/.test(normalized) ? normalized : null;
+  }
+
+  private normalizeOptionalString(value: unknown): string | null {
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+  }
+
+  private normalizeStringArray(values: string[] | undefined): string[] {
+    const deduped = new Set<string>();
+    for (const value of values ?? []) {
+      const normalized = this.normalizeOptionalString(value);
+      if (normalized) {
+        deduped.add(normalized);
+      }
+    }
+
+    return [...deduped];
   }
 
   private parseAssetUrl(value: unknown): string | null {

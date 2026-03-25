@@ -257,7 +257,7 @@ describe('StashAdapter', () => {
     const [, init] = fetchMock.mock.calls[0] ?? [];
     expect(typeof init?.body).toBe('string');
     const body = JSON.parse(String(init?.body));
-    expect(body.variables).toEqual({
+    expect(body.variables).toMatchObject({
       filter: {
         page: 1,
         per_page: 16,
@@ -265,7 +265,8 @@ describe('StashAdapter', () => {
         direction: 'DESC',
       },
     });
-    expect(String(body.query)).toContain('findScenes(filter: $filter)');
+    expect(body.variables.sceneFilter).toBeUndefined();
+    expect(String(body.query)).toContain('findScenes(filter: $filter, scene_filter: $sceneFilter)');
     expect(String(body.query)).toContain('paths');
   });
 
@@ -309,6 +310,120 @@ describe('StashAdapter', () => {
       per_page: 8,
       sort: 'title',
       direction: 'DESC',
+    });
+  });
+
+  it('adds title, tag, studio, and favorite filters to the local scene feed query', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getLocalSceneFeed(
+      { baseUrl: 'http://stash.local' },
+      {
+        page: 1,
+        perPage: 10,
+        sort: 'UPDATED_AT',
+        direction: 'ASC',
+        titleQuery: ' anthology ',
+        tagIds: ['tag-1', 'tag-1', 'tag-2'],
+        tagMode: 'AND',
+        studioIds: ['studio-1', 'studio-1', 'studio-2'],
+        favoritePerformersOnly: true,
+        favoriteStudiosOnly: true,
+      },
+    );
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    const body = JSON.parse(String(init?.body));
+    expect(body.variables.sceneFilter).toEqual({
+      title: {
+        value: 'anthology',
+        modifier: 'INCLUDES',
+      },
+      tags: {
+        value: ['tag-1', 'tag-2'],
+        modifier: 'INCLUDES_ALL',
+      },
+      studios: {
+        value: ['studio-1', 'studio-2'],
+        modifier: 'INCLUDES',
+      },
+      performers_filter: {
+        filter_favorites: true,
+      },
+      studios_filter: {
+        favorite: true,
+      },
+    });
+  });
+
+  it('maps stash tag mode OR to INCLUDES and omits scene_filter when unset', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.getLocalSceneFeed(
+      { baseUrl: 'http://stash.local' },
+      {
+        page: 1,
+        perPage: 5,
+        sort: 'CREATED_AT',
+        direction: 'DESC',
+      },
+    );
+
+    let [, init] = fetchMock.mock.calls[0] ?? [];
+    let body = JSON.parse(String(init?.body));
+    expect(body.variables).toMatchObject({
+      filter: {
+        page: 1,
+        per_page: 5,
+        sort: 'created_at',
+        direction: 'DESC',
+      },
+    });
+    expect(body.variables.sceneFilter).toBeUndefined();
+
+    fetchMock.mockClear();
+
+    await adapter.getLocalSceneFeed(
+      { baseUrl: 'http://stash.local' },
+      {
+        page: 1,
+        perPage: 5,
+        sort: 'CREATED_AT',
+        direction: 'DESC',
+        tagIds: ['tag-1'],
+        tagMode: 'OR',
+      },
+    );
+
+    [, init] = fetchMock.mock.calls[0] ?? [];
+    body = JSON.parse(String(init?.body));
+    expect(body.variables.sceneFilter).toEqual({
+      tags: {
+        value: ['tag-1'],
+        modifier: 'INCLUDES',
+      },
     });
   });
 
@@ -385,12 +500,7 @@ describe('StashAdapter', () => {
           'cache-control': 'public, max-age=300',
           'content-length': '12',
         }),
-        body: new ReadableStream<Uint8Array>({
-          start(controller) {
-            controller.enqueue(new Uint8Array([1, 2, 3]));
-            controller.close();
-          },
-        }),
+        arrayBuffer: () => Promise.resolve(new Uint8Array([1, 2, 3]).buffer),
       } as Response);
 
     const result = await adapter.openSceneScreenshot('411', {
@@ -401,7 +511,7 @@ describe('StashAdapter', () => {
     expect(result).toMatchObject({
       contentType: 'image/jpeg',
       cacheControl: 'public, max-age=300',
-      contentLength: '12',
+      contentLength: '3',
     });
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
@@ -428,11 +538,7 @@ describe('StashAdapter', () => {
         ok: true,
         status: 200,
         headers: new Headers({ 'content-type': 'image/png' }),
-        body: new ReadableStream<Uint8Array>({
-          start(controller) {
-            controller.close();
-          },
-        }),
+        arrayBuffer: () => Promise.resolve(new Uint8Array([4, 5, 6]).buffer),
       } as Response);
 
     await expect(
@@ -503,5 +609,84 @@ describe('StashAdapter', () => {
       }),
     ).resolves.toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('normalizes stash local tag search results', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findTags: {
+              tags: [
+                { id: '2', name: 'Archive' },
+                { id: '1', name: ' Anthology ' },
+                { id: '', name: 'Bad' },
+              ],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.searchTags('archive', { baseUrl: 'http://stash.local' }),
+    ).resolves.toEqual([
+      { id: '1', name: 'Anthology' },
+      { id: '2', name: 'Archive' },
+    ]);
+  });
+
+  it('normalizes stash local studio search results into parent groups', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findStudios: {
+              studios: [
+                {
+                  id: 'network-1',
+                  name: 'North Network',
+                  child_studios: [
+                    { id: 'child-2', name: 'Bravo' },
+                    { id: 'child-1', name: 'Alpha' },
+                  ],
+                },
+                {
+                  id: 'child-3',
+                  name: 'Gamma',
+                  parent_studio: { id: 'network-2', name: 'South Network' },
+                },
+                {
+                  id: 'network-2',
+                  name: 'South Network',
+                  child_studios: [{ id: 'child-4', name: 'Delta' }],
+                },
+              ],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.searchStudios('north', { baseUrl: 'http://stash.local' }),
+    ).resolves.toEqual([
+      {
+        id: 'network-1',
+        name: 'North Network',
+        childStudios: [
+          { id: 'child-1', name: 'Alpha' },
+          { id: 'child-2', name: 'Bravo' },
+        ],
+      },
+      {
+        id: 'network-2',
+        name: 'South Network',
+        childStudios: [
+          { id: 'child-4', name: 'Delta' },
+          { id: 'child-3', name: 'Gamma' },
+        ],
+      },
+    ]);
   });
 });

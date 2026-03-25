@@ -27,11 +27,7 @@ describe('MediaService', () => {
   });
 
   it('returns a proxied scene screenshot using stash integration credentials', async () => {
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.close();
-      },
-    });
+    const body = Buffer.from([1, 2, 3]);
 
     integrationFindUniqueMock.mockResolvedValue({
       type: 'STASH',
@@ -65,11 +61,7 @@ describe('MediaService', () => {
   });
 
   it('returns a proxied studio logo using stash integration credentials', async () => {
-    const body = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.close();
-      },
-    });
+    const body = Buffer.from([4, 5, 6]);
 
     integrationFindUniqueMock.mockResolvedValue({
       type: 'STASH',

@@ -116,6 +116,9 @@
                   <span>{{ rail.config.sort }}</span>
                   <span>{{ rail.config.direction }}</span>
                   <span>Limit {{ rail.config.limit }}</span>
+                  @if (isStashRail(rail) && rail.config.titleQuery) {
+                    <span>Title contains "{{ rail.config.titleQuery }}"</span>
+                  }
                   @if (railFavoritesValue(rail); as favorites) {
                     <span>{{ favorites }}</span>
                   }
@@ -347,14 +350,33 @@
                   />
                 </label>
               } @else {
-                <p class="editor-note source-note">
-                  Stash rails currently support local-library sorting only. More Stash filters can
-                  come later.
-                </p>
+                <label class="control-field">
+                  <span>Title Contains</span>
+                  <input
+                    type="text"
+                    [ngModel]="form.titleQuery"
+                    (ngModelChange)="updateRailForm('titleQuery', $event)"
+                    placeholder="Newest scenes, anthology, archive..."
+                  />
+                </label>
+
+                <label class="control-field">
+                  <span>Tag Mode</span>
+                  <p-select
+                    inputId="home-rail-stash-tag-mode"
+                    [ngModel]="form.tagMode"
+                    (ngModelChange)="updateRailForm('tagMode', $event)"
+                    [options]="tagMatchOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    [appendTo]="'body'"
+                    panelStyleClass="home-rail-select-panel"
+                  />
+                </label>
               }
             </div>
 
-            @if (form.source === 'STASHDB') {
+            @if (form.source === 'STASHDB' || form.source === 'STASH') {
               <div class="rail-form-pickers">
                 <label class="control-field">
                   <span>Tags</span>
@@ -366,7 +388,9 @@
                     (onPanelHide)="onRailFormTagPanelHide()"
                     [filter]="true"
                     [filterValue]="tagSearchTerm()"
-                    filterPlaceHolder="Search tags"
+                    [filterPlaceHolder]="
+                      form.source === 'STASH' ? 'Search local tags' : 'Search tags'
+                    "
                     [loading]="tagSearchLoading()"
                     [options]="tagSelectOptions()"
                     optionLabel="label"
@@ -378,7 +402,11 @@
                     [resetFilterOnHide]="true"
                     [appendTo]="'body'"
                     panelStyleClass="home-rail-tag-panel"
-                    placeholder="Select matching tags"
+                    [placeholder]="
+                      form.source === 'STASH'
+                        ? 'Select local-library tags'
+                        : 'Select matching tags'
+                    "
                     scrollHeight="16rem"
                   />
                 </label>
@@ -393,7 +421,11 @@
                     (onPanelHide)="onRailFormStudioPanelHide()"
                     [filter]="true"
                     [filterValue]="studioSearchTerm()"
-                    filterPlaceHolder="Search studio networks"
+                    [filterPlaceHolder]="
+                      form.source === 'STASH'
+                        ? 'Search local studios'
+                        : 'Search studio networks'
+                    "
                     [loading]="studioSearchLoading()"
                     [options]="studioSelectOptions()"
                     [group]="true"
@@ -408,11 +440,50 @@
                     [resetFilterOnHide]="true"
                     [appendTo]="'body'"
                     panelStyleClass="home-rail-studio-panel"
-                    placeholder="Choose studio networks or child studios"
+                    [placeholder]="
+                      form.source === 'STASH'
+                        ? 'Choose local studios'
+                        : 'Choose studio networks or child studios'
+                    "
                     scrollHeight="16rem"
                   />
                 </label>
               </div>
+
+              @if (form.source === 'STASH') {
+                <div class="rail-form-grid stash-toggle-grid">
+                  <label class="control-field checkbox-field compact-toggle">
+                    <span>Only Favorite Performers</span>
+                    <label class="toggle-inline">
+                      <input
+                        type="checkbox"
+                        [ngModel]="form.favoritePerformersOnly"
+                        (ngModelChange)="updateRailForm('favoritePerformersOnly', $event)"
+                      />
+                      <span>{{
+                        form.favoritePerformersOnly ? 'Enabled' : 'Disabled'
+                      }}</span>
+                    </label>
+                  </label>
+
+                  <label class="control-field checkbox-field compact-toggle">
+                    <span>Only Favorite Studios</span>
+                    <label class="toggle-inline">
+                      <input
+                        type="checkbox"
+                        [ngModel]="form.favoriteStudiosOnly"
+                        (ngModelChange)="updateRailForm('favoriteStudiosOnly', $event)"
+                      />
+                      <span>{{ form.favoriteStudiosOnly ? 'Enabled' : 'Disabled' }}</span>
+                    </label>
+                  </label>
+                </div>
+
+                <p class="editor-note source-note">
+                  Stash rails use your local library filters only. This slice supports title
+                  search, local tags, local studios, and favorite performer or studio toggles.
+                </p>
+              }
             }
           </section>
         }
@@ -459,6 +530,9 @@
                   <div class="rail-summary-line">
                     <span>{{ rail.summary.sortLabel }}</span>
                     <span>{{ rail.summary.favoritesLabel }}</span>
+                    @if (rail.summary.titleQueryLabel) {
+                      <span>{{ rail.summary.titleQueryLabel }}</span>
+                    }
                     <span>{{ rail.summary.limit }} items</span>
                     @if (rail.summary.tagCount > 0) {
                       <span>{{ rail.summary.tagCount }} tags</span>

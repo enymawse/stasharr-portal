@@ -1,9 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { CreateHomeRailDto, UpdateHomeRailDto } from './dto/create-home-rail.dto';
 import { HomeRailContentDto } from './dto/home-rail-content.dto';
 import { HomeRailDto } from './dto/home-rail.dto';
 import { UpdateHomeRailsDto } from './dto/update-home-rails.dto';
 import { HomeService } from './home.service';
+import { SceneTagOptionDto } from '../scenes/dto/scene-tag-option.dto';
+import { PerformerStudioOptionDto } from '../performers/dto/performer-studio-option.dto';
 
 @Controller('api/home')
 export class HomeController {
@@ -12,6 +14,18 @@ export class HomeController {
   @Get('rails')
   getRails(): Promise<HomeRailDto[]> {
     return this.homeService.getRails();
+  }
+
+  @Get('stash/tags')
+  searchStashTags(@Query('query') query?: string): Promise<SceneTagOptionDto[]> {
+    return this.homeService.searchStashTags(query);
+  }
+
+  @Get('stash/studios')
+  searchStashStudios(
+    @Query('query') query?: string,
+  ): Promise<PerformerStudioOptionDto[]> {
+    return this.homeService.searchStashStudios(query);
   }
 
   @Get('rails/:id/items')

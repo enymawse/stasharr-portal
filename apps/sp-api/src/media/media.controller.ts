@@ -1,7 +1,5 @@
-import { Controller, Get, Param, Res, StreamableFile } from '@nestjs/common';
+import { Controller, Get, Param, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { Readable } from 'node:stream';
-import { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { MediaService } from './media.service';
 
 @Controller('api/media')
@@ -11,35 +9,30 @@ export class MediaController {
   @Get('stash/scenes/:sceneId/screenshot')
   async getStashSceneScreenshot(
     @Param('sceneId') sceneId: string,
-    @Res({ passthrough: true }) response: Response,
-  ): Promise<StreamableFile> {
+    @Res() response: Response,
+  ): Promise<void> {
     const asset = await this.mediaService.getStashSceneScreenshot(sceneId);
-    return this.toStreamableFile(asset, response);
+    this.writeAssetResponse(asset, response);
   }
 
   @Get('stash/studios/:studioId/logo')
   async getStashStudioLogo(
     @Param('studioId') studioId: string,
-    @Res({ passthrough: true }) response: Response,
-  ): Promise<StreamableFile> {
+    @Res() response: Response,
+  ): Promise<void> {
     const asset = await this.mediaService.getStashStudioLogo(studioId);
-    return this.toStreamableFile(asset, response);
+    this.writeAssetResponse(asset, response);
   }
 
-  private toStreamableFile(
+  private writeAssetResponse(
     asset: Awaited<ReturnType<MediaService['getStashSceneScreenshot']>>,
     response: Response,
-  ): StreamableFile {
+  ): void {
+    response.setHeader('Content-Type', asset.contentType ?? 'application/octet-stream');
+    response.setHeader('Content-Length', asset.contentLength ?? String(asset.body.byteLength));
     if (asset.cacheControl) {
       response.setHeader('Cache-Control', asset.cacheControl);
     }
-
-    return new StreamableFile(
-      Readable.fromWeb(asset.body as unknown as NodeReadableStream<Uint8Array>),
-      {
-        type: asset.contentType ?? 'application/octet-stream',
-        length: asset.contentLength ? Number(asset.contentLength) : undefined,
-      },
-    );
+    response.status(200).end(asset.body);
   }
 }

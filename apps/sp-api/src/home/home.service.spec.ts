@@ -50,6 +50,8 @@ describe('HomeService', () => {
   const deleteMock = jest.fn();
   const integrationFindUniqueMock = jest.fn();
   const stashGetLocalSceneFeedMock = jest.fn();
+  const stashSearchTagsMock = jest.fn();
+  const stashSearchStudiosMock = jest.fn();
 
   const prismaService = {
     homeRail: {
@@ -69,6 +71,8 @@ describe('HomeService', () => {
 
   const stashAdapter = {
     getLocalSceneFeed: stashGetLocalSceneFeedMock,
+    searchTags: stashSearchTagsMock,
+    searchStudios: stashSearchStudiosMock,
   } as unknown as StashAdapter;
 
   let service: HomeService;
@@ -112,12 +116,14 @@ describe('HomeService', () => {
         config: {
           sort: 'CREATED_AT',
           direction: 'DESC',
-          favorites: null,
+          titleQuery: null,
           tagIds: [],
           tagNames: [],
           tagMode: null,
           studioIds: [],
           studioNames: [],
+          favoritePerformersOnly: false,
+          favoriteStudiosOnly: false,
           limit: 16,
         },
       }),
@@ -306,6 +312,14 @@ describe('HomeService', () => {
         config: {
           sort: 'CREATED_AT',
           direction: 'DESC',
+          titleQuery: null,
+          tagIds: [],
+          tagNames: [],
+          tagMode: null,
+          studioIds: [],
+          studioNames: [],
+          favoritePerformersOnly: false,
+          favoriteStudiosOnly: false,
           limit: 16,
         },
       }),
@@ -374,6 +388,14 @@ describe('HomeService', () => {
         config: {
           sort: 'CREATED_AT',
           direction: 'DESC',
+          titleQuery: null,
+          tagIds: [],
+          tagNames: [],
+          tagMode: null,
+          studioIds: [],
+          studioNames: [],
+          favoritePerformersOnly: false,
+          favoriteStudiosOnly: false,
           limit: 22,
         },
       }),
@@ -398,6 +420,14 @@ describe('HomeService', () => {
         config: {
           sort: 'CREATED_AT',
           direction: 'DESC',
+          titleQuery: null,
+          tagIds: [],
+          tagNames: [],
+          tagMode: null,
+          studioIds: [],
+          studioNames: [],
+          favoritePerformersOnly: false,
+          favoriteStudiosOnly: false,
           limit: 22,
         },
       }),
@@ -422,6 +452,14 @@ describe('HomeService', () => {
         config: {
           sort: 'UPDATED_AT',
           direction: 'ASC',
+          titleQuery: 'anthology',
+          tagIds: ['tag-1', 'tag-2'],
+          tagNames: ['Feature', 'Archive'],
+          tagMode: 'AND',
+          studioIds: ['studio-1'],
+          studioNames: ['Pulse'],
+          favoritePerformersOnly: true,
+          favoriteStudiosOnly: false,
           limit: 10,
         },
       }),
@@ -434,6 +472,14 @@ describe('HomeService', () => {
         config: {
           sort: 'TITLE',
           direction: 'ASC',
+          titleQuery: 'archive',
+          tagIds: ['tag-1'],
+          tagNames: ['Feature'],
+          tagMode: 'OR',
+          studioIds: ['studio-3'],
+          studioNames: ['North'],
+          favoritePerformersOnly: false,
+          favoriteStudiosOnly: true,
           limit: 12,
         },
       }),
@@ -447,6 +493,14 @@ describe('HomeService', () => {
       config: {
         sort: 'TITLE',
         direction: 'ASC',
+        titleQuery: 'archive',
+        tagIds: ['tag-1'],
+        tagNames: ['Feature'],
+        tagMode: 'OR',
+        studioIds: ['studio-3'],
+        studioNames: ['North'],
+        favoritePerformersOnly: false,
+        favoriteStudiosOnly: true,
         limit: 12,
       },
     });
@@ -458,6 +512,14 @@ describe('HomeService', () => {
         config: {
           sort: 'TITLE',
           direction: 'ASC',
+          titleQuery: 'archive',
+          tagIds: ['tag-1'],
+          tagNames: ['Feature'],
+          tagMode: 'OR',
+          studioIds: ['studio-3'],
+          studioNames: ['North'],
+          favoritePerformersOnly: false,
+          favoriteStudiosOnly: true,
           limit: 12,
         },
       }),
@@ -467,6 +529,14 @@ describe('HomeService', () => {
       config: {
         sort: 'TITLE',
         direction: 'ASC',
+        titleQuery: 'archive',
+        tagIds: ['tag-1'],
+        tagNames: ['Feature'],
+        tagMode: 'OR',
+        studioIds: ['studio-3'],
+        studioNames: ['North'],
+        favoritePerformersOnly: false,
+        favoriteStudiosOnly: true,
         limit: 12,
       },
     });
@@ -485,11 +555,6 @@ describe('HomeService', () => {
           sort: 'CREATED_AT',
           direction: 'DESC',
           favorites: 'ALL',
-          tagIds: ['tag-1'],
-          tagNames: ['Feature'],
-          tagMode: 'AND',
-          studioIds: [],
-          studioNames: [],
           limit: 16,
         },
       }),
@@ -536,6 +601,14 @@ describe('HomeService', () => {
         config: {
           sort: 'CREATED_AT',
           direction: 'DESC',
+          titleQuery: null,
+          tagIds: [],
+          tagNames: [],
+          tagMode: null,
+          studioIds: [],
+          studioNames: [],
+          favoritePerformersOnly: false,
+          favoriteStudiosOnly: false,
           limit: 16,
         },
       }),
@@ -620,6 +693,14 @@ describe('HomeService', () => {
         config: {
           sort: 'CREATED_AT',
           direction: 'DESC',
+          titleQuery: null,
+          tagIds: [],
+          tagNames: [],
+          tagMode: null,
+          studioIds: [],
+          studioNames: [],
+          favoritePerformersOnly: false,
+          favoriteStudiosOnly: false,
           limit: 12,
         },
       }),
@@ -665,6 +746,12 @@ describe('HomeService', () => {
         perPage: 12,
         sort: 'CREATED_AT',
         direction: 'DESC',
+        titleQuery: null,
+        tagIds: [],
+        tagMode: null,
+        studioIds: [],
+        favoritePerformersOnly: false,
+        favoriteStudiosOnly: false,
       },
     );
     expect(result).toEqual({
@@ -715,6 +802,14 @@ describe('HomeService', () => {
         config: {
           sort: 'UPDATED_AT',
           direction: 'DESC',
+          titleQuery: 'anthology',
+          tagIds: ['tag-1'],
+          tagNames: ['Feature'],
+          tagMode: 'AND',
+          studioIds: ['studio-5'],
+          studioNames: ['Vault'],
+          favoritePerformersOnly: true,
+          favoriteStudiosOnly: true,
           limit: 9,
         },
       }),
@@ -745,7 +840,34 @@ describe('HomeService', () => {
         perPage: 9,
         sort: 'UPDATED_AT',
         direction: 'DESC',
+        titleQuery: 'anthology',
+        tagIds: ['tag-1'],
+        tagMode: 'AND',
+        studioIds: ['studio-5'],
+        favoritePerformersOnly: true,
+        favoriteStudiosOnly: true,
       },
     );
+  });
+
+  it('searches stash-local tags and studios through dedicated Home endpoints', async () => {
+    integrationFindUniqueMock.mockResolvedValue({
+      type: 'STASH',
+      enabled: true,
+      status: 'CONFIGURED',
+      baseUrl: 'http://stash.local',
+      apiKey: 'secret',
+    });
+    stashSearchTagsMock.mockResolvedValue([{ id: 'tag-1', name: 'Archive' }]);
+    stashSearchStudiosMock.mockResolvedValue([
+      { id: 'studio-1', name: 'Pulse', childStudios: [] },
+    ]);
+
+    await expect(service.searchStashTags('archive')).resolves.toEqual([
+      { id: 'tag-1', name: 'Archive', description: null, aliases: [] },
+    ]);
+    await expect(service.searchStashStudios('pulse')).resolves.toEqual([
+      { id: 'studio-1', name: 'Pulse', childStudios: [] },
+    ]);
   });
 });

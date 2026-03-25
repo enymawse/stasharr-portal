@@ -31,6 +31,14 @@ export interface HomeStashdbSceneRailConfig {
 export interface HomeStashSceneRailConfig {
   sort: HomeStashSceneSort;
   direction: SortDirection;
+  titleQuery: string | null;
+  tagIds: string[];
+  tagNames: string[];
+  tagMode: SceneTagMatchMode | null;
+  studioIds: string[];
+  studioNames: string[];
+  favoritePerformersOnly: boolean;
+  favoriteStudiosOnly: boolean;
   limit: number;
 }
 
@@ -96,10 +104,13 @@ export interface HomeRailFormDraft {
   title: string;
   subtitle: string;
   enabled: boolean;
-  sort: SceneFeedSort;
+  sort: SceneFeedSort | HomeStashSceneSort;
   direction: SortDirection;
+  titleQuery: string;
   favorites: SceneFavoritesFilter | 'NONE';
   tagMode: SceneTagMatchMode;
+  favoritePerformersOnly: boolean;
+  favoriteStudiosOnly: boolean;
   limit: number;
   selectedTags: SceneTagOption[];
   selectedStudios: Array<{
@@ -111,6 +122,7 @@ export interface HomeRailFormDraft {
 export interface HomeRailViewSummary {
   sortLabel: string;
   favoritesLabel: string;
+  titleQueryLabel: string | null;
   tagCount: number;
   studioCount: number;
   limit: number;

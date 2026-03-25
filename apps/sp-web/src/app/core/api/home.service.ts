@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
@@ -7,6 +7,7 @@ import {
   SaveHomeRailPayload,
   UpdateHomeRailsPayload,
 } from './home.types';
+import { PerformerStudioOption, SceneTagOption } from './discover.types';
 
 @Injectable({
   providedIn: 'root',
@@ -22,6 +23,18 @@ export class HomeService {
     return this.http.get<HomeRailContentResponse>(
       `/api/home/rails/${encodeURIComponent(id)}/items`,
     );
+  }
+
+  searchStashTags(query: string): Observable<SceneTagOption[]> {
+    const params = new HttpParams().set('query', query);
+    return this.http.get<SceneTagOption[]>('/api/home/stash/tags', { params });
+  }
+
+  searchStashStudios(query: string): Observable<PerformerStudioOption[]> {
+    const params = new HttpParams().set('query', query);
+    return this.http.get<PerformerStudioOption[]>('/api/home/stash/studios', {
+      params,
+    });
   }
 
   updateRails(payload: UpdateHomeRailsPayload): Observable<HomeRailConfig[]> {
