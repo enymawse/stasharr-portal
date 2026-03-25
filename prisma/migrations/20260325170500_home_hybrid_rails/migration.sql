@@ -1,0 +1,1 @@
+ALTER TYPE "HomeRailSource" ADD VALUE 'HYBRID';

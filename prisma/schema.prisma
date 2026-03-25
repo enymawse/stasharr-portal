@@ -52,6 +52,7 @@ enum HomeRailKind {
 enum HomeRailSource {
   STASHDB
   STASH
+  HYBRID
 }
 
 enum HomeRailContentType {

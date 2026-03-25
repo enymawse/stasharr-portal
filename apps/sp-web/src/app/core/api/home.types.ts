@@ -12,9 +12,10 @@ export type HomeRailKey =
   | 'FAVORITE_PERFORMERS'
   | 'RECENTLY_ADDED_LIBRARY';
 export type HomeRailKind = 'BUILTIN' | 'CUSTOM';
-export type HomeRailSource = 'STASHDB' | 'STASH';
+export type HomeRailSource = 'STASHDB' | 'STASH' | 'HYBRID';
 export type HomeRailContentType = 'SCENES';
 export type HomeStashSceneSort = 'CREATED_AT' | 'UPDATED_AT' | 'TITLE';
+export type HomeHybridLibraryAvailability = 'IN_LIBRARY' | 'MISSING_FROM_LIBRARY';
 
 export interface HomeStashdbSceneRailConfig {
   sort: SceneFeedSort;
@@ -42,6 +43,19 @@ export interface HomeStashSceneRailConfig {
   limit: number;
 }
 
+export interface HomeHybridSceneRailConfig {
+  sort: SceneFeedSort;
+  direction: SortDirection;
+  stashdbFavorites: SceneFavoritesFilter | null;
+  tagIds: string[];
+  tagNames: string[];
+  tagMode: SceneTagMatchMode | null;
+  studioIds: string[];
+  studioNames: string[];
+  libraryAvailability: HomeHybridLibraryAvailability;
+  limit: number;
+}
+
 interface BaseHomeRailConfig<TSource extends HomeRailSource, TConfig> {
   id: string;
   key: HomeRailKey | null;
@@ -59,7 +73,8 @@ interface BaseHomeRailConfig<TSource extends HomeRailSource, TConfig> {
 
 export type HomeRailConfig =
   | BaseHomeRailConfig<'STASHDB', HomeStashdbSceneRailConfig>
-  | BaseHomeRailConfig<'STASH', HomeStashSceneRailConfig>;
+  | BaseHomeRailConfig<'STASH', HomeStashSceneRailConfig>
+  | BaseHomeRailConfig<'HYBRID', HomeHybridSceneRailConfig>;
 
 export interface HomeRailItem {
   id: string;
@@ -96,7 +111,7 @@ export interface SaveHomeRailPayload {
   title: string;
   subtitle: string | null;
   enabled: boolean;
-  config: HomeStashdbSceneRailConfig | HomeStashSceneRailConfig;
+  config: HomeStashdbSceneRailConfig | HomeStashSceneRailConfig | HomeHybridSceneRailConfig;
 }
 
 export interface HomeRailFormDraft {
@@ -108,9 +123,11 @@ export interface HomeRailFormDraft {
   direction: SortDirection;
   titleQuery: string;
   favorites: SceneFavoritesFilter | 'NONE';
+  stashdbFavorites: SceneFavoritesFilter | 'NONE';
   tagMode: SceneTagMatchMode;
   favoritePerformersOnly: boolean;
   favoriteStudiosOnly: boolean;
+  libraryAvailability: HomeHybridLibraryAvailability;
   limit: number;
   selectedTags: SceneTagOption[];
   selectedStudios: Array<{
@@ -123,6 +140,7 @@ export interface HomeRailViewSummary {
   sortLabel: string;
   favoritesLabel: string;
   titleQueryLabel: string | null;
+  libraryAvailabilityLabel: string | null;
   tagCount: number;
   studioCount: number;
   limit: number;

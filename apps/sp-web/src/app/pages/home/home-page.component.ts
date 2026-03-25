@@ -40,6 +40,8 @@ import {
   HomeRailContentResponse,
   HomeRailConfig,
   HomeRailFormDraft,
+  HomeHybridLibraryAvailability,
+  HomeHybridSceneRailConfig,
   HomeRailItem,
   HomeRailSource,
   HomeStashSceneSort,
@@ -103,6 +105,8 @@ export class HomePageComponent implements OnInit, OnDestroy {
   private static readonly DEFAULT_SORT: SceneFeedSort = 'DATE';
   private static readonly DEFAULT_DIRECTION: SortDirection = 'DESC';
   private static readonly DEFAULT_TAG_MODE: SceneTagMatchMode = 'OR';
+  private static readonly DEFAULT_LIBRARY_AVAILABILITY: HomeHybridLibraryAvailability =
+    'MISSING_FROM_LIBRARY';
 
   protected static readonly SORT_OPTIONS: Array<{ value: SceneFeedSort; label: string }> = [
     { value: 'DATE', label: 'Release Date' },
@@ -122,6 +126,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
   protected static readonly SOURCE_OPTIONS: Array<{ value: HomeRailSource; label: string }> = [
     { value: 'STASHDB', label: 'StashDB' },
     { value: 'STASH', label: 'Stash' },
+    { value: 'HYBRID', label: 'Hybrid' },
   ];
   protected static readonly DIRECTION_OPTIONS: Array<{
     value: SortDirection;
@@ -145,6 +150,13 @@ export class HomePageComponent implements OnInit, OnDestroy {
   }> = [
     { value: 'OR', label: 'OR (Any)' },
     { value: 'AND', label: 'AND (All)' },
+  ];
+  protected static readonly HYBRID_LIBRARY_AVAILABILITY_OPTIONS: Array<{
+    value: HomeHybridLibraryAvailability;
+    label: string;
+  }> = [
+    { value: 'MISSING_FROM_LIBRARY', label: 'Missing From Library' },
+    { value: 'IN_LIBRARY', label: 'Already In Library' },
   ];
 
   private readonly discoverService = inject(DiscoverService);
@@ -203,6 +215,8 @@ export class HomePageComponent implements OnInit, OnDestroy {
   protected readonly sourceOptions = HomePageComponent.SOURCE_OPTIONS;
   protected readonly favoritesOptions = HomePageComponent.FAVORITES_OPTIONS;
   protected readonly tagMatchOptions = HomePageComponent.TAG_MATCH_OPTIONS;
+  protected readonly hybridLibraryAvailabilityOptions =
+    HomePageComponent.HYBRID_LIBRARY_AVAILABILITY_OPTIONS;
 
   ngOnInit(): void {
     this.setupTagSearch();
@@ -541,9 +555,11 @@ export class HomePageComponent implements OnInit, OnDestroy {
     | 'direction'
     | 'titleQuery'
     | 'favorites'
+    | 'stashdbFavorites'
     | 'tagMode'
     | 'favoritePerformersOnly'
     | 'favoriteStudiosOnly'
+    | 'libraryAvailability'
     | 'limit'
   >>(field: K, value: HomeRailFormDraft[K]): void {
     this.railForm.update((current) => (current ? { ...current, [field]: value } : current));
@@ -566,11 +582,35 @@ export class HomePageComponent implements OnInit, OnDestroy {
           sort: 'CREATED_AT',
           titleQuery: '',
           favorites: 'NONE',
+          stashdbFavorites: 'NONE',
           tagMode: HomePageComponent.DEFAULT_TAG_MODE,
           favoritePerformersOnly: false,
           favoriteStudiosOnly: false,
+          libraryAvailability: HomePageComponent.DEFAULT_LIBRARY_AVAILABILITY,
           selectedTags: [],
           selectedStudios: [],
+        };
+      }
+
+      if (nextSource === 'HYBRID') {
+        return {
+          ...current,
+          source: 'HYBRID',
+          sort: 'DATE',
+          titleQuery: '',
+          favorites: 'NONE',
+          stashdbFavorites:
+            current.source === 'STASHDB'
+              ? current.favorites
+              : current.source === 'HYBRID'
+                ? current.stashdbFavorites
+                : 'NONE',
+          tagMode: current.tagMode,
+          favoritePerformersOnly: false,
+          favoriteStudiosOnly: false,
+          libraryAvailability: HomePageComponent.DEFAULT_LIBRARY_AVAILABILITY,
+          selectedTags: current.source === 'STASH' ? [] : current.selectedTags,
+          selectedStudios: current.source === 'STASH' ? [] : current.selectedStudios,
         };
       }
 
@@ -579,14 +619,22 @@ export class HomePageComponent implements OnInit, OnDestroy {
         source: 'STASHDB',
         sort: 'DATE',
         titleQuery: '',
+        favorites: current.source === 'HYBRID' ? current.stashdbFavorites : current.favorites,
+        stashdbFavorites: 'NONE',
         favoritePerformersOnly: false,
         favoriteStudiosOnly: false,
+        libraryAvailability: HomePageComponent.DEFAULT_LIBRARY_AVAILABILITY,
+        selectedTags: current.source === 'STASH' ? [] : current.selectedTags,
+        selectedStudios: current.source === 'STASH' ? [] : current.selectedStudios,
       };
     });
-    this.formTagSelectedIdsModel.set([]);
-    this.formStudioSelectedIdsModel.set([]);
-    this.rebuildRailFormTagSelectOptions([]);
-    this.rebuildRailFormStudioSelectOptions([]);
+    const updatedForm = this.railForm();
+    this.formTagSelectedIdsModel.set(updatedForm?.selectedTags.map((tag) => tag.id) ?? []);
+    this.formStudioSelectedIdsModel.set(
+      updatedForm?.selectedStudios.map((studio) => studio.id) ?? [],
+    );
+    this.rebuildRailFormTagSelectOptions(this.tagOptions());
+    this.rebuildRailFormStudioSelectOptions(this.studioOptions());
   }
 
   protected onRailFormTagSelectionChanged(nextValue: string[] | null): void {
@@ -744,15 +792,32 @@ export class HomePageComponent implements OnInit, OnDestroy {
   }
 
   protected sourceLabel(source: HomeRailSource): string {
-    return source === 'STASH' ? 'Stash' : 'StashDB';
+    if (source === 'STASH') {
+      return 'Stash';
+    }
+    if (source === 'HYBRID') {
+      return 'Hybrid';
+    }
+
+    return 'StashDB';
   }
 
   protected isStashRail(rail: HomeRailConfig): rail is Extract<HomeRailConfig, { source: 'STASH' }> {
     return rail.source === 'STASH';
   }
 
+  protected isHybridRail(
+    rail: HomeRailConfig,
+  ): rail is Extract<HomeRailConfig, { source: 'HYBRID' }> {
+    return rail.source === 'HYBRID';
+  }
+
   protected isStashForm(): boolean {
     return this.railForm()?.source === 'STASH';
+  }
+
+  protected isHybridForm(): boolean {
+    return this.railForm()?.source === 'HYBRID';
   }
 
   protected railFormSortOptions() {
@@ -762,6 +827,9 @@ export class HomePageComponent implements OnInit, OnDestroy {
   protected railFavoritesValue(rail: HomeRailConfig): string | null {
     if (this.isStashdbConfig(rail.config)) {
       return rail.config.favorites;
+    }
+    if (this.isHybridConfig(rail.config)) {
+      return rail.config.stashdbFavorites;
     }
 
     return this.stashFavoriteSummary(rail.config);
@@ -831,7 +899,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
   }
 
   private loadSingleRail(rail: HomeRailConfig) {
-    if (rail.source === 'STASH') {
+    if (rail.source === 'STASH' || rail.source === 'HYBRID') {
       return this.homeService.getRailItems(rail.id).pipe(
         map(
           (response: HomeRailContentResponse): RailLoadResult => ({
@@ -896,6 +964,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
       sortLabel: this.sortLabelForRail(rail),
       favoritesLabel: this.favoritesLabelForRail(rail),
       titleQueryLabel: this.titleQueryLabelForRail(rail),
+      libraryAvailabilityLabel: this.libraryAvailabilityLabelForRail(rail),
       tagCount: rail.config.tagIds.length,
       studioCount: rail.config.studioIds.length,
       limit: rail.config.limit,
@@ -908,29 +977,41 @@ export class HomePageComponent implements OnInit, OnDestroy {
 
   private cloneRails(rails: HomeRailConfig[]): HomeRailConfig[] {
     return rails.map((rail): HomeRailConfig => {
-      if (rail.source === 'STASHDB') {
-        return {
-          ...rail,
-          config: {
-            ...rail.config,
-            tagIds: [...rail.config.tagIds],
-            tagNames: [...rail.config.tagNames],
-            studioIds: [...rail.config.studioIds],
-            studioNames: [...rail.config.studioNames],
-          },
-        };
+      switch (rail.source) {
+        case 'STASHDB':
+          return {
+            ...rail,
+            config: {
+              ...rail.config,
+              tagIds: [...rail.config.tagIds],
+              tagNames: [...rail.config.tagNames],
+              studioIds: [...rail.config.studioIds],
+              studioNames: [...rail.config.studioNames],
+            },
+          };
+        case 'HYBRID':
+          return {
+            ...rail,
+            config: {
+              ...rail.config,
+              tagIds: [...rail.config.tagIds],
+              tagNames: [...rail.config.tagNames],
+              studioIds: [...rail.config.studioIds],
+              studioNames: [...rail.config.studioNames],
+            },
+          };
+        case 'STASH':
+          return {
+            ...rail,
+            config: {
+              ...rail.config,
+              tagIds: [...rail.config.tagIds],
+              tagNames: [...rail.config.tagNames],
+              studioIds: [...rail.config.studioIds],
+              studioNames: [...rail.config.studioNames],
+            },
+          };
       }
-
-      return {
-        ...rail,
-        config: {
-          ...rail.config,
-          tagIds: [...rail.config.tagIds],
-          tagNames: [...rail.config.tagNames],
-          studioIds: [...rail.config.studioIds],
-          studioNames: [...rail.config.studioNames],
-        } as HomeStashSceneRailConfig,
-      };
     });
   }
 
@@ -945,10 +1026,14 @@ export class HomePageComponent implements OnInit, OnDestroy {
       direction: config.direction,
       titleQuery: this.isStashConfig(config) ? config.titleQuery ?? '' : '',
       favorites: this.isStashdbConfig(config) ? config.favorites ?? 'NONE' : 'NONE',
+      stashdbFavorites: this.isHybridConfig(config) ? config.stashdbFavorites ?? 'NONE' : 'NONE',
       tagMode: config.tagMode ?? HomePageComponent.DEFAULT_TAG_MODE,
       favoritePerformersOnly:
         this.isStashConfig(config) ? config.favoritePerformersOnly : false,
       favoriteStudiosOnly: this.isStashConfig(config) ? config.favoriteStudiosOnly : false,
+      libraryAvailability: this.isHybridConfig(config)
+        ? config.libraryAvailability
+        : HomePageComponent.DEFAULT_LIBRARY_AVAILABILITY,
       limit: config.limit,
       selectedTags: config.tagIds
         ? config.tagIds.map((id, index) => ({
@@ -977,9 +1062,11 @@ export class HomePageComponent implements OnInit, OnDestroy {
       direction: HomePageComponent.DEFAULT_DIRECTION,
       titleQuery: '',
       favorites: 'NONE',
+      stashdbFavorites: 'NONE',
       tagMode: HomePageComponent.DEFAULT_TAG_MODE,
       favoritePerformersOnly: false,
       favoriteStudiosOnly: false,
+      libraryAvailability: HomePageComponent.DEFAULT_LIBRARY_AVAILABILITY,
       limit: HomePageComponent.DEFAULT_LIMIT,
       selectedTags: [],
       selectedStudios: [],
@@ -1009,6 +1096,30 @@ export class HomePageComponent implements OnInit, OnDestroy {
               Math.round(Number(form.limit) || HomePageComponent.DEFAULT_LIMIT),
               HomePageComponent.LIMIT_MIN,
             ),
+            HomePageComponent.LIMIT_MAX,
+          ),
+        },
+      };
+    }
+
+    if (form.source === 'HYBRID') {
+      return {
+        source: 'HYBRID',
+        title: form.title.trim(),
+        subtitle: form.subtitle.trim() || null,
+        enabled: form.enabled,
+        config: {
+          sort: form.sort as SceneFeedSort,
+          direction: form.direction,
+          stashdbFavorites: form.stashdbFavorites === 'NONE' ? null : form.stashdbFavorites,
+          tagIds: form.selectedTags.map((tag) => tag.id),
+          tagNames: form.selectedTags.map((tag) => tag.name),
+          tagMode: form.selectedTags.length > 0 ? form.tagMode : null,
+          studioIds: form.selectedStudios.map((studio) => studio.id),
+          studioNames: form.selectedStudios.map((studio) => studio.label),
+          libraryAvailability: form.libraryAvailability,
+          limit: Math.min(
+            Math.max(Math.round(Number(form.limit) || HomePageComponent.DEFAULT_LIMIT), HomePageComponent.LIMIT_MIN),
             HomePageComponent.LIMIT_MAX,
           ),
         },
@@ -1201,15 +1312,24 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return 'favorites' in config;
   }
 
+  private isHybridConfig(
+    config: HomeRailConfig['config'],
+  ): config is HomeHybridSceneRailConfig {
+    return 'libraryAvailability' in config;
+  }
+
   private isStashConfig(
     config: HomeRailConfig['config'],
   ): config is HomeStashSceneRailConfig {
-    return !this.isStashdbConfig(config);
+    return !this.isStashdbConfig(config) && !this.isHybridConfig(config);
   }
 
   private favoritesLabelForRail(rail: HomeRailConfig): string {
     const config = rail.config;
-    if (!this.isStashdbConfig(config)) {
+    if (this.isHybridConfig(config)) {
+      return this.hybridFavoritesSummary(config);
+    }
+    if (this.isStashConfig(config)) {
       return this.stashFavoriteSummary(config);
     }
 
@@ -1233,6 +1353,16 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return null;
   }
 
+  private libraryAvailabilityLabelForRail(rail: HomeRailConfig): string | null {
+    if (!this.isHybridConfig(rail.config)) {
+      return null;
+    }
+
+    return rail.config.libraryAvailability === 'IN_LIBRARY'
+      ? 'Already In Library'
+      : 'Missing From Library';
+  }
+
   private stashFavoriteSummary(config: HomeStashSceneRailConfig): string {
     if (config.favoritePerformersOnly && config.favoriteStudiosOnly) {
       return 'Favorite Performers + Studios';
@@ -1245,6 +1375,15 @@ export class HomePageComponent implements OnInit, OnDestroy {
     }
 
     return 'Local Library';
+  }
+
+  private hybridFavoritesSummary(config: HomeHybridSceneRailConfig): string {
+    const label =
+      HomePageComponent.FAVORITES_OPTIONS.find(
+        (option) => option.value === (config.stashdbFavorites ?? 'NONE'),
+      )?.label ?? 'No Favorites Filter';
+
+    return `StashDB ${label}`;
   }
 
   private searchRailTags(query: string) {

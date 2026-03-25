@@ -19,16 +19,25 @@ import {
   type StashLocalSceneFeedItem,
   type StashLocalTagOption,
 } from '../providers/stash/stash.adapter';
+import {
+  StashdbAdapter,
+  type StashdbScene,
+} from '../providers/stashdb/stashdb.adapter';
+import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import { PerformerStudioOptionDto } from '../performers/dto/performer-studio-option.dto';
 import { SceneTagOptionDto } from '../scenes/dto/scene-tag-option.dto';
+import { SceneStatusService } from '../scene-status/scene-status.service';
 import {
   HOME_RAIL_CONTENT_TYPE_VALUES,
   HOME_RAIL_DIRECTION_VALUES,
   HOME_RAIL_FAVORITES_VALUES,
+  HOME_RAIL_LIBRARY_AVAILABILITY_VALUES,
   HOME_RAIL_SCENE_LIMIT_DEFAULT,
   HOME_RAIL_SCENE_LIMIT_MAX,
   HOME_RAIL_SCENE_LIMIT_MIN,
   HOME_RAIL_SOURCE_VALUES,
+  type HomeRailLibraryAvailability,
+  type HomeRailHybridSceneConfigDto,
   HOME_RAIL_STASH_SCENE_SORT_VALUES,
   HOME_RAIL_STASHDB_SCENE_SORT_VALUES,
   HOME_RAIL_TAG_MODE_VALUES,
@@ -116,6 +125,10 @@ const DEFAULT_HOME_RAILS: Array<{
   },
 ];
 
+const HYBRID_LOOKUP_CONCURRENCY = 6;
+const HYBRID_OVERSCAN_FACTOR = 5;
+const HYBRID_PAGE_SIZE_MAX = 50;
+
 @Injectable()
 export class HomeService {
   private readonly logger = new Logger(HomeService.name);
@@ -123,6 +136,8 @@ export class HomeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stashAdapter: StashAdapter,
+    private readonly stashdbAdapter: StashdbAdapter,
+    private readonly sceneStatusService: SceneStatusService,
   ) {}
 
   async getRails(): Promise<HomeRailDto[]> {
@@ -212,13 +227,17 @@ export class HomeService {
       throw new BadRequestException('Unsupported Home rail content type.');
     }
 
-    if (rail.source !== HomeRailSource.STASH) {
-      throw new BadRequestException(
-        'This Home rail is loaded through the scenes feed endpoint instead.',
-      );
+    if (rail.source === HomeRailSource.STASH) {
+      return this.getStashRailContent(rail);
     }
 
-    return this.getStashRailContent(rail);
+    if (rail.source === HomeRailSource.HYBRID) {
+      return this.getHybridRailContent(rail);
+    }
+
+    throw new BadRequestException(
+      'This Home rail is loaded through the scenes feed endpoint instead.',
+    );
   }
 
   async searchStashTags(query?: string): Promise<SceneTagOptionDto[]> {
@@ -327,6 +346,62 @@ export class HomeService {
     }
   }
 
+  private async getHybridRailContent(rail: HomeRail): Promise<HomeRailContentDto> {
+    let stashdbConfig: { baseUrl: string; apiKey?: string | null };
+    let stashConfig: { baseUrl: string; apiKey?: string | null };
+
+    try {
+      stashdbConfig = await this.getRequiredStashdbConfig();
+    } catch {
+      return {
+        items: [],
+        message: 'Configure and enable your StashDB integration to populate this hybrid rail.',
+      };
+    }
+
+    try {
+      stashConfig = await this.getRequiredStashConfig();
+    } catch {
+      return {
+        items: [],
+        message: 'Configure and enable your Stash integration to apply library matching.',
+      };
+    }
+
+    const config = this.normalizeSceneRailConfig(
+      rail.source,
+      rail.config,
+      null,
+    ) as HomeRailHybridSceneConfigDto;
+
+    try {
+      const matchedScenes = await this.loadHybridMatchedScenes(config, stashdbConfig, stashConfig);
+      const statuses =
+        config.libraryAvailability === 'MISSING_FROM_LIBRARY'
+          ? await this.sceneStatusService.resolveForScenes(matchedScenes.map((scene) => scene.id))
+          : new Map<string, { state: 'AVAILABLE' }>();
+
+      return {
+        items: matchedScenes.map((scene) =>
+          this.toHybridRailItem(
+            scene,
+            config.libraryAvailability,
+            statuses.get(scene.id) ?? { state: 'AVAILABLE' },
+          ),
+        ),
+        message: null,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Failed to load hybrid Home rail ${rail.id}. ${(error as Error)?.message ?? 'Unknown error.'}`,
+      );
+      return {
+        items: [],
+        message: 'Unable to load hybrid library matches right now.',
+      };
+    }
+  }
+
   private async listRails(): Promise<HomeRail[]> {
     return this.prisma.homeRail.findMany({
       orderBy: { sortOrder: 'asc' },
@@ -428,6 +503,33 @@ export class HomeService {
     };
   }
 
+  private toHybridRailItem(
+    scene: StashdbScene,
+    libraryAvailability: HomeRailLibraryAvailability,
+    status: { state: 'NOT_REQUESTED' | 'DOWNLOADING' | 'AVAILABLE' | 'MISSING' },
+  ): HomeRailItemDto {
+    const effectiveStatus =
+      libraryAvailability === 'IN_LIBRARY' ? { state: 'AVAILABLE' as const } : status;
+
+    return {
+      id: scene.id,
+      title: scene.title,
+      description: scene.details,
+      imageUrl: scene.imageUrl,
+      cardImageUrl: withStashImageSize(scene.imageUrl, 600),
+      studioId: scene.studioId,
+      studio: scene.studioName,
+      studioImageUrl: scene.studioImageUrl,
+      releaseDate: scene.releaseDate ?? scene.productionDate ?? scene.date,
+      duration: scene.duration,
+      type: 'SCENE',
+      source: 'STASHDB',
+      status: effectiveStatus,
+      requestable: libraryAvailability === 'MISSING_FROM_LIBRARY' && effectiveStatus.state === 'NOT_REQUESTED',
+      viewUrl: null,
+    };
+  }
+
   private buildStashSceneScreenshotProxyUrl(sceneId: string): string {
     return `/api/media/stash/scenes/${encodeURIComponent(sceneId)}/screenshot`;
   }
@@ -457,6 +559,9 @@ export class HomeService {
     const record = this.asRecord(input);
     if (source === HomeRailSource.STASH) {
       return this.normalizeStashSceneRailConfig(record, fallback);
+    }
+    if (source === HomeRailSource.HYBRID) {
+      return this.normalizeHybridSceneRailConfig(record, fallback);
     }
 
     return this.normalizeStashdbSceneRailConfig(record, fallback);
@@ -508,7 +613,7 @@ export class HomeService {
     record: Record<string, unknown>,
     fallback: Partial<HomeRailSceneConfigDto> | null,
   ): HomeRailStashSceneConfigDto {
-    this.ensureNullishField(record.favorites, 'favorites');
+    this.ensureNullishField(record.favorites, 'favorites', 'STASH');
 
     const fallbackConfig = this.asStashSceneConfig(fallback);
     const sort = this.parseOptionalStrictInSet(
@@ -564,6 +669,71 @@ export class HomeService {
     };
   }
 
+  private normalizeHybridSceneRailConfig(
+    record: Record<string, unknown>,
+    fallback: Partial<HomeRailSceneConfigDto> | null,
+  ): HomeRailHybridSceneConfigDto {
+    this.ensureNullishField(record.favorites, 'favorites', 'HYBRID');
+    this.ensureNullishField(record.titleQuery, 'titleQuery', 'HYBRID');
+    this.ensureFalseField(record.favoritePerformersOnly, 'favoritePerformersOnly');
+    this.ensureFalseField(record.favoriteStudiosOnly, 'favoriteStudiosOnly');
+
+    const fallbackConfig = this.asHybridSceneConfig(fallback);
+    const sort = this.parseOptionalStrictInSet(
+      record.sort,
+      HOME_RAIL_STASHDB_SCENE_SORT_VALUES,
+      fallbackConfig?.sort ?? 'DATE',
+      'sort',
+    );
+    const direction = this.parseOptionalStrictInSet(
+      record.direction,
+      HOME_RAIL_DIRECTION_VALUES,
+      fallbackConfig?.direction ?? 'DESC',
+      'direction',
+    );
+    const stashdbFavorites = this.parseOptionalStrictNullableInSet(
+      record.stashdbFavorites,
+      HOME_RAIL_FAVORITES_VALUES,
+      fallbackConfig?.stashdbFavorites ?? null,
+      'stashdbFavorites',
+    );
+    const tags = this.normalizeNamedIds(record.tagIds, record.tagNames);
+    const studios = this.normalizeNamedIds(record.studioIds, record.studioNames);
+    const fallbackTagMode = tags.ids.length > 0 ? fallbackConfig?.tagMode ?? 'OR' : null;
+    const tagMode =
+      tags.ids.length > 0
+        ? this.parseOptionalStrictNullableInSet(
+            record.tagMode,
+            HOME_RAIL_TAG_MODE_VALUES,
+            fallbackTagMode,
+            'tagMode',
+          )
+        : null;
+    const libraryAvailability = this.parseOptionalStrictInSet(
+      record.libraryAvailability,
+      HOME_RAIL_LIBRARY_AVAILABILITY_VALUES,
+      fallbackConfig?.libraryAvailability ?? 'MISSING_FROM_LIBRARY',
+      'libraryAvailability',
+    );
+    const limit = this.parseLimit(
+      record.limit,
+      fallbackConfig?.limit ?? HOME_RAIL_SCENE_LIMIT_DEFAULT,
+    );
+
+    return {
+      sort,
+      direction,
+      stashdbFavorites,
+      tagIds: tags.ids,
+      tagNames: tags.names,
+      tagMode,
+      studioIds: studios.ids,
+      studioNames: studios.names,
+      libraryAvailability,
+      limit,
+    };
+  }
+
   private normalizeNamedIds(idsValue: unknown, namesValue: unknown): { ids: string[]; names: string[] } {
     const ids = Array.isArray(idsValue) ? idsValue : [];
     const names = Array.isArray(namesValue) ? namesValue : [];
@@ -593,12 +763,20 @@ export class HomeService {
     };
   }
 
-  private ensureNullishField(value: unknown, fieldName: string): void {
+  private ensureNullishField(value: unknown, fieldName: string, source: 'STASH' | 'HYBRID'): void {
     if (value === null || value === undefined || value === '') {
       return;
     }
 
-    throw new BadRequestException(`Field ${fieldName} is not supported for STASH Home rails.`);
+    throw new BadRequestException(`Field ${fieldName} is not supported for ${source} Home rails.`);
+  }
+
+  private ensureFalseField(value: unknown, fieldName: string): void {
+    if (value === null || value === undefined || value === '' || value === false) {
+      return;
+    }
+
+    throw new BadRequestException(`Field ${fieldName} is not supported for HYBRID Home rails.`);
   }
 
   private parseBoolean(value: unknown, fallback: boolean): boolean {
@@ -657,6 +835,20 @@ export class HomeService {
         'favoriteStudiosOnly' in value && value.favoriteStudiosOnly === true,
       limit: value.limit,
     };
+  }
+
+  private asHybridSceneConfig(
+    value: Partial<HomeRailSceneConfigDto> | null,
+  ): Partial<HomeRailHybridSceneConfigDto> | null {
+    if (!value) {
+      return null;
+    }
+
+    if ('stashdbFavorites' in value || 'libraryAvailability' in value) {
+      return value as Partial<HomeRailHybridSceneConfigDto>;
+    }
+
+    return null;
   }
 
   private parseOptionalInSet<const T extends readonly string[]>(
@@ -752,6 +944,119 @@ export class HomeService {
     };
   }
 
+  private async loadHybridMatchedScenes(
+    config: HomeRailHybridSceneConfigDto,
+    stashdbConfig: { baseUrl: string; apiKey?: string | null },
+    stashConfig: { baseUrl: string; apiKey?: string | null },
+  ): Promise<StashdbScene[]> {
+    const desiredInLibrary = config.libraryAvailability === 'IN_LIBRARY';
+    const targetCount = config.limit;
+    const maxInspected = targetCount * HYBRID_OVERSCAN_FACTOR;
+    const pageSize = Math.min(Math.max(targetCount * 2, targetCount), HYBRID_PAGE_SIZE_MAX);
+    const matched: StashdbScene[] = [];
+    const availabilityCache = new Map<string, boolean>();
+    let inspected = 0;
+    let page = 1;
+    let totalCandidates = Number.POSITIVE_INFINITY;
+
+    while (
+      matched.length < targetCount &&
+      inspected < maxInspected &&
+      (page - 1) * pageSize < totalCandidates
+    ) {
+      const candidatePage = await this.stashdbAdapter.getScenesBySort({
+        ...stashdbConfig,
+        page,
+        perPage: pageSize,
+        sort: config.sort,
+        direction: config.direction,
+        favorites: config.stashdbFavorites ?? undefined,
+        studioIds: config.studioIds,
+        tagFilter:
+          config.tagIds.length > 0
+            ? {
+                tagIds: config.tagIds,
+                mode: config.tagMode ?? 'OR',
+              }
+            : undefined,
+      });
+
+      totalCandidates = candidatePage.total;
+      const pageScenes = candidatePage.scenes.slice(0, maxInspected - inspected);
+      if (pageScenes.length === 0) {
+        break;
+      }
+
+      const pageMatches = await this.mapWithConcurrency(
+        pageScenes,
+        HYBRID_LOOKUP_CONCURRENCY,
+        async (scene) => {
+          const inLibrary = await this.resolveHybridLibraryAvailability(
+            scene.id,
+            stashConfig,
+            availabilityCache,
+          );
+          return { scene, inLibrary };
+        },
+      );
+
+      inspected += pageScenes.length;
+
+      for (const result of pageMatches) {
+        if (result.inLibrary === desiredInLibrary) {
+          matched.push(result.scene);
+          if (matched.length >= targetCount) {
+            break;
+          }
+        }
+      }
+
+      if (candidatePage.scenes.length < pageSize) {
+        break;
+      }
+
+      page += 1;
+    }
+
+    return matched.slice(0, targetCount);
+  }
+
+  private async resolveHybridLibraryAvailability(
+    stashId: string,
+    stashConfig: { baseUrl: string; apiKey?: string | null },
+    cache: Map<string, boolean>,
+  ): Promise<boolean> {
+    const cached = cache.get(stashId);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const matches = await this.stashAdapter.findScenesByStashId(stashId, stashConfig);
+    const inLibrary = matches.length > 0;
+    cache.set(stashId, inLibrary);
+    return inLibrary;
+  }
+
+  private async mapWithConcurrency<TInput, TOutput>(
+    items: TInput[],
+    concurrency: number,
+    mapper: (item: TInput, index: number) => Promise<TOutput>,
+  ): Promise<TOutput[]> {
+    const results = new Array<TOutput>(items.length);
+    let nextIndex = 0;
+
+    const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+      while (nextIndex < items.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        results[currentIndex] = await mapper(items[currentIndex] as TInput, currentIndex);
+      }
+    });
+
+    await Promise.all(workers);
+    return results;
+  }
+
   private async getRequiredStashConfig(): Promise<{ baseUrl: string; apiKey?: string | null }> {
     const integration = await this.prisma.integrationConfig.findUnique({
       where: { type: 'STASH' },
@@ -772,6 +1077,34 @@ export class HomeService {
     const baseUrl = integration.baseUrl?.trim();
     if (!baseUrl) {
       throw new BadRequestException('STASH integration is missing a base URL.');
+    }
+
+    return {
+      baseUrl,
+      apiKey: integration.apiKey,
+    };
+  }
+
+  private async getRequiredStashdbConfig(): Promise<{ baseUrl: string; apiKey?: string | null }> {
+    const integration = await this.prisma.integrationConfig.findUnique({
+      where: { type: 'STASHDB' },
+    });
+
+    if (!integration) {
+      throw new ConflictException('STASHDB integration is not configured.');
+    }
+
+    if (!integration.enabled) {
+      throw new ConflictException('STASHDB integration is disabled.');
+    }
+
+    if (integration.status !== 'CONFIGURED') {
+      throw new ConflictException('STASHDB integration is not configured.');
+    }
+
+    const baseUrl = integration.baseUrl?.trim();
+    if (!baseUrl) {
+      throw new BadRequestException('STASHDB integration is missing a base URL.');
     }
 
     return {
