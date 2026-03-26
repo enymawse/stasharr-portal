@@ -2,19 +2,8 @@
 
 :root {
   --app-font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    'Helvetica Neue',
-    'Noto Sans',
-    'Liberation Sans',
-    Arial,
-    sans-serif,
-    'Apple Color Emoji',
-    'Segoe UI Emoji',
-    'Segoe UI Symbol',
-    'Noto Color Emoji';
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', 'Liberation Sans',
+    Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --app-bg: #eef3f8;
   --surface-1: #ffffff;
   --surface-2: #f6f9fc;
@@ -40,15 +29,18 @@
   --badge-not-requested-bg: #eef2f6;
   --badge-not-requested-border: #d1dae4;
   --badge-not-requested-text: #43576b;
+  --badge-requested-bg: #e8effc;
+  --badge-requested-border: #b9caea;
+  --badge-requested-text: #244d7a;
   --badge-downloading-bg: #fff2d8;
   --badge-downloading-border: #ebcf98;
   --badge-downloading-text: #7f5607;
+  --badge-import-pending-bg: #e4f4f0;
+  --badge-import-pending-border: #aed8cd;
+  --badge-import-pending-text: #15635b;
   --badge-available-bg: #e2f4e6;
   --badge-available-border: #add8b8;
   --badge-available-text: #1b6231;
-  --badge-missing-bg: #fbe8e8;
-  --badge-missing-border: #ebb4b4;
-  --badge-missing-text: #842121;
   --shadow-sm: 0 6px 16px rgb(8 16 27 / 12%);
 
   /* PrimeNG token bridge: keep framework controls aligned with app surfaces/colors. */
@@ -91,15 +83,18 @@
   --badge-not-requested-bg: #273647;
   --badge-not-requested-border: #3e5269;
   --badge-not-requested-text: #c0d0e3;
+  --badge-requested-bg: #233b57;
+  --badge-requested-border: #45688f;
+  --badge-requested-text: #d4e6fb;
   --badge-downloading-bg: #524427;
   --badge-downloading-border: #8b7442;
   --badge-downloading-text: #f8dc99;
+  --badge-import-pending-bg: #1f4744;
+  --badge-import-pending-border: #4b8e87;
+  --badge-import-pending-text: #c7f0ea;
   --badge-available-bg: #1f4d33;
   --badge-available-border: #4c8d62;
   --badge-available-text: #ccefd4;
-  --badge-missing-bg: #522a2a;
-  --badge-missing-border: #8f4949;
-  --badge-missing-text: #f8c5c5;
   --shadow-sm: 0 10px 22px rgb(0 0 0 / 40%);
 
   --p-content-background: var(--surface-1);

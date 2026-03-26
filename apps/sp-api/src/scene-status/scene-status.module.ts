@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { IntegrationsModule } from '../integrations/integrations.module';
+import { StashModule } from '../providers/stash/stash.module';
 import { WhisparrModule } from '../providers/whisparr/whisparr.module';
 import { SceneStatusService } from './scene-status.service';
 
 @Module({
-  imports: [IntegrationsModule, WhisparrModule],
+  imports: [IntegrationsModule, StashModule, WhisparrModule],
   providers: [SceneStatusService],
   exports: [SceneStatusService],
 })

@@ -73,9 +73,7 @@ interface MultiSelectGroup {
   templateUrl: './performer-page.component.html',
   styleUrl: './performer-page.component.scss',
 })
-export class PerformerPageComponent
-  implements OnInit, AfterViewInit, OnDestroy
-{
+export class PerformerPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly SCENES_PAGE_SIZE = 25;
   private static readonly SEARCH_DEBOUNCE_MS = 250;
   private static readonly DEFAULT_SORT: SceneFeedSort = 'DATE';
@@ -266,9 +264,7 @@ export class PerformerPageComponent
         },
         error: () => {
           this.notifications.error(
-            nextFavorite
-              ? 'Failed to favorite performer'
-              : 'Failed to unfavorite performer',
+            nextFavorite ? 'Failed to favorite performer' : 'Failed to unfavorite performer',
           );
         },
       });
@@ -324,7 +320,7 @@ export class PerformerPageComponent
   protected onRequestSubmitted(stashId: string): void {
     this.scenes.update((current) =>
       current.map((item) =>
-        item.id === stashId ? { ...item, status: { state: 'DOWNLOADING' } } : item,
+        item.id === stashId ? { ...item, status: { state: 'REQUESTED' } } : item,
       ),
     );
   }
@@ -362,9 +358,7 @@ export class PerformerPageComponent
   }
 
   protected toggleSceneSortDirection(): void {
-    this.onSceneSortDirectionChanged(
-      this.sceneSortDirection() === 'ASC' ? 'DESC' : 'ASC',
-    );
+    this.onSceneSortDirectionChanged(this.sceneSortDirection() === 'ASC' ? 'DESC' : 'ASC');
   }
 
   protected sceneSortDirectionIconClass(): string {
@@ -534,9 +528,7 @@ export class PerformerPageComponent
       return;
     }
 
-    this.activeImageIndex.set(
-      (this.activeImageIndex() - 1 + imageCount) % imageCount,
-    );
+    this.activeImageIndex.set((this.activeImageIndex() - 1 + imageCount) % imageCount);
   }
 
   protected performerInitial(name: string): string {
@@ -890,17 +882,19 @@ export class PerformerPageComponent
 
   private syncUrlWithCurrentFilters(replaceUrl: boolean): void {
     const next = {
-      sort:
-        this.sceneSort() === PerformerPageComponent.DEFAULT_SORT
-          ? null
-          : this.sceneSort(),
+      sort: this.sceneSort() === PerformerPageComponent.DEFAULT_SORT ? null : this.sceneSort(),
       dir:
         this.sceneSortDirection() === PerformerPageComponent.DEFAULT_DIRECTION
           ? null
           : this.sceneSortDirection(),
       favStudios: this.onlyFavoriteStudios() ? '1' : null,
       studios: this.selectedStudiosIds().length > 0 ? this.selectedStudiosIds().join(',') : null,
-      tags: this.selectedTags().length > 0 ? this.selectedTags().map((tag) => tag.id).join(',') : null,
+      tags:
+        this.selectedTags().length > 0
+          ? this.selectedTags()
+              .map((tag) => tag.id)
+              .join(',')
+          : null,
     };
 
     const current = this.route.snapshot.queryParamMap;

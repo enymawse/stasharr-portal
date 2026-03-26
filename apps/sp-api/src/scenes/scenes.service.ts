@@ -5,12 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
-import { DiscoverResponseDto } from '../discover/dto/discover-item.dto';
+import { HybridScenesService } from '../hybrid-scenes/hybrid-scenes.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
+import { SceneStatusDto } from '../scene-status/dto/scene-status.dto';
 import { SceneStatusService } from '../scene-status/scene-status.service';
 import { SceneTagOptionDto } from './dto/scene-tag-option.dto';
 import {
@@ -18,9 +19,11 @@ import {
   SceneStashAvailabilityDto,
   SceneWhisparrAvailabilityDto,
 } from './dto/scene-details.dto';
+import { ScenesFeedResponseDto } from './dto/scenes-feed.dto';
 import {
   SceneFavoritesFilter,
   SceneFeedSort,
+  SceneLibraryAvailability,
   SortDirection,
   SceneTagMatchMode,
 } from './dto/scenes-query.dto';
@@ -36,6 +39,7 @@ export class ScenesService {
     private readonly sceneStatusService: SceneStatusService,
     private readonly stashAdapter: StashAdapter,
     private readonly whisparrAdapter: WhisparrAdapter,
+    private readonly hybridScenesService: HybridScenesService,
   ) {}
 
   async getScenesFeed(
@@ -47,69 +51,103 @@ export class ScenesService {
     tagMode: SceneTagMatchMode = 'OR',
     favorites?: SceneFavoritesFilter,
     studioIds: string[] = [],
-  ): Promise<DiscoverResponseDto> {
-    const integration = await this.getStashdbIntegration();
-
-    if (!integration.enabled) {
-      throw new ConflictException('STASHDB integration is disabled.');
-    }
-
-    if (integration.status !== IntegrationStatus.CONFIGURED) {
-      throw new ConflictException('STASHDB integration is not configured.');
-    }
-
-    if (!integration.baseUrl) {
-      throw new BadRequestException(
-        'STASHDB integration is missing a base URL.',
-      );
-    }
-
+    libraryAvailability: SceneLibraryAvailability = 'ANY',
+    stashFavoritePerformersOnly = false,
+    stashFavoriteStudiosOnly = false,
+    stashFavoriteTagsOnly = false,
+  ): Promise<ScenesFeedResponseDto> {
+    const stashdbConfig = await this.getStashdbConfig();
     const normalizedTagIds = this.normalizeTagIds(tagIds);
     const normalizedStudioIds = this.normalizeStudioIds(studioIds);
+    const hybridActive =
+      libraryAvailability !== 'ANY' ||
+      stashFavoritePerformersOnly ||
+      stashFavoriteStudiosOnly ||
+      stashFavoriteTagsOnly;
 
-    const scenes = await this.stashdbAdapter.getScenesBySort({
-      baseUrl: integration.baseUrl,
-      apiKey: integration.apiKey,
-      page,
-      perPage,
-      sort,
-      direction,
-      favorites,
-      studioIds: normalizedStudioIds,
-      tagFilter:
-        normalizedTagIds.length > 0
-          ? {
-              tagIds: normalizedTagIds,
-              mode: tagMode,
-            }
-          : undefined,
-    });
+    if (!hybridActive) {
+      const scenes = await this.stashdbAdapter.getScenesBySort({
+        ...stashdbConfig,
+        page,
+        perPage,
+        sort,
+        direction,
+        favorites,
+        studioIds: normalizedStudioIds,
+        tagFilter:
+          normalizedTagIds.length > 0
+            ? {
+                tagIds: normalizedTagIds,
+                mode: tagMode,
+              }
+            : undefined,
+      });
 
-    const hasMore = page * perPage < scenes.total;
-    const statuses = await this.sceneStatusService.resolveForScenes(
-      scenes.scenes.map((scene) => scene.id),
+      const hasMore = page * perPage < scenes.total;
+      const statuses = await this.sceneStatusService.resolveForScenes(
+        scenes.scenes.map((scene) => scene.id),
+      );
+
+      return {
+        total: scenes.total,
+        page,
+        perPage,
+        hasMore,
+        items: scenes.scenes.map((scene) => {
+          const status = statuses.get(scene.id) ?? { state: 'NOT_REQUESTED' };
+          return this.toScenesFeedItem(
+            scene,
+            status,
+            status.state === 'NOT_REQUESTED',
+          );
+        }),
+      };
+    }
+
+    const stashConfig = await this.getStashConfig();
+    const hybridFeed = await this.hybridScenesService.getHybridSceneFeed(
+      stashdbConfig,
+      stashConfig,
+      {
+        page,
+        perPage,
+        sort,
+        direction,
+        stashdbFavorites: favorites,
+        tagIds: normalizedTagIds,
+        tagMode,
+        studioIds: normalizedStudioIds,
+        libraryAvailability,
+        stashFavoritePerformersOnly,
+        stashFavoriteStudiosOnly,
+        stashFavoriteTagsOnly,
+      },
     );
 
+    const isInLibraryAvailability =
+      hybridFeed.effectiveAvailability === 'IN_LIBRARY';
+    const statuses = isInLibraryAvailability
+      ? new Map<string, { state: 'AVAILABLE' }>()
+      : await this.sceneStatusService.resolveForScenes(
+          hybridFeed.scenes.map((scene) => scene.id),
+        );
+
     return {
-      total: scenes.total,
+      total: hybridFeed.total,
       page,
       perPage,
-      hasMore,
-      items: scenes.scenes.map((scene) => ({
-        id: scene.id,
-        title: scene.title,
-        description: scene.details,
-        imageUrl: scene.imageUrl,
-        cardImageUrl: withStashImageSize(scene.imageUrl, 600),
-        studioId: scene.studioId,
-        studio: scene.studioName,
-        studioImageUrl: scene.studioImageUrl,
-        releaseDate: scene.releaseDate ?? scene.productionDate ?? scene.date,
-        duration: scene.duration,
-        type: 'SCENE',
-        source: 'STASHDB',
-        status: statuses.get(scene.id) ?? { state: 'NOT_REQUESTED' },
-      })),
+      hasMore: hybridFeed.hasMore,
+      items: hybridFeed.scenes.map((scene) =>
+        this.toScenesFeedItem(
+          scene,
+          isInLibraryAvailability
+            ? { state: 'AVAILABLE' }
+            : (statuses.get(scene.id) ?? { state: 'NOT_REQUESTED' }),
+          !isInLibraryAvailability &&
+            (statuses.get(scene.id)?.state ?? 'NOT_REQUESTED') ===
+              'NOT_REQUESTED',
+        ),
+      ),
     };
   }
 
@@ -291,12 +329,76 @@ export class ScenesService {
     };
   }
 
+  private async getStashConfig(): Promise<{
+    baseUrl: string;
+    apiKey: string | null;
+  }> {
+    const integration = await this.integrationsService.findOne(
+      IntegrationType.STASH,
+    );
+
+    if (!integration.enabled) {
+      throw new ConflictException('STASH integration is disabled.');
+    }
+
+    if (integration.status !== IntegrationStatus.CONFIGURED) {
+      throw new ConflictException('STASH integration is not configured.');
+    }
+
+    const baseUrl = integration.baseUrl?.trim();
+    if (!baseUrl) {
+      throw new BadRequestException('STASH integration is missing a base URL.');
+    }
+
+    return {
+      baseUrl,
+      apiKey: integration.apiKey,
+    };
+  }
+
+  private toScenesFeedItem(
+    scene: {
+      id: string;
+      title: string;
+      details: string | null;
+      imageUrl: string | null;
+      studioId: string | null;
+      studioName: string | null;
+      studioImageUrl: string | null;
+      releaseDate: string | null;
+      productionDate: string | null;
+      date: string | null;
+      duration: number | null;
+    },
+    status: SceneStatusDto,
+    requestable: boolean,
+  ) {
+    return {
+      id: scene.id,
+      title: scene.title,
+      description: scene.details,
+      imageUrl: scene.imageUrl,
+      cardImageUrl: withStashImageSize(scene.imageUrl, 600),
+      studioId: scene.studioId,
+      studio: scene.studioName,
+      studioImageUrl: scene.studioImageUrl,
+      releaseDate: scene.releaseDate ?? scene.productionDate ?? scene.date,
+      duration: scene.duration,
+      type: 'SCENE' as const,
+      source: 'STASHDB' as const,
+      status,
+      requestable,
+    };
+  }
+
   private normalizeTagIds(tagIds: string[]): string[] {
     return [...new Set(tagIds.map((tagId) => tagId.trim()).filter(Boolean))];
   }
 
   private normalizeStudioIds(studioIds: string[]): string[] {
-    return [...new Set(studioIds.map((studioId) => studioId.trim()).filter(Boolean))];
+    return [
+      ...new Set(studioIds.map((studioId) => studioId.trim()).filter(Boolean)),
+    ];
   }
 
   private resolveStudioUrl(

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { DiscoverResponseDto } from '../discover/dto/discover-item.dto';
 import { SceneTagOptionDto } from './dto/scene-tag-option.dto';
 import { SceneDetailsDto } from './dto/scene-details.dto';
+import { ScenesFeedResponseDto } from './dto/scenes-feed.dto';
 import { ScenesQueryDto } from './dto/scenes-query.dto';
 import { ScenesTagsQueryDto } from './dto/scenes-tags-query.dto';
 import { ToggleFavoriteDto } from './dto/toggle-favorite.dto';
@@ -14,7 +14,7 @@ export class ScenesController {
   @Get()
   getScenesFeed(
     @Query() query: ScenesQueryDto,
-  ): Promise<DiscoverResponseDto> {
+  ): Promise<ScenesFeedResponseDto> {
     return this.scenesService.getScenesFeed(
       query.page,
       query.perPage,
@@ -24,6 +24,10 @@ export class ScenesController {
       query.tagMode,
       query.favorites,
       query.studioIds,
+      query.libraryAvailability,
+      query.stashFavoritePerformersOnly,
+      query.stashFavoriteStudiosOnly,
+      query.stashFavoriteTagsOnly,
     );
   }
 

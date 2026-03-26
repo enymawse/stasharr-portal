@@ -17,7 +17,9 @@ import {
   SceneTagMatchMode,
   SceneTagOption,
   SceneDetails,
+  SceneLibraryAvailability,
   SceneRequestOptions,
+  ScenesFeedResponse,
   SubmitSceneRequestPayload,
   SubmitSceneRequestResponse,
   StudioDetails,
@@ -45,7 +47,11 @@ export class DiscoverService {
     tagMode?: SceneTagMatchMode,
     favorites?: SceneFavoritesFilter,
     studioIds?: string[],
-  ): Observable<DiscoverResponse> {
+    libraryAvailability?: SceneLibraryAvailability,
+    stashFavoritePerformersOnly?: boolean,
+    stashFavoriteStudiosOnly?: boolean,
+    stashFavoriteTagsOnly?: boolean,
+  ): Observable<ScenesFeedResponse> {
     let params = new HttpParams()
       .set('page', page.toString())
       .set('perPage', perPage.toString());
@@ -68,8 +74,20 @@ export class DiscoverService {
     if (studioIds && studioIds.length > 0) {
       params = params.set('studioIds', studioIds.join(','));
     }
+    if (libraryAvailability) {
+      params = params.set('libraryAvailability', libraryAvailability);
+    }
+    if (stashFavoritePerformersOnly) {
+      params = params.set('stashFavoritePerformersOnly', '1');
+    }
+    if (stashFavoriteStudiosOnly) {
+      params = params.set('stashFavoriteStudiosOnly', '1');
+    }
+    if (stashFavoriteTagsOnly) {
+      params = params.set('stashFavoriteTagsOnly', '1');
+    }
 
-    return this.http.get<DiscoverResponse>('/api/scenes', { params });
+    return this.http.get<ScenesFeedResponse>('/api/scenes', { params });
   }
 
   searchSceneTags(query: string): Observable<SceneTagOption[]> {

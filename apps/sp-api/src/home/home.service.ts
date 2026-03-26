@@ -26,6 +26,7 @@ import {
 import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import { PerformerStudioOptionDto } from '../performers/dto/performer-studio-option.dto';
 import { SceneTagOptionDto } from '../scenes/dto/scene-tag-option.dto';
+import { SceneStatusDto } from '../scene-status/dto/scene-status.dto';
 import { SceneStatusService } from '../scene-status/scene-status.service';
 import {
   HOME_RAIL_CONTENT_TYPE_VALUES,
@@ -48,8 +49,15 @@ import {
   type HomeRailStashdbSceneConfigDto,
 } from './dto/home-rail.dto';
 import { UpdateHomeRailsDto } from './dto/update-home-rails.dto';
-import { CreateHomeRailDto, UpdateHomeRailDto } from './dto/create-home-rail.dto';
-import { HomeRailContentDto, HomeRailItemDto } from './dto/home-rail-content.dto';
+import {
+  CreateHomeRailDto,
+  UpdateHomeRailDto,
+} from './dto/create-home-rail.dto';
+import {
+  HomeRailContentDto,
+  HomeRailItemDto,
+} from './dto/home-rail-content.dto';
+import { HybridScenesService } from '../hybrid-scenes/hybrid-scenes.service';
 
 const DEFAULT_HOME_RAILS: Array<{
   key: HomeRailKey;
@@ -104,7 +112,8 @@ const DEFAULT_HOME_RAILS: Array<{
   {
     key: HomeRailKey.RECENTLY_ADDED_LIBRARY,
     title: 'Recently Added to Library',
-    subtitle: 'Fresh local-library scenes pulled from your configured Stash instance.',
+    subtitle:
+      'Fresh local-library scenes pulled from your configured Stash instance.',
     enabled: true,
     sortOrder: 2,
     source: HomeRailSource.STASH,
@@ -126,10 +135,6 @@ const DEFAULT_HOME_RAILS: Array<{
   },
 ];
 
-const HYBRID_LOOKUP_CONCURRENCY = 6;
-const HYBRID_OVERSCAN_FACTOR = 5;
-const HYBRID_PAGE_SIZE_MAX = 50;
-
 @Injectable()
 export class HomeService {
   private readonly logger = new Logger(HomeService.name);
@@ -139,6 +144,7 @@ export class HomeService {
     private readonly stashAdapter: StashAdapter,
     private readonly stashdbAdapter: StashdbAdapter,
     private readonly sceneStatusService: SceneStatusService,
+    private readonly hybridScenesService: HybridScenesService,
   ) {}
 
   async getRails(): Promise<HomeRailDto[]> {
@@ -183,18 +189,26 @@ export class HomeService {
         subtitle: this.normalizeSubtitle(payload.subtitle),
         enabled: payload.enabled,
         sortOrder: (lastRail?.sortOrder ?? -1) + 1,
-        config: this.normalizeSceneRailConfig(payload.source, payload.config) as unknown as Prisma.InputJsonValue,
+        config: this.normalizeSceneRailConfig(
+          payload.source,
+          payload.config,
+        ) as unknown as Prisma.InputJsonValue,
       },
     });
 
     return this.toDto(created);
   }
 
-  async updateRail(id: string, payload: UpdateHomeRailDto): Promise<HomeRailDto> {
+  async updateRail(
+    id: string,
+    payload: UpdateHomeRailDto,
+  ): Promise<HomeRailDto> {
     await this.ensureDefaultRails();
     const existingRail = await this.requireCustomRail(id);
     if (payload.source !== existingRail.source) {
-      throw new BadRequestException('Custom Home rail source cannot be changed after creation.');
+      throw new BadRequestException(
+        'Custom Home rail source cannot be changed after creation.',
+      );
     }
 
     const updated = await this.prisma.homeRail.update({
@@ -203,7 +217,10 @@ export class HomeService {
         title: payload.title.trim(),
         subtitle: this.normalizeSubtitle(payload.subtitle),
         enabled: payload.enabled,
-        config: this.normalizeSceneRailConfig(existingRail.source, payload.config) as unknown as Prisma.InputJsonValue,
+        config: this.normalizeSceneRailConfig(
+          existingRail.source,
+          payload.config,
+        ) as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -252,7 +269,9 @@ export class HomeService {
     return tags.map((tag) => this.toTagOptionDto(tag));
   }
 
-  async searchStashStudios(query?: string): Promise<PerformerStudioOptionDto[]> {
+  async searchStashStudios(
+    query?: string,
+  ): Promise<PerformerStudioOptionDto[]> {
     const normalizedQuery = query?.trim() ?? '';
     if (!normalizedQuery) {
       return [];
@@ -289,7 +308,9 @@ export class HomeService {
     }
   }
 
-  private async getStashRailContent(rail: HomeRail): Promise<HomeRailContentDto> {
+  private async getStashRailContent(
+    rail: HomeRail,
+  ): Promise<HomeRailContentDto> {
     const integration = await this.prisma.integrationConfig.findUnique({
       where: { type: 'STASH' },
     });
@@ -302,14 +323,16 @@ export class HomeService {
     ) {
       return {
         items: [],
-        message: 'Configure and enable your Stash integration to populate this rail.',
+        message:
+          'Configure and enable your Stash integration to populate this rail.',
       };
     }
 
     const config = this.normalizeSceneRailConfig(
       rail.source,
       rail.config,
-      DEFAULT_HOME_RAILS.find((defaultRail) => defaultRail.key === rail.key)?.config ?? null,
+      DEFAULT_HOME_RAILS.find((defaultRail) => defaultRail.key === rail.key)
+        ?.config ?? null,
     ) as HomeRailStashSceneConfigDto;
 
     try {
@@ -348,7 +371,9 @@ export class HomeService {
     }
   }
 
-  private async getHybridRailContent(rail: HomeRail): Promise<HomeRailContentDto> {
+  private async getHybridRailContent(
+    rail: HomeRail,
+  ): Promise<HomeRailContentDto> {
     let stashdbConfig: { baseUrl: string; apiKey?: string | null };
     let stashConfig: { baseUrl: string; apiKey?: string | null };
 
@@ -357,7 +382,8 @@ export class HomeService {
     } catch {
       return {
         items: [],
-        message: 'Configure and enable your StashDB integration to populate this hybrid rail.',
+        message:
+          'Configure and enable your StashDB integration to populate this hybrid rail.',
       };
     }
 
@@ -366,7 +392,8 @@ export class HomeService {
     } catch {
       return {
         items: [],
-        message: 'Configure and enable your Stash integration to apply library matching.',
+        message:
+          'Configure and enable your Stash integration to apply library matching.',
       };
     }
 
@@ -377,14 +404,33 @@ export class HomeService {
     ) as HomeRailHybridSceneConfigDto;
 
     try {
-      const matchedScenes = await this.loadHybridMatchedScenes(config, stashdbConfig, stashConfig);
+      const matchedScenes = await this.hybridScenesService.getHybridSceneFeed(
+        stashdbConfig,
+        stashConfig,
+        {
+          page: 1,
+          perPage: config.limit,
+          sort: config.sort,
+          direction: config.direction,
+          stashdbFavorites: config.stashdbFavorites ?? undefined,
+          tagIds: config.tagIds,
+          tagMode: config.tagMode,
+          studioIds: config.studioIds,
+          libraryAvailability: config.libraryAvailability,
+          stashFavoritePerformersOnly: config.stashFavoritePerformersOnly,
+          stashFavoriteStudiosOnly: config.stashFavoriteStudiosOnly,
+          stashFavoriteTagsOnly: config.stashFavoriteTagsOnly,
+        },
+      );
       const statuses =
         config.libraryAvailability === 'MISSING_FROM_LIBRARY'
-          ? await this.sceneStatusService.resolveForScenes(matchedScenes.map((scene) => scene.id))
+          ? await this.sceneStatusService.resolveForScenes(
+              matchedScenes.scenes.map((scene) => scene.id),
+            )
           : new Map<string, { state: 'AVAILABLE' }>();
 
       return {
-        items: matchedScenes.map((scene) =>
+        items: matchedScenes.scenes.map((scene) =>
           this.toHybridRailItem(
             scene,
             config.libraryAvailability,
@@ -410,11 +456,16 @@ export class HomeService {
     });
   }
 
-  private validateSubmittedRails(payload: UpdateHomeRailsDto, existingRails: HomeRail[]): void {
+  private validateSubmittedRails(
+    payload: UpdateHomeRailsDto,
+    existingRails: HomeRail[],
+  ): void {
     const submittedIds = payload.rails.map((rail) => rail.id.trim());
     const uniqueIds = new Set(submittedIds);
     if (uniqueIds.size !== submittedIds.length) {
-      throw new BadRequestException('Home rails payload contains duplicate ids.');
+      throw new BadRequestException(
+        'Home rails payload contains duplicate ids.',
+      );
     }
 
     const existingIds = existingRails.map((rail) => rail.id);
@@ -434,7 +485,9 @@ export class HomeService {
       throw new NotFoundException('Home rail not found.');
     }
     if (rail.kind !== HomeRailKind.CUSTOM) {
-      throw new BadRequestException('Built-in Home rails cannot be deleted or edited here.');
+      throw new BadRequestException(
+        'Built-in Home rails cannot be deleted or edited here.',
+      );
     }
 
     return rail;
@@ -467,14 +520,21 @@ export class HomeService {
       key: (rail.key as HomeRailDtoKey | null) ?? null,
       kind: rail.kind,
       source: this.ensureInSet(rail.source, HOME_RAIL_SOURCE_VALUES),
-      contentType: this.ensureInSet(rail.contentType, HOME_RAIL_CONTENT_TYPE_VALUES),
+      contentType: this.ensureInSet(
+        rail.contentType,
+        HOME_RAIL_CONTENT_TYPE_VALUES,
+      ),
       title: rail.title,
       subtitle: rail.subtitle,
       enabled: rail.enabled,
       sortOrder: rail.sortOrder,
       editable: rail.kind === HomeRailKind.CUSTOM,
       deletable: rail.kind === HomeRailKind.CUSTOM,
-      config: this.normalizeSceneRailConfig(rail.source, rail.config, defaults?.config ?? null),
+      config: this.normalizeSceneRailConfig(
+        rail.source,
+        rail.config,
+        defaults?.config ?? null,
+      ),
     };
   }
 
@@ -482,9 +542,10 @@ export class HomeService {
     const sceneScreenshotUrl = item.imageUrl
       ? this.buildStashSceneScreenshotProxyUrl(item.id)
       : null;
-    const studioLogoUrl = item.studioImageUrl && item.studioId
-      ? this.buildStashStudioLogoProxyUrl(item.studioId)
-      : null;
+    const studioLogoUrl =
+      item.studioImageUrl && item.studioId
+        ? this.buildStashStudioLogoProxyUrl(item.studioId)
+        : null;
 
     return {
       id: item.id,
@@ -508,10 +569,12 @@ export class HomeService {
   private toHybridRailItem(
     scene: StashdbScene,
     libraryAvailability: HomeRailLibraryAvailability,
-    status: { state: 'NOT_REQUESTED' | 'DOWNLOADING' | 'AVAILABLE' | 'MISSING' },
+    status: SceneStatusDto,
   ): HomeRailItemDto {
     const effectiveStatus =
-      libraryAvailability === 'IN_LIBRARY' ? { state: 'AVAILABLE' as const } : status;
+      libraryAvailability === 'IN_LIBRARY'
+        ? { state: 'AVAILABLE' as const }
+        : status;
 
     return {
       id: scene.id,
@@ -527,7 +590,9 @@ export class HomeService {
       type: 'SCENE',
       source: 'STASHDB',
       status: effectiveStatus,
-      requestable: libraryAvailability === 'MISSING_FROM_LIBRARY' && effectiveStatus.state === 'NOT_REQUESTED',
+      requestable:
+        libraryAvailability === 'MISSING_FROM_LIBRARY' &&
+        effectiveStatus.state === 'NOT_REQUESTED',
       viewUrl: null,
     };
   }
@@ -540,7 +605,9 @@ export class HomeService {
     return `/api/media/stash/studios/${encodeURIComponent(studioId)}/logo`;
   }
 
-  private toStashFeedSort(sort: HomeRailStashSceneConfigDto['sort']): 'CREATED_AT' | 'UPDATED_AT' | 'TITLE' {
+  private toStashFeedSort(
+    sort: HomeRailStashSceneConfigDto['sort'],
+  ): 'CREATED_AT' | 'UPDATED_AT' | 'TITLE' {
     switch (sort) {
       case 'TITLE':
         return 'TITLE';
@@ -590,13 +657,24 @@ export class HomeService {
       fallbackConfig?.favorites ?? null,
     );
     const tags = this.normalizeNamedIds(record.tagIds, record.tagNames);
-    const studios = this.normalizeNamedIds(record.studioIds, record.studioNames);
-    const fallbackTagMode = tags.ids.length > 0 ? fallbackConfig?.tagMode ?? 'OR' : null;
+    const studios = this.normalizeNamedIds(
+      record.studioIds,
+      record.studioNames,
+    );
+    const fallbackTagMode =
+      tags.ids.length > 0 ? (fallbackConfig?.tagMode ?? 'OR') : null;
     const tagMode =
       tags.ids.length > 0
-        ? this.parseOptionalInSet(record.tagMode, HOME_RAIL_TAG_MODE_VALUES, fallbackTagMode)
+        ? this.parseOptionalInSet(
+            record.tagMode,
+            HOME_RAIL_TAG_MODE_VALUES,
+            fallbackTagMode,
+          )
         : null;
-    const limit = this.parseLimit(record.limit, fallbackConfig?.limit ?? HOME_RAIL_SCENE_LIMIT_DEFAULT);
+    const limit = this.parseLimit(
+      record.limit,
+      fallbackConfig?.limit ?? HOME_RAIL_SCENE_LIMIT_DEFAULT,
+    );
 
     return {
       sort,
@@ -616,8 +694,16 @@ export class HomeService {
     fallback: Partial<HomeRailSceneConfigDto> | null,
   ): HomeRailStashSceneConfigDto {
     this.ensureNullishField(record.favorites, 'favorites', 'STASH');
-    this.ensureNullishField(record.stashdbFavorites, 'stashdbFavorites', 'STASH');
-    this.ensureNullishField(record.libraryAvailability, 'libraryAvailability', 'STASH');
+    this.ensureNullishField(
+      record.stashdbFavorites,
+      'stashdbFavorites',
+      'STASH',
+    );
+    this.ensureNullishField(
+      record.libraryAvailability,
+      'libraryAvailability',
+      'STASH',
+    );
     this.ensureFalseField(
       record.stashFavoritePerformersOnly,
       'stashFavoritePerformersOnly',
@@ -628,7 +714,11 @@ export class HomeService {
       'stashFavoriteStudiosOnly',
       'STASH',
     );
-    this.ensureFalseField(record.stashFavoriteTagsOnly, 'stashFavoriteTagsOnly', 'STASH');
+    this.ensureFalseField(
+      record.stashFavoriteTagsOnly,
+      'stashFavoriteTagsOnly',
+      'STASH',
+    );
 
     const fallbackConfig = this.asStashSceneConfig(fallback);
     const sort = this.parseOptionalStrictInSet(
@@ -648,8 +738,12 @@ export class HomeService {
       fallbackConfig?.titleQuery ?? null,
     );
     const tags = this.normalizeNamedIds(record.tagIds, record.tagNames);
-    const studios = this.normalizeNamedIds(record.studioIds, record.studioNames);
-    const fallbackTagMode = tags.ids.length > 0 ? fallbackConfig?.tagMode ?? 'OR' : null;
+    const studios = this.normalizeNamedIds(
+      record.studioIds,
+      record.studioNames,
+    );
+    const fallbackTagMode =
+      tags.ids.length > 0 ? (fallbackConfig?.tagMode ?? 'OR') : null;
     const tagMode =
       tags.ids.length > 0
         ? this.parseOptionalStrictNullableInSet(
@@ -671,7 +765,10 @@ export class HomeService {
       record.favoriteTagsOnly,
       fallbackConfig?.favoriteTagsOnly ?? false,
     );
-    const limit = this.parseLimit(record.limit, fallbackConfig?.limit ?? HOME_RAIL_SCENE_LIMIT_DEFAULT);
+    const limit = this.parseLimit(
+      record.limit,
+      fallbackConfig?.limit ?? HOME_RAIL_SCENE_LIMIT_DEFAULT,
+    );
 
     return {
       sort,
@@ -695,9 +792,21 @@ export class HomeService {
   ): HomeRailHybridSceneConfigDto {
     this.ensureNullishField(record.favorites, 'favorites', 'HYBRID');
     this.ensureNullishField(record.titleQuery, 'titleQuery', 'HYBRID');
-    this.ensureFalseField(record.favoritePerformersOnly, 'favoritePerformersOnly', 'HYBRID');
-    this.ensureFalseField(record.favoriteStudiosOnly, 'favoriteStudiosOnly', 'HYBRID');
-    this.ensureFalseField(record.favoriteTagsOnly, 'favoriteTagsOnly', 'HYBRID');
+    this.ensureFalseField(
+      record.favoritePerformersOnly,
+      'favoritePerformersOnly',
+      'HYBRID',
+    );
+    this.ensureFalseField(
+      record.favoriteStudiosOnly,
+      'favoriteStudiosOnly',
+      'HYBRID',
+    );
+    this.ensureFalseField(
+      record.favoriteTagsOnly,
+      'favoriteTagsOnly',
+      'HYBRID',
+    );
 
     const fallbackConfig = this.asHybridSceneConfig(fallback);
     const sort = this.parseOptionalStrictInSet(
@@ -719,8 +828,12 @@ export class HomeService {
       'stashdbFavorites',
     );
     const tags = this.normalizeNamedIds(record.tagIds, record.tagNames);
-    const studios = this.normalizeNamedIds(record.studioIds, record.studioNames);
-    const fallbackTagMode = tags.ids.length > 0 ? fallbackConfig?.tagMode ?? 'OR' : null;
+    const studios = this.normalizeNamedIds(
+      record.studioIds,
+      record.studioNames,
+    );
+    const fallbackTagMode =
+      tags.ids.length > 0 ? (fallbackConfig?.tagMode ?? 'OR') : null;
     const tagMode =
       tags.ids.length > 0
         ? this.parseOptionalStrictNullableInSet(
@@ -769,13 +882,18 @@ export class HomeService {
       stashFavoriteStudiosOnly: usesStashLocalFavoriteOverlays
         ? stashFavoriteStudiosOnly
         : false,
-      stashFavoriteTagsOnly: usesStashLocalFavoriteOverlays ? stashFavoriteTagsOnly : false,
+      stashFavoriteTagsOnly: usesStashLocalFavoriteOverlays
+        ? stashFavoriteTagsOnly
+        : false,
       libraryAvailability,
       limit,
     };
   }
 
-  private normalizeNamedIds(idsValue: unknown, namesValue: unknown): { ids: string[]; names: string[] } {
+  private normalizeNamedIds(
+    idsValue: unknown,
+    namesValue: unknown,
+  ): { ids: string[]; names: string[] } {
     const ids = Array.isArray(idsValue) ? idsValue : [];
     const names = Array.isArray(namesValue) ? namesValue : [];
     const seen = new Set<string>();
@@ -804,12 +922,18 @@ export class HomeService {
     };
   }
 
-  private ensureNullishField(value: unknown, fieldName: string, source: 'STASH' | 'HYBRID'): void {
+  private ensureNullishField(
+    value: unknown,
+    fieldName: string,
+    source: 'STASH' | 'HYBRID',
+  ): void {
     if (value === null || value === undefined || value === '') {
       return;
     }
 
-    throw new BadRequestException(`Field ${fieldName} is not supported for ${source} Home rails.`);
+    throw new BadRequestException(
+      `Field ${fieldName} is not supported for ${source} Home rails.`,
+    );
   }
 
   private ensureFalseField(
@@ -817,11 +941,18 @@ export class HomeService {
     fieldName: string,
     source: 'STASH' | 'HYBRID',
   ): void {
-    if (value === null || value === undefined || value === '' || value === false) {
+    if (
+      value === null ||
+      value === undefined ||
+      value === '' ||
+      value === false
+    ) {
       return;
     }
 
-    throw new BadRequestException(`Field ${fieldName} is not supported for ${source} Home rails.`);
+    throw new BadRequestException(
+      `Field ${fieldName} is not supported for ${source} Home rails.`,
+    );
   }
 
   private parseBoolean(value: unknown, fallback: boolean): boolean {
@@ -838,13 +969,21 @@ export class HomeService {
       return fallback;
     }
 
-    return Math.min(Math.max(next, HOME_RAIL_SCENE_LIMIT_MIN), HOME_RAIL_SCENE_LIMIT_MAX);
+    return Math.min(
+      Math.max(next, HOME_RAIL_SCENE_LIMIT_MIN),
+      HOME_RAIL_SCENE_LIMIT_MAX,
+    );
   }
 
   private asStashdbSceneConfig(
     value: Partial<HomeRailSceneConfigDto> | null,
   ): Partial<HomeRailStashdbSceneConfigDto> | null {
-    if (!value || 'favorites' in value || 'tagIds' in value || 'studioIds' in value) {
+    if (
+      !value ||
+      'favorites' in value ||
+      'tagIds' in value ||
+      'studioIds' in value
+    ) {
       return value as Partial<HomeRailStashdbSceneConfigDto> | null;
     }
 
@@ -865,17 +1004,27 @@ export class HomeService {
         'titleQuery' in value && typeof value.titleQuery === 'string'
           ? value.titleQuery
           : null,
-      tagIds: 'tagIds' in value && Array.isArray(value.tagIds) ? value.tagIds : [],
-      tagNames: 'tagNames' in value && Array.isArray(value.tagNames) ? value.tagNames : [],
+      tagIds:
+        'tagIds' in value && Array.isArray(value.tagIds) ? value.tagIds : [],
+      tagNames:
+        'tagNames' in value && Array.isArray(value.tagNames)
+          ? value.tagNames
+          : [],
       tagMode:
         'tagMode' in value && typeof value.tagMode === 'string'
           ? (value.tagMode as HomeRailStashSceneConfigDto['tagMode'])
           : null,
-      studioIds: 'studioIds' in value && Array.isArray(value.studioIds) ? value.studioIds : [],
+      studioIds:
+        'studioIds' in value && Array.isArray(value.studioIds)
+          ? value.studioIds
+          : [],
       studioNames:
-        'studioNames' in value && Array.isArray(value.studioNames) ? value.studioNames : [],
+        'studioNames' in value && Array.isArray(value.studioNames)
+          ? value.studioNames
+          : [],
       favoritePerformersOnly:
-        'favoritePerformersOnly' in value && value.favoritePerformersOnly === true,
+        'favoritePerformersOnly' in value &&
+        value.favoritePerformersOnly === true,
       favoriteStudiosOnly:
         'favoriteStudiosOnly' in value && value.favoriteStudiosOnly === true,
       favoriteTagsOnly:
@@ -924,7 +1073,9 @@ export class HomeService {
       return value as T[number];
     }
 
-    throw new BadRequestException(`Unsupported ${fieldName} value for this Home rail source.`);
+    throw new BadRequestException(
+      `Unsupported ${fieldName} value for this Home rail source.`,
+    );
   }
 
   private parseOptionalStrictNullableInSet<const T extends readonly string[]>(
@@ -941,7 +1092,9 @@ export class HomeService {
       return value as T[number];
     }
 
-    throw new BadRequestException(`Unsupported ${fieldName} value for this Home rail source.`);
+    throw new BadRequestException(
+      `Unsupported ${fieldName} value for this Home rail source.`,
+    );
   }
 
   private parseInSet<const T extends readonly string[]>(
@@ -954,7 +1107,10 @@ export class HomeService {
       : fallback;
   }
 
-  private ensureInSet<const T extends readonly string[]>(value: string, validValues: T): T[number] {
+  private ensureInSet<const T extends readonly string[]>(
+    value: string,
+    validValues: T,
+  ): T[number] {
     if (!validValues.includes(value as T[number])) {
       throw new BadRequestException(`Unsupported Home rail value: ${value}`);
     }
@@ -967,7 +1123,10 @@ export class HomeService {
     return normalized ? normalized : null;
   }
 
-  private normalizeOptionalString(value: unknown, fallback: string | null): string | null {
+  private normalizeOptionalString(
+    value: unknown,
+    fallback: string | null,
+  ): string | null {
     if (typeof value !== 'string') {
       return fallback;
     }
@@ -991,126 +1150,10 @@ export class HomeService {
     };
   }
 
-  private async loadHybridMatchedScenes(
-    config: HomeRailHybridSceneConfigDto,
-    stashdbConfig: { baseUrl: string; apiKey?: string | null },
-    stashConfig: { baseUrl: string; apiKey?: string | null },
-  ): Promise<StashdbScene[]> {
-    const desiredInLibrary = config.libraryAvailability === 'IN_LIBRARY';
-    const targetCount = config.limit;
-    const maxInspected = targetCount * HYBRID_OVERSCAN_FACTOR;
-    const pageSize = Math.min(Math.max(targetCount * 2, targetCount), HYBRID_PAGE_SIZE_MAX);
-    const matched: StashdbScene[] = [];
-    const availabilityCache = new Map<string, boolean>();
-    let inspected = 0;
-    let page = 1;
-    let totalCandidates = Number.POSITIVE_INFINITY;
-
-    while (
-      matched.length < targetCount &&
-      inspected < maxInspected &&
-      (page - 1) * pageSize < totalCandidates
-    ) {
-      const candidatePage = await this.stashdbAdapter.getScenesBySort({
-        ...stashdbConfig,
-        page,
-        perPage: pageSize,
-        sort: config.sort,
-        direction: config.direction,
-        favorites: config.stashdbFavorites ?? undefined,
-        studioIds: config.studioIds,
-        tagFilter:
-          config.tagIds.length > 0
-            ? {
-                tagIds: config.tagIds,
-                mode: config.tagMode ?? 'OR',
-              }
-            : undefined,
-      });
-
-      totalCandidates = candidatePage.total;
-      const pageScenes = candidatePage.scenes.slice(0, maxInspected - inspected);
-      if (pageScenes.length === 0) {
-        break;
-      }
-
-      const pageMatches = await this.mapWithConcurrency(
-        pageScenes,
-        HYBRID_LOOKUP_CONCURRENCY,
-        async (scene) => {
-          const inLibrary = await this.resolveHybridLibraryAvailability(
-            scene.id,
-            stashConfig,
-            config,
-            availabilityCache,
-          );
-          return { scene, inLibrary };
-        },
-      );
-
-      inspected += pageScenes.length;
-
-      for (const result of pageMatches) {
-        if (result.inLibrary === desiredInLibrary) {
-          matched.push(result.scene);
-          if (matched.length >= targetCount) {
-            break;
-          }
-        }
-      }
-
-      if (candidatePage.scenes.length < pageSize) {
-        break;
-      }
-
-      page += 1;
-    }
-
-    return matched.slice(0, targetCount);
-  }
-
-  private async resolveHybridLibraryAvailability(
-    stashId: string,
-    stashConfig: { baseUrl: string; apiKey?: string | null },
-    config: HomeRailHybridSceneConfigDto,
-    cache: Map<string, boolean>,
-  ): Promise<boolean> {
-    const cached = cache.get(stashId);
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    const matches = await this.stashAdapter.findScenesByStashId(stashId, stashConfig, {
-      favoritePerformersOnly: config.stashFavoritePerformersOnly,
-      favoriteStudiosOnly: config.stashFavoriteStudiosOnly,
-      favoriteTagsOnly: config.stashFavoriteTagsOnly,
-    });
-    const inLibrary = matches.length > 0;
-    cache.set(stashId, inLibrary);
-    return inLibrary;
-  }
-
-  private async mapWithConcurrency<TInput, TOutput>(
-    items: TInput[],
-    concurrency: number,
-    mapper: (item: TInput, index: number) => Promise<TOutput>,
-  ): Promise<TOutput[]> {
-    const results = new Array<TOutput>(items.length);
-    let nextIndex = 0;
-
-    const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-      while (nextIndex < items.length) {
-        const currentIndex = nextIndex;
-        nextIndex += 1;
-        results[currentIndex] = await mapper(items[currentIndex] as TInput, currentIndex);
-      }
-    });
-
-    await Promise.all(workers);
-    return results;
-  }
-
-  private async getRequiredStashConfig(): Promise<{ baseUrl: string; apiKey?: string | null }> {
+  private async getRequiredStashConfig(): Promise<{
+    baseUrl: string;
+    apiKey?: string | null;
+  }> {
     const integration = await this.prisma.integrationConfig.findUnique({
       where: { type: 'STASH' },
     });
@@ -1138,7 +1181,10 @@ export class HomeService {
     };
   }
 
-  private async getRequiredStashdbConfig(): Promise<{ baseUrl: string; apiKey?: string | null }> {
+  private async getRequiredStashdbConfig(): Promise<{
+    baseUrl: string;
+    apiKey?: string | null;
+  }> {
     const integration = await this.prisma.integrationConfig.findUnique({
       where: { type: 'STASHDB' },
     });
@@ -1157,7 +1203,9 @@ export class HomeService {
 
     const baseUrl = integration.baseUrl?.trim();
     if (!baseUrl) {
-      throw new BadRequestException('STASHDB integration is missing a base URL.');
+      throw new BadRequestException(
+        'STASHDB integration is missing a base URL.',
+      );
     }
 
     return {

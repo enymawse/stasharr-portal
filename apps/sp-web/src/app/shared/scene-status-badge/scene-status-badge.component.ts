@@ -26,18 +26,18 @@ export class SceneStatusBadgeComponent {
   readonly status = input.required<SceneStatus>();
   readonly mode = input<'badge' | 'icon'>('badge');
 
-  protected readonly iconVisible = computed(
-    () => this.status().state !== 'NOT_REQUESTED',
-  );
+  protected readonly iconVisible = computed(() => this.status().state !== 'NOT_REQUESTED');
 
   protected readonly badgeLabel = computed(() => {
     switch (this.status().state) {
+      case 'REQUESTED':
+        return 'Requested';
       case 'DOWNLOADING':
         return 'Downloading';
+      case 'IMPORT_PENDING':
+        return 'Awaiting Import';
       case 'AVAILABLE':
-        return 'Available';
-      case 'MISSING':
-        return 'Missing';
+        return 'In Library';
       case 'NOT_REQUESTED':
       default:
         return 'Not Requested';
@@ -46,12 +46,14 @@ export class SceneStatusBadgeComponent {
 
   protected readonly badgeClass = computed(() => {
     switch (this.status().state) {
+      case 'REQUESTED':
+        return 'badge requested';
       case 'DOWNLOADING':
         return 'badge downloading';
+      case 'IMPORT_PENDING':
+        return 'badge import-pending';
       case 'AVAILABLE':
         return 'badge available';
-      case 'MISSING':
-        return 'badge missing';
       case 'NOT_REQUESTED':
       default:
         return 'badge not-requested';
@@ -60,12 +62,14 @@ export class SceneStatusBadgeComponent {
 
   protected readonly iconClass = computed(() => {
     switch (this.status().state) {
+      case 'REQUESTED':
+        return 'icon requested';
       case 'DOWNLOADING':
         return 'icon downloading';
+      case 'IMPORT_PENDING':
+        return 'icon import-pending';
       case 'AVAILABLE':
         return 'icon available';
-      case 'MISSING':
-        return 'icon missing';
       case 'NOT_REQUESTED':
       default:
         return 'icon not-requested';
@@ -74,12 +78,14 @@ export class SceneStatusBadgeComponent {
 
   protected readonly statusIconClass = computed(() => {
     switch (this.status().state) {
+      case 'REQUESTED':
+        return 'pi pi-bookmark';
       case 'DOWNLOADING':
         return 'pi pi-spinner pi-spin';
+      case 'IMPORT_PENDING':
+        return 'pi pi-upload';
       case 'AVAILABLE':
         return 'pi pi-check-circle';
-      case 'MISSING':
-        return 'pi pi-times-circle';
       case 'NOT_REQUESTED':
       default:
         return 'pi pi-circle';

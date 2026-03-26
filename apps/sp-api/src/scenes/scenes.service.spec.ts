@@ -1,4 +1,5 @@
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
+import { HybridScenesService } from '../hybrid-scenes/hybrid-scenes.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import {
@@ -73,15 +74,18 @@ describe('ScenesService', () => {
   };
 
   let service: ScenesService;
+  let hybridScenesService: HybridScenesService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    hybridScenesService = new HybridScenesService(stashAdapter, stashdbAdapter);
     service = new ScenesService(
       integrationsService,
       stashdbAdapter,
       sceneStatusService,
       stashAdapter,
       whisparrAdapter,
+      hybridScenesService,
     );
 
     integrationsService.findOne = jest
@@ -196,6 +200,7 @@ describe('ScenesService', () => {
           type: 'SCENE',
           source: 'STASHDB',
           status: { state: 'AVAILABLE' },
+          requestable: false,
         },
       ],
     });
@@ -211,6 +216,7 @@ describe('ScenesService', () => {
       tagFilter: undefined,
       studioIds: [],
     });
+    expect(stashAdapter.findScenesByStashId).not.toHaveBeenCalled();
   });
 
   it('forwards non-default sort to stashdb adapter', async () => {
@@ -258,6 +264,187 @@ describe('ScenesService', () => {
       favorites: 'PERFORMER',
       tagFilter: undefined,
       studioIds: [],
+    });
+  });
+
+  it('uses hybrid matching for IN_LIBRARY scenes and disables request CTA', async () => {
+    stashdbAdapter.getScenesBySort = jest.fn().mockResolvedValue({
+      total: 1,
+      scenes: [
+        {
+          id: 'stashdb-scene-1',
+          title: 'Scene',
+          details: 'Description',
+          imageUrl: 'http://cdn.local/image.jpg',
+          studioId: 'studio-1',
+          studioName: 'Studio',
+          studioImageUrl: 'http://studio-image',
+          date: '2026-01-01',
+          releaseDate: '2026-01-02',
+          productionDate: '2026-01-03',
+          duration: 300,
+        },
+      ],
+    });
+    stashAdapter.findScenesByStashId = jest.fn().mockResolvedValue([
+      {
+        id: 'local-1',
+        width: 1920,
+        height: 1080,
+        viewUrl: 'http://stash.local/scenes/local-1',
+        label: '1080p',
+      },
+    ]);
+
+    await expect(
+      service.getScenesFeed(
+        1,
+        25,
+        'DATE',
+        'DESC',
+        [],
+        'OR',
+        undefined,
+        [],
+        'IN_LIBRARY',
+      ),
+    ).resolves.toEqual({
+      total: null,
+      page: 1,
+      perPage: 25,
+      hasMore: false,
+      items: [
+        expect.objectContaining({
+          id: 'stashdb-scene-1',
+          source: 'STASHDB',
+          status: { state: 'AVAILABLE' },
+          requestable: false,
+        }),
+      ],
+    });
+
+    expect(sceneStatusService.resolveForScenes).not.toHaveBeenCalled();
+    expect(stashAdapter.findScenesByStashId).toHaveBeenCalledWith(
+      'stashdb-scene-1',
+      {
+        baseUrl: stashIntegration.baseUrl,
+        apiKey: stashIntegration.apiKey,
+      },
+      {
+        favoritePerformersOnly: false,
+        favoriteStudiosOnly: false,
+        favoriteTagsOnly: false,
+      },
+    );
+  });
+
+  it('activates hybrid mode when stash local favorite overlays are enabled', async () => {
+    stashdbAdapter.getScenesBySort = jest.fn().mockResolvedValue({
+      total: 1,
+      scenes: [
+        {
+          id: 'stashdb-scene-1',
+          title: 'Scene',
+          details: 'Description',
+          imageUrl: 'http://cdn.local/image.jpg',
+          studioId: 'studio-1',
+          studioName: 'Studio',
+          studioImageUrl: 'http://studio-image',
+          date: '2026-01-01',
+          releaseDate: '2026-01-02',
+          productionDate: '2026-01-03',
+          duration: 300,
+        },
+      ],
+    });
+    stashAdapter.findScenesByStashId = jest.fn().mockResolvedValue([
+      {
+        id: 'local-1',
+        width: 1920,
+        height: 1080,
+        viewUrl: 'http://stash.local/scenes/local-1',
+        label: '1080p',
+      },
+    ]);
+
+    await service.getScenesFeed(
+      1,
+      25,
+      'DATE',
+      'DESC',
+      [],
+      'OR',
+      undefined,
+      [],
+      'ANY',
+      true,
+      false,
+      true,
+    );
+
+    expect(stashAdapter.findScenesByStashId).toHaveBeenCalledWith(
+      'stashdb-scene-1',
+      {
+        baseUrl: stashIntegration.baseUrl,
+        apiKey: stashIntegration.apiKey,
+      },
+      {
+        favoritePerformersOnly: true,
+        favoriteStudiosOnly: false,
+        favoriteTagsOnly: true,
+      },
+    );
+    expect(sceneStatusService.resolveForScenes).not.toHaveBeenCalled();
+  });
+
+  it('marks hybrid missing-library scenes as requestable only when status is NOT_REQUESTED', async () => {
+    stashdbAdapter.getScenesBySort = jest.fn().mockResolvedValue({
+      total: 2,
+      scenes: [
+        {
+          id: 'stashdb-scene-1',
+          title: 'Scene',
+          details: 'Description',
+          imageUrl: 'http://cdn.local/image.jpg',
+          studioId: 'studio-1',
+          studioName: 'Studio',
+          studioImageUrl: 'http://studio-image',
+          date: '2026-01-01',
+          releaseDate: '2026-01-02',
+          productionDate: '2026-01-03',
+          duration: 300,
+        },
+      ],
+    });
+    stashAdapter.findScenesByStashId = jest.fn().mockResolvedValue([]);
+    sceneStatusService.resolveForScenes = jest
+      .fn()
+      .mockResolvedValue(new Map([['stashdb-scene-1', { state: 'NOT_REQUESTED' }]]));
+
+    await expect(
+      service.getScenesFeed(
+        1,
+        25,
+        'DATE',
+        'DESC',
+        [],
+        'OR',
+        undefined,
+        [],
+        'MISSING_FROM_LIBRARY',
+      ),
+    ).resolves.toEqual({
+      total: null,
+      page: 1,
+      perPage: 25,
+      hasMore: false,
+      items: [
+        expect.objectContaining({
+          id: 'stashdb-scene-1',
+          status: { state: 'NOT_REQUESTED' },
+          requestable: true,
+        }),
+      ],
     });
   });
 

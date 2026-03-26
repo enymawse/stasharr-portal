@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SceneStatusService } from '../scene-status/scene-status.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
+import { HybridScenesService } from '../hybrid-scenes/hybrid-scenes.service';
 import { HomeService } from './home.service';
 
 const now = new Date('2026-03-24T00:00:00.000Z');
@@ -133,6 +134,7 @@ describe('HomeService', () => {
   } as unknown as SceneStatusService;
 
   let service: HomeService;
+  let hybridScenesService: HybridScenesService;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -140,11 +142,13 @@ describe('HomeService', () => {
       Promise.all(operations),
     );
     sceneStatusResolveForScenesMock.mockResolvedValue(new Map());
+    hybridScenesService = new HybridScenesService(stashAdapter, stashdbAdapter);
     service = new HomeService(
       prismaService,
       stashAdapter,
       stashdbAdapter,
       sceneStatusService,
+      hybridScenesService,
     );
   });
 
@@ -1317,7 +1321,7 @@ describe('HomeService', () => {
       apiKey: 'stash-secret',
     }, {
       favoritePerformersOnly: false,
-      favoriteStudiosOnly: true,
+      favoriteStudiosOnly: false,
       favoriteTagsOnly: false,
     });
     expect(stashFindScenesByStashIdMock).toHaveBeenCalledWith('scene-14', {
@@ -1325,7 +1329,7 @@ describe('HomeService', () => {
       apiKey: 'stash-secret',
     }, {
       favoritePerformersOnly: false,
-      favoriteStudiosOnly: true,
+      favoriteStudiosOnly: false,
       favoriteTagsOnly: false,
     });
     expect(sceneStatusResolveForScenesMock).toHaveBeenCalledWith(['scene-13', 'scene-14']);

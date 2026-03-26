@@ -27,10 +27,11 @@ import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
 import {
-  DiscoverItem,
   PerformerStudioOption,
   SceneFavoritesFilter,
   SceneFeedSort,
+  SceneExplorerItem,
+  SceneLibraryAvailability,
   SceneRequestContext,
   SortDirection,
   SceneTagMatchMode,
@@ -77,6 +78,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly DEFAULT_DIRECTION: SortDirection = 'DESC';
   private static readonly DEFAULT_FAVORITES: FavoritesFilterOption = 'NONE';
   private static readonly DEFAULT_TAG_MODE: SceneTagMatchMode = 'OR';
+  private static readonly DEFAULT_LIBRARY_AVAILABILITY: SceneLibraryAvailability = 'ANY';
   protected static readonly SORT_OPTIONS: Array<{
     value: SceneFeedSort;
     label: string;
@@ -102,6 +104,14 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }> = [
     { value: 'OR', label: 'OR (Any)' },
     { value: 'AND', label: 'AND (All)' },
+  ];
+  protected static readonly LIBRARY_AVAILABILITY_OPTIONS: Array<{
+    value: SceneLibraryAvailability;
+    label: string;
+  }> = [
+    { value: 'ANY', label: 'Any Scene' },
+    { value: 'IN_LIBRARY', label: 'Already In Library' },
+    { value: 'MISSING_FROM_LIBRARY', label: 'Missing From Library' },
   ];
 
   private readonly discoverService = inject(DiscoverService);
@@ -141,11 +151,11 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly loadingMore = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly loadMoreError = signal<string | null>(null);
-  protected readonly total = signal(0);
+  protected readonly total = signal<number | null>(0);
   protected readonly page = signal(0);
   protected readonly hasMore = signal(true);
   protected readonly inFlight = signal(false);
-  protected readonly items = signal<DiscoverItem[]>([]);
+  protected readonly items = signal<SceneExplorerItem[]>([]);
   protected readonly requestModalOpen = signal(false);
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
   protected readonly selectedSort = signal<SceneFeedSort>(ScenesPageComponent.DEFAULT_SORT);
@@ -155,6 +165,12 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly selectedFavorites = signal<FavoritesFilterOption>(
     ScenesPageComponent.DEFAULT_FAVORITES,
   );
+  protected readonly selectedLibraryAvailability = signal<SceneLibraryAvailability>(
+    ScenesPageComponent.DEFAULT_LIBRARY_AVAILABILITY,
+  );
+  protected readonly stashFavoritePerformersOnly = signal(false);
+  protected readonly stashFavoriteStudiosOnly = signal(false);
+  protected readonly stashFavoriteTagsOnly = signal(false);
   protected readonly tagSearchTerm = signal('');
   protected readonly selectedTagMode = signal<SceneTagMatchMode>(
     ScenesPageComponent.DEFAULT_TAG_MODE,
@@ -175,6 +191,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly sortOptions = ScenesPageComponent.SORT_OPTIONS;
   protected readonly favoritesOptions = ScenesPageComponent.FAVORITES_OPTIONS;
   protected readonly tagMatchOptions = ScenesPageComponent.TAG_MATCH_OPTIONS;
+  protected readonly libraryAvailabilityOptions = ScenesPageComponent.LIBRARY_AVAILABILITY_OPTIONS;
 
   ngOnInit(): void {
     this.setupStudioSearch();
@@ -218,11 +235,11 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadNextPage();
   }
 
-  protected isRequestable(item: DiscoverItem): boolean {
-    return item.status.state === 'NOT_REQUESTED';
+  protected isRequestable(item: SceneExplorerItem): boolean {
+    return item.requestable && item.status.state === 'NOT_REQUESTED';
   }
 
-  protected openRequestModal(item: DiscoverItem): void {
+  protected openRequestModal(item: SceneExplorerItem): void {
     if (!this.isRequestable(item)) {
       return;
     }
@@ -298,6 +315,68 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.syncUrlWithCurrentFilters(false);
       this.resetFeedAndReload();
     }
+  }
+
+  protected onLibraryAvailabilityChanged(nextValue: string): void {
+    if (nextValue !== 'ANY' && nextValue !== 'IN_LIBRARY' && nextValue !== 'MISSING_FROM_LIBRARY') {
+      return;
+    }
+
+    if (this.selectedLibraryAvailability() === nextValue) {
+      return;
+    }
+
+    this.selectedLibraryAvailability.set(nextValue);
+    this.syncUrlWithCurrentFilters(false);
+    this.resetFeedAndReload();
+  }
+
+  protected onStashFavoritePerformersChanged(nextValue: boolean): void {
+    if (this.stashFavoritePerformersOnly() === nextValue) {
+      return;
+    }
+
+    this.stashFavoritePerformersOnly.set(nextValue);
+    this.syncUrlWithCurrentFilters(false);
+    this.resetFeedAndReload();
+  }
+
+  protected onStashFavoriteStudiosChanged(nextValue: boolean): void {
+    if (this.stashFavoriteStudiosOnly() === nextValue) {
+      return;
+    }
+
+    this.stashFavoriteStudiosOnly.set(nextValue);
+    this.syncUrlWithCurrentFilters(false);
+    this.resetFeedAndReload();
+  }
+
+  protected onStashFavoriteTagsChanged(nextValue: boolean): void {
+    if (this.stashFavoriteTagsOnly() === nextValue) {
+      return;
+    }
+
+    this.stashFavoriteTagsOnly.set(nextValue);
+    this.syncUrlWithCurrentFilters(false);
+    this.resetFeedAndReload();
+  }
+
+  protected hasHybridFiltersActive(): boolean {
+    return (
+      this.selectedLibraryAvailability() !== ScenesPageComponent.DEFAULT_LIBRARY_AVAILABILITY ||
+      this.stashFavoritePerformersOnly() ||
+      this.stashFavoriteStudiosOnly() ||
+      this.stashFavoriteTagsOnly()
+    );
+  }
+
+  protected scenesTotalLabel(): string {
+    const total = this.total();
+    if (total === null) {
+      return 'Showing lifecycle-aware results.';
+    }
+
+    return `Total scenes: ${total}`;
   }
 
   protected onTagFilterChanged(nextValue: string | null | undefined): void {
@@ -422,7 +501,8 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
         item.id === stashId
           ? {
               ...item,
-              status: { state: 'DOWNLOADING' },
+              requestable: false,
+              status: { state: 'REQUESTED' },
             }
           : item,
       ),
@@ -433,7 +513,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.router.url;
   }
 
-  protected studioBadgeQueryParams(item: DiscoverItem): Record<string, string> | null {
+  protected studioBadgeQueryParams(item: SceneExplorerItem): Record<string, string> | null {
     if (!item.studioId || !item.studio) {
       return null;
     }
@@ -472,6 +552,10 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
         this.selectedTagMode(),
         this.selectedFavoritesFilter(),
         this.selectedStudioIds(),
+        this.selectedLibraryAvailability(),
+        this.stashFavoritePerformersOnly(),
+        this.stashFavoriteStudiosOnly(),
+        this.stashFavoriteTagsOnly(),
       )
       .pipe(
         finalize(() => {
@@ -573,6 +657,10 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     sort: SceneFeedSort;
     direction: SortDirection;
     favorites: FavoritesFilterOption;
+    availability: SceneLibraryAvailability;
+    stashFavoritePerformersOnly: boolean;
+    stashFavoriteStudiosOnly: boolean;
+    stashFavoriteTagsOnly: boolean;
     mode: SceneTagMatchMode;
     tagIds: string[];
     tagNamesById: Map<string, string>;
@@ -602,12 +690,20 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       directionParam === 'ASC' || directionParam === 'DESC'
         ? directionParam
         : ScenesPageComponent.DEFAULT_DIRECTION;
+    const availabilityParam = queryParamMap.get('availability');
+    const availability: SceneLibraryAvailability =
+      availabilityParam === 'ANY' ||
+      availabilityParam === 'IN_LIBRARY' ||
+      availabilityParam === 'MISSING_FROM_LIBRARY'
+        ? availabilityParam
+        : ScenesPageComponent.DEFAULT_LIBRARY_AVAILABILITY;
+    const stashFavoritePerformersOnly = queryParamMap.get('stashFavPerformers') === '1';
+    const stashFavoriteStudiosOnly = queryParamMap.get('stashFavStudios') === '1';
+    const stashFavoriteTagsOnly = queryParamMap.get('stashFavTags') === '1';
 
     const modeParam = queryParamMap.get('mode');
     const mode: SceneTagMatchMode =
-      modeParam === 'OR' || modeParam === 'AND'
-        ? modeParam
-        : ScenesPageComponent.DEFAULT_TAG_MODE;
+      modeParam === 'OR' || modeParam === 'AND' ? modeParam : ScenesPageComponent.DEFAULT_TAG_MODE;
 
     const rawTagIds = (queryParamMap.get('tags') ?? '')
       .split(',')
@@ -646,6 +742,10 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       sort,
       direction,
       favorites,
+      availability,
+      stashFavoritePerformersOnly,
+      stashFavoriteStudiosOnly,
+      stashFavoriteTagsOnly,
       mode,
       tagIds,
       tagNamesById,
@@ -658,6 +758,10 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     sort: SceneFeedSort;
     direction: SortDirection;
     favorites: FavoritesFilterOption;
+    availability: SceneLibraryAvailability;
+    stashFavoritePerformersOnly: boolean;
+    stashFavoriteStudiosOnly: boolean;
+    stashFavoriteTagsOnly: boolean;
     mode: SceneTagMatchMode;
     tagIds: string[];
     tagNamesById: Map<string, string>;
@@ -667,14 +771,15 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const currentSelectedIds = this.selectedTagIds();
     const currentSelectedStudioIds = this.selectedStudioIds();
     const tagsChanged = !this.areStringArraysEqual(currentSelectedIds, state.tagIds);
-    const studiosChanged = !this.areStringArraysEqual(
-      currentSelectedStudioIds,
-      state.studioIds,
-    );
+    const studiosChanged = !this.areStringArraysEqual(currentSelectedStudioIds, state.studioIds);
     const changed =
       this.selectedSort() !== state.sort ||
       this.selectedDirection() !== state.direction ||
       this.selectedFavorites() !== state.favorites ||
+      this.selectedLibraryAvailability() !== state.availability ||
+      this.stashFavoritePerformersOnly() !== state.stashFavoritePerformersOnly ||
+      this.stashFavoriteStudiosOnly() !== state.stashFavoriteStudiosOnly ||
+      this.stashFavoriteTagsOnly() !== state.stashFavoriteTagsOnly ||
       this.selectedTagMode() !== state.mode ||
       tagsChanged ||
       studiosChanged;
@@ -686,6 +791,10 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.selectedSort.set(state.sort);
     this.selectedDirection.set(state.direction);
     this.selectedFavorites.set(state.favorites);
+    this.selectedLibraryAvailability.set(state.availability);
+    this.stashFavoritePerformersOnly.set(state.stashFavoritePerformersOnly);
+    this.stashFavoriteStudiosOnly.set(state.stashFavoriteStudiosOnly);
+    this.stashFavoriteTagsOnly.set(state.stashFavoriteTagsOnly);
     this.selectedTagMode.set(state.mode);
     this.selectedTagIdsModel.set(state.tagIds);
 
@@ -727,10 +836,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private syncUrlWithCurrentFilters(replaceUrl: boolean): void {
     const next = {
-      sort:
-        this.selectedSort() === ScenesPageComponent.DEFAULT_SORT
-          ? null
-          : this.selectedSort(),
+      sort: this.selectedSort() === ScenesPageComponent.DEFAULT_SORT ? null : this.selectedSort(),
       dir:
         this.selectedDirection() === ScenesPageComponent.DEFAULT_DIRECTION
           ? null
@@ -739,6 +845,13 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
         this.selectedFavorites() === ScenesPageComponent.DEFAULT_FAVORITES
           ? null
           : this.selectedFavorites(),
+      availability:
+        this.selectedLibraryAvailability() === ScenesPageComponent.DEFAULT_LIBRARY_AVAILABILITY
+          ? null
+          : this.selectedLibraryAvailability(),
+      stashFavPerformers: this.stashFavoritePerformersOnly() ? '1' : null,
+      stashFavStudios: this.stashFavoriteStudiosOnly() ? '1' : null,
+      stashFavTags: this.stashFavoriteTagsOnly() ? '1' : null,
       mode:
         this.selectedTagMode() === ScenesPageComponent.DEFAULT_TAG_MODE
           ? null
@@ -750,8 +863,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
               .map((tag) => tag.name.trim())
               .join(',')
           : null,
-      studios:
-        this.selectedStudioIds().length > 0 ? this.selectedStudioIds().join(',') : null,
+      studios: this.selectedStudioIds().length > 0 ? this.selectedStudioIds().join(',') : null,
       studioNames:
         this.selectedStudios().length > 0
           ? this.selectedStudios()
@@ -765,6 +877,10 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const currentFav = current.get('fav');
     const currentDir = current.get('dir');
     const currentMode = current.get('mode');
+    const currentAvailability = current.get('availability');
+    const currentStashFavPerformers = current.get('stashFavPerformers');
+    const currentStashFavStudios = current.get('stashFavStudios');
+    const currentStashFavTags = current.get('stashFavTags');
     const currentTags = current.get('tags');
     const currentTagNames = current.get('tagNames');
     const currentStudios = current.get('studios');
@@ -773,6 +889,10 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       (currentSort ?? null) === next.sort &&
       (currentDir ?? null) === next.dir &&
       (currentFav ?? null) === next.fav &&
+      (currentAvailability ?? null) === next.availability &&
+      (currentStashFavPerformers ?? null) === next.stashFavPerformers &&
+      (currentStashFavStudios ?? null) === next.stashFavStudios &&
+      (currentStashFavTags ?? null) === next.stashFavTags &&
       (currentMode ?? null) === next.mode &&
       (currentTags ?? null) === next.tags &&
       (currentTagNames ?? null) === next.tagNames &&

@@ -2,13 +2,12 @@
   display: block;
   min-height: 100dvh;
   color: var(--text-primary);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--app-bg) 35%, #0c141f) 0%,
-      color-mix(in srgb, var(--app-bg) 25%, #101a27) 22%,
-      var(--app-bg) 55%
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--app-bg) 35%, #0c141f) 0%,
+    color-mix(in srgb, var(--app-bg) 25%, #101a27) 22%,
+    var(--app-bg) 55%
+  );
   font-family: var(--app-font-family);
 }
 
@@ -20,6 +19,7 @@ main {
 
 h1,
 h2,
+h3,
 p {
   margin: 0;
 }
@@ -58,12 +58,7 @@ p {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(
-      110deg,
-      rgb(7 13 20 / 86%) 0%,
-      rgb(7 13 20 / 58%) 42%,
-      rgb(7 13 20 / 84%) 100%
-    ),
+    linear-gradient(110deg, rgb(7 13 20 / 86%) 0%, rgb(7 13 20 / 58%) 42%, rgb(7 13 20 / 84%) 100%),
     linear-gradient(
       to bottom,
       rgb(8 14 23 / 10%) 0%,
@@ -352,6 +347,19 @@ button {
   margin-top: 0.9rem;
   display: grid;
   gap: 0.9rem;
+}
+
+.lifecycle-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.lifecycle-card {
+  display: grid;
+  padding: 0.8rem;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-2);
 }
 
 .section {

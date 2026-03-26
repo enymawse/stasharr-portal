@@ -1,12 +1,4 @@
-import {
-  Component,
-  ElementRef,
-  OnDestroy,
-  OnInit,
-  ViewChild,
-  inject,
-  signal,
-} from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { Subscription, combineLatest, finalize } from 'rxjs';
@@ -16,13 +8,16 @@ import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
-import {
-  SceneDetails,
-  ScenePerformer,
-  SceneRequestContext,
-} from '../../core/api/discover.types';
+import { SceneDetails, ScenePerformer, SceneRequestContext } from '../../core/api/discover.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
+
+interface SceneLifecycleStep {
+  system: 'StashDB' | 'Whisparr' | 'Stash';
+  title: string;
+  detail: string;
+  tone: 'complete' | 'active' | 'pending';
+}
 
 @Component({
   selector: 'app-scene-page',
@@ -68,15 +63,10 @@ export class ScenePageComponent implements OnInit, OnDestroy {
       this.route.paramMap,
       this.route.queryParamMap,
     ]).subscribe(([paramMap, queryParamMap]) => {
-      const resolvedBackLink = this.parseReturnTo(
-        queryParamMap.get('returnTo'),
-        '/discover',
-      );
+      const resolvedBackLink = this.parseReturnTo(queryParamMap.get('returnTo'), '/discover');
       this.backLinkPath.set(resolvedBackLink.path);
       this.backLinkQueryParams.set(resolvedBackLink.queryParams);
-      this.backLinkLabel.set(
-        this.backLinkText(resolvedBackLink.path, 'Back to Discover'),
-      );
+      this.backLinkLabel.set(this.backLinkText(resolvedBackLink.path, 'Back to Discover'));
 
       const stashIdParam = paramMap.get('stashId')?.trim();
       if (!stashIdParam) {
@@ -128,10 +118,7 @@ export class ScenePageComponent implements OnInit, OnDestroy {
       return 'View in Stash';
     }
 
-    return (
-      scene.stash?.copies.find((copy) => copy.viewUrl === selected)?.label ??
-      'View in Stash'
-    );
+    return scene.stash?.copies.find((copy) => copy.viewUrl === selected)?.label ?? 'View in Stash';
   }
 
   protected onStashCopySelected(viewUrl: string | null | undefined): void {
@@ -195,6 +182,35 @@ export class ScenePageComponent implements OnInit, OnDestroy {
     return gender;
   }
 
+  protected lifecycleSummary(scene: SceneDetails): string {
+    switch (scene.status.state) {
+      case 'REQUESTED':
+        return 'Requested in Whisparr and waiting for acquisition to begin.';
+      case 'DOWNLOADING':
+        return 'Whisparr is actively acquiring this scene.';
+      case 'IMPORT_PENDING':
+        return 'Whisparr has the file, but Stash has not imported it yet.';
+      case 'AVAILABLE':
+        return 'Imported into Stash and available in your local library.';
+      case 'NOT_REQUESTED':
+      default:
+        return 'Discovered in StashDB and not yet sent into your local acquisition pipeline.';
+    }
+  }
+
+  protected lifecycleSteps(scene: SceneDetails): SceneLifecycleStep[] {
+    return [
+      {
+        system: 'StashDB',
+        title: 'Discovered',
+        detail: 'Metadata, credits, and source links on this page come from StashDB.',
+        tone: 'complete',
+      },
+      this.whisparrLifecycleStep(scene),
+      this.stashLifecycleStep(scene),
+    ];
+  }
+
   protected canRequestScene(scene: SceneDetails): boolean {
     return scene.status.state === 'NOT_REQUESTED';
   }
@@ -253,9 +269,7 @@ export class ScenePageComponent implements OnInit, OnDestroy {
             return;
           }
 
-          this.notifications.success(
-            nextFavorite ? 'Studio favorited' : 'Studio unfavorited',
-          );
+          this.notifications.success(nextFavorite ? 'Studio favorited' : 'Studio unfavorited');
         },
         error: () => {
           this.notifications.error(
@@ -273,10 +287,7 @@ export class ScenePageComponent implements OnInit, OnDestroy {
     return isFavorite ? 'Unfavorite performer' : 'Favorite performer';
   }
 
-  protected toggleScenePerformerFavorite(
-    event: Event,
-    performer: ScenePerformer,
-  ): void {
+  protected toggleScenePerformerFavorite(event: Event, performer: ScenePerformer): void {
     event.preventDefault();
     event.stopPropagation();
 
@@ -319,9 +330,7 @@ export class ScenePageComponent implements OnInit, OnDestroy {
         },
         error: () => {
           this.notifications.error(
-            nextFavorite
-              ? 'Failed to favorite performer'
-              : 'Failed to unfavorite performer',
+            nextFavorite ? 'Failed to favorite performer' : 'Failed to unfavorite performer',
           );
         },
       });
@@ -345,8 +354,7 @@ export class ScenePageComponent implements OnInit, OnDestroy {
     this.requestModalOpen.set(false);
 
     setTimeout(() => {
-      const focusTarget =
-        this.requestTriggerButton?.nativeElement ?? this.previousFocusedElement;
+      const focusTarget = this.requestTriggerButton?.nativeElement ?? this.previousFocusedElement;
       focusTarget?.focus();
       this.previousFocusedElement = null;
     }, 0);
@@ -404,6 +412,76 @@ export class ScenePageComponent implements OnInit, OnDestroy {
 
   private normalizeDescription(description: string): string {
     return description.replaceAll(/\s+/g, ' ').trim();
+  }
+
+  private whisparrLifecycleStep(scene: SceneDetails): SceneLifecycleStep {
+    switch (scene.status.state) {
+      case 'REQUESTED':
+        return {
+          system: 'Whisparr',
+          title: 'Requested',
+          detail: 'Whisparr knows about this scene, but acquisition has not started.',
+          tone: 'active',
+        };
+      case 'DOWNLOADING':
+        return {
+          system: 'Whisparr',
+          title: 'Downloading',
+          detail: 'Whisparr is actively pulling the asset into your pipeline.',
+          tone: 'active',
+        };
+      case 'IMPORT_PENDING':
+        return {
+          system: 'Whisparr',
+          title: 'Ready for import',
+          detail: 'Whisparr has finished acquisition and is waiting for Stash to pick it up.',
+          tone: 'complete',
+        };
+      case 'AVAILABLE':
+        return {
+          system: 'Whisparr',
+          title: 'Handled',
+          detail: scene.whisparr?.exists
+            ? 'Whisparr has a linked record for this scene.'
+            : 'The request pipeline has already handed this scene off to your library.',
+          tone: 'complete',
+        };
+      case 'NOT_REQUESTED':
+      default:
+        return {
+          system: 'Whisparr',
+          title: 'Not requested',
+          detail: 'No Whisparr request or tracked acquisition is linked yet.',
+          tone: 'pending',
+        };
+    }
+  }
+
+  private stashLifecycleStep(scene: SceneDetails): SceneLifecycleStep {
+    if (scene.status.state === 'AVAILABLE') {
+      return {
+        system: 'Stash',
+        title: 'In library',
+        detail: 'A linked local scene is available in Stash.',
+        tone: 'complete',
+      };
+    }
+
+    if (scene.status.state === 'IMPORT_PENDING') {
+      return {
+        system: 'Stash',
+        title: 'Awaiting import',
+        detail: 'Stash has not linked a local copy yet.',
+        tone: 'active',
+      };
+    }
+
+    return {
+      system: 'Stash',
+      title: 'Not in library',
+      detail: 'No linked Stash scene is available yet.',
+      tone: 'pending',
+    };
   }
 
   private parseReturnTo(

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { HybridScenesModule } from '../hybrid-scenes/hybrid-scenes.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { StashModule } from '../providers/stash/stash.module';
 import { StashdbModule } from '../providers/stashdb/stashdb.module';
@@ -14,6 +15,7 @@ import { ScenesService } from './scenes.service';
     SceneStatusModule,
     StashModule,
     WhisparrModule,
+    HybridScenesModule,
   ],
   controllers: [ScenesController],
   providers: [ScenesService],

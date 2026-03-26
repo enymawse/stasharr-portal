@@ -1,9 +1,5 @@
 <main>
-  <a
-    class="back-link"
-    [routerLink]="backLinkPath()"
-    [queryParams]="backLinkQueryParams()"
-  >
+  <a class="back-link" [routerLink]="backLinkPath()" [queryParams]="backLinkQueryParams()">
     {{ backLinkLabel() }}
   </a>
 
@@ -61,7 +57,10 @@
               [attr.title]="studioFavoriteTitle(scene)"
               (click)="toggleFavoriteStudio(scene)"
             >
-              <i [class]="scene.studioIsFavorite ? 'pi pi-star-fill' : 'pi pi-star'" aria-hidden="true"></i>
+              <i
+                [class]="scene.studioIsFavorite ? 'pi pi-star-fill' : 'pi pi-star'"
+                aria-hidden="true"
+              ></i>
             </button>
           }
         </div>
@@ -134,8 +133,12 @@
                       [href]="selectedViewUrl"
                       target="_blank"
                       rel="noopener noreferrer"
-                      [attr.aria-label]="'View in Stash (' + selectedStashLabel(scene) + ') in a new tab'"
-                      [attr.title]="'View in Stash (' + selectedStashLabel(scene) + ') in a new tab'"
+                      [attr.aria-label]="
+                        'View in Stash (' + selectedStashLabel(scene) + ') in a new tab'
+                      "
+                      [attr.title]="
+                        'View in Stash (' + selectedStashLabel(scene) + ') in a new tab'
+                      "
                     >
                       <span class="external-action-label">
                         View in Stash ({{ selectedStashLabel(scene) }})
@@ -192,6 +195,25 @@
     </section>
 
     <div class="content-shell">
+      <section class="section lifecycle-section">
+        <h2>Lifecycle</h2>
+        <p class="overview-text">{{ lifecycleSummary(scene) }}</p>
+
+        <div class="lifecycle-grid">
+          @for (step of lifecycleSteps(scene); track step.system) {
+            <article class="lifecycle-card">
+              <p class="overview-text">
+                <strong>{{ step.system }}</strong>
+              </p>
+              <p>
+                <strong>{{ step.title }}</strong>
+              </p>
+              <p class="overview-text">{{ step.detail }}</p>
+            </article>
+          }
+        </div>
+      </section>
+
       @if (displayedDescription(scene.description); as description) {
         <section class="section overview-section">
           <h2>Overview</h2>
@@ -235,7 +257,11 @@
                 </button>
 
                 @if (performer.cardImageUrl || performer.imageUrl) {
-                  <img class="performer-image" [src]="performer.cardImageUrl ?? performer.imageUrl" [alt]="performer.name" />
+                  <img
+                    class="performer-image"
+                    [src]="performer.cardImageUrl ?? performer.imageUrl"
+                    [alt]="performer.name"
+                  />
                 } @else {
                   <div class="performer-image placeholder">
                     {{ performerInitial(performer.name) }}
@@ -271,7 +297,6 @@
           </div>
         </section>
       }
-
     </div>
 
     <app-scene-request-modal

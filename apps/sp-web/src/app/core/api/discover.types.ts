@@ -1,8 +1,9 @@
 export type SceneStatusState =
   | 'NOT_REQUESTED'
+  | 'REQUESTED'
   | 'DOWNLOADING'
-  | 'AVAILABLE'
-  | 'MISSING';
+  | 'IMPORT_PENDING'
+  | 'AVAILABLE';
 
 export interface SceneStatus {
   state: SceneStatusState;
@@ -32,12 +33,21 @@ export interface DiscoverResponse {
   items: DiscoverItem[];
 }
 
-export type SceneFeedSort =
-  | 'DATE'
-  | 'TRENDING'
-  | 'TITLE'
-  | 'CREATED_AT'
-  | 'UPDATED_AT';
+export type SceneLibraryAvailability = 'ANY' | 'IN_LIBRARY' | 'MISSING_FROM_LIBRARY';
+
+export interface SceneExplorerItem extends DiscoverItem {
+  requestable: boolean;
+}
+
+export interface ScenesFeedResponse {
+  total: number | null;
+  page: number;
+  perPage: number;
+  hasMore: boolean;
+  items: SceneExplorerItem[];
+}
+
+export type SceneFeedSort = 'DATE' | 'TRENDING' | 'TITLE' | 'CREATED_AT' | 'UPDATED_AT';
 export type SortDirection = 'ASC' | 'DESC';
 
 export type SceneTagMatchMode = 'OR' | 'AND';

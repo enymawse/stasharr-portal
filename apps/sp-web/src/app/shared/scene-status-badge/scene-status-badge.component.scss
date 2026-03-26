@@ -32,20 +32,26 @@
   color: var(--badge-not-requested-text);
 }
 
+.requested {
+  background: var(--badge-requested-bg);
+  border-color: var(--badge-requested-border);
+  color: var(--badge-requested-text);
+}
+
 .downloading {
   background: var(--badge-downloading-bg);
   border-color: var(--badge-downloading-border);
   color: var(--badge-downloading-text);
 }
 
+.import-pending {
+  background: var(--badge-import-pending-bg);
+  border-color: var(--badge-import-pending-border);
+  color: var(--badge-import-pending-text);
+}
+
 .available {
   background: var(--badge-available-bg);
   border-color: var(--badge-available-border);
   color: var(--badge-available-text);
-}
-
-.missing {
-  background: var(--badge-missing-bg);
-  border-color: var(--badge-missing-border);
-  color: var(--badge-missing-text);
 }

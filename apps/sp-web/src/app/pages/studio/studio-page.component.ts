@@ -141,9 +141,7 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly activeImageIndex = signal(0);
   protected readonly favoritingStudio = signal(false);
 
-  protected readonly sceneSort = signal<SceneFeedSort>(
-    StudioPageComponent.DEFAULT_SCENE_SORT,
-  );
+  protected readonly sceneSort = signal<SceneFeedSort>(StudioPageComponent.DEFAULT_SCENE_SORT);
   protected readonly sceneSortDirection = signal<SortDirection>(
     StudioPageComponent.DEFAULT_SCENE_DIRECTION,
   );
@@ -352,9 +350,7 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
             return;
           }
 
-          this.notifications.success(
-            nextFavorite ? 'Studio favorited' : 'Studio unfavorited',
-          );
+          this.notifications.success(nextFavorite ? 'Studio favorited' : 'Studio unfavorited');
         },
         error: () => {
           this.notifications.error(
@@ -401,9 +397,7 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected toggleSceneSortDirection(): void {
-    this.onSceneSortDirectionChanged(
-      this.sceneSortDirection() === 'ASC' ? 'DESC' : 'ASC',
-    );
+    this.onSceneSortDirectionChanged(this.sceneSortDirection() === 'ASC' ? 'DESC' : 'ASC');
   }
 
   protected sceneSortDirectionIconClass(): string {
@@ -525,7 +519,7 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected onRequestSubmitted(stashId: string): void {
     this.scenes.update((current) =>
       current.map((item) =>
-        item.id === stashId ? { ...item, status: { state: 'DOWNLOADING' } } : item,
+        item.id === stashId ? { ...item, status: { state: 'REQUESTED' } } : item,
       ),
     );
   }
@@ -632,7 +626,7 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
             return;
           }
 
-          this.scenesTotal.set(response.total);
+          this.scenesTotal.set(response.total ?? 0);
           this.scenesPage.set(response.page);
           this.scenesHasMore.set(response.hasMore);
           this.scenes.update((current) =>
@@ -751,9 +745,7 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const modeParam = queryParamMap.get('mode');
     const mode: SceneTagMatchMode =
-      modeParam === 'OR' || modeParam === 'AND'
-        ? modeParam
-        : StudioPageComponent.DEFAULT_TAG_MODE;
+      modeParam === 'OR' || modeParam === 'AND' ? modeParam : StudioPageComponent.DEFAULT_TAG_MODE;
 
     const rawTagIds = (queryParamMap.get('tags') ?? '')
       .split(',')
@@ -831,10 +823,7 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private syncUrlWithCurrentFilters(replaceUrl: boolean): void {
     const next = {
-      sort:
-        this.sceneSort() === StudioPageComponent.DEFAULT_SCENE_SORT
-          ? null
-          : this.sceneSort(),
+      sort: this.sceneSort() === StudioPageComponent.DEFAULT_SCENE_SORT ? null : this.sceneSort(),
       dir:
         this.sceneSortDirection() === StudioPageComponent.DEFAULT_SCENE_DIRECTION
           ? null

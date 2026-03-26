@@ -109,7 +109,9 @@ export class RequestsPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return item.status.state === 'NOT_REQUESTED';
   }
 
-  protected openRequestModal(item: DiscoverItem): void {    if (!this.isRequestable(item)) {      return;
+  protected openRequestModal(item: DiscoverItem): void {
+    if (!this.isRequestable(item)) {
+      return;
     }
 
     this.requestContext.set({
@@ -117,7 +119,8 @@ export class RequestsPageComponent implements OnInit, AfterViewInit, OnDestroy {
       title: item.title,
       imageUrl: item.imageUrl,
     });
-    this.requestModalOpen.set(true);  }
+    this.requestModalOpen.set(true);
+  }
 
   protected onRequestModalClosed(): void {
     this.requestModalOpen.set(false);
@@ -129,7 +132,7 @@ export class RequestsPageComponent implements OnInit, AfterViewInit, OnDestroy {
         item.id === stashId
           ? {
               ...item,
-              status: { state: 'DOWNLOADING' },
+              status: { state: 'REQUESTED' },
             }
           : item,
       ),

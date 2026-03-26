@@ -1,8 +1,9 @@
 export const SCENE_STATUS_VALUES = [
   'NOT_REQUESTED',
+  'REQUESTED',
   'DOWNLOADING',
+  'IMPORT_PENDING',
   'AVAILABLE',
-  'MISSING',
 ] as const;
 
 export type SceneStatus = (typeof SCENE_STATUS_VALUES)[number];

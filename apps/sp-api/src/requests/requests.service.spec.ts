@@ -1,9 +1,9 @@
+import { BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import {
-  BadRequestException,
-  ConflictException,
-  Logger,
-} from '@nestjs/common';
-import { IntegrationStatus, IntegrationType, RequestStatus } from '@prisma/client';
+  IntegrationStatus,
+  IntegrationType,
+  RequestStatus,
+} from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
@@ -113,10 +113,26 @@ describe('RequestsService', () => {
 
   it('builds queue-scoped feed with stable deduped order and pagination', async () => {
     getQueueSnapshotMock.mockResolvedValue([
-      { movieId: 2, trackedDownloadState: 'downloading', trackedDownloadStatus: 'ok' },
-      { movieId: 1, trackedDownloadState: 'downloading', trackedDownloadStatus: 'ok' },
-      { movieId: 2, trackedDownloadState: 'importing', trackedDownloadStatus: 'ok' },
-      { movieId: 3, trackedDownloadState: 'downloading', trackedDownloadStatus: 'ok' },
+      {
+        movieId: 2,
+        trackedDownloadState: 'downloading',
+        trackedDownloadStatus: 'ok',
+      },
+      {
+        movieId: 1,
+        trackedDownloadState: 'downloading',
+        trackedDownloadStatus: 'ok',
+      },
+      {
+        movieId: 2,
+        trackedDownloadState: 'importing',
+        trackedDownloadStatus: 'ok',
+      },
+      {
+        movieId: 3,
+        trackedDownloadState: 'downloading',
+        trackedDownloadStatus: 'ok',
+      },
     ]);
 
     findMovieByIdMock.mockImplementation((movieId: number) => {
@@ -135,7 +151,7 @@ describe('RequestsService', () => {
     resolveForScenesMock.mockResolvedValue(
       new Map([
         ['scene-b', { state: 'DOWNLOADING' }],
-        ['scene-a', { state: 'MISSING' }],
+        ['scene-a', { state: 'REQUESTED' }],
       ]),
     );
 
@@ -329,9 +345,21 @@ describe('RequestsService', () => {
       .mockImplementation(() => undefined);
 
     getQueueSnapshotMock.mockResolvedValue([
-      { movieId: 1, trackedDownloadState: 'downloading', trackedDownloadStatus: 'ok' },
-      { movieId: 2, trackedDownloadState: 'downloading', trackedDownloadStatus: 'ok' },
-      { movieId: 3, trackedDownloadState: 'downloading', trackedDownloadStatus: 'ok' },
+      {
+        movieId: 1,
+        trackedDownloadState: 'downloading',
+        trackedDownloadStatus: 'ok',
+      },
+      {
+        movieId: 2,
+        trackedDownloadState: 'downloading',
+        trackedDownloadStatus: 'ok',
+      },
+      {
+        movieId: 3,
+        trackedDownloadState: 'downloading',
+        trackedDownloadStatus: 'ok',
+      },
     ]);
 
     findMovieByIdMock.mockImplementation((movieId: number) => {

@@ -1,6 +1,7 @@
-import { IntegrationStatus, RequestStatus } from '@prisma/client';
+import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StashAdapter } from '../providers/stash/stash.adapter';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
 import { SceneStatusService } from './scene-status.service';
 
@@ -17,10 +18,15 @@ describe('SceneStatusService', () => {
   const findOneMock = jest.fn();
   const findMovieByStashIdMock = jest.fn();
   const getQueueSnapshotMock = jest.fn();
+  const findScenesByStashIdMock = jest.fn();
 
   const integrationsService = {
     findOne: findOneMock,
   } as unknown as IntegrationsService;
+
+  const stashAdapter = {
+    findScenesByStashId: findScenesByStashIdMock,
+  } as unknown as StashAdapter;
 
   const whisparrAdapter = {
     findMovieByStashId: findMovieByStashIdMock,
@@ -31,7 +37,14 @@ describe('SceneStatusService', () => {
     enabled: true,
     status: IntegrationStatus.CONFIGURED,
     baseUrl: 'http://whisparr.local',
-    apiKey: 'key',
+    apiKey: 'whisparr-key',
+  };
+
+  const configuredStashIntegration = {
+    enabled: true,
+    status: IntegrationStatus.CONFIGURED,
+    baseUrl: 'http://stash.local',
+    apiKey: 'stash-key',
   };
 
   let service: SceneStatusService;
@@ -41,8 +54,26 @@ describe('SceneStatusService', () => {
     service = new SceneStatusService(
       prisma,
       integrationsService,
+      stashAdapter,
       whisparrAdapter,
     );
+
+    findOneMock.mockImplementation((type: IntegrationType) => {
+      if (type === IntegrationType.WHISPARR) {
+        return Promise.resolve(configuredWhisparrIntegration);
+      }
+
+      if (type === IntegrationType.STASH) {
+        return Promise.resolve(configuredStashIntegration);
+      }
+
+      return Promise.reject(new Error(`Unexpected integration type: ${type}`));
+    });
+    requestDelegate.findUnique.mockResolvedValue(null);
+    requestDelegate.findMany.mockResolvedValue([]);
+    findScenesByStashIdMock.mockResolvedValue([]);
+    findMovieByStashIdMock.mockResolvedValue(null);
+    getQueueSnapshotMock.mockResolvedValue([]);
   });
 
   describe('resolveForScene', () => {
@@ -51,51 +82,47 @@ describe('SceneStatusService', () => {
         state: 'NOT_REQUESTED',
       });
       expect(requestDelegate.findUnique).not.toHaveBeenCalled();
+      expect(findScenesByStashIdMock).not.toHaveBeenCalled();
       expect(findMovieByStashIdMock).not.toHaveBeenCalled();
-      expect(getQueueSnapshotMock).not.toHaveBeenCalled();
     });
 
-    it('keeps fallback status when Whisparr integration is missing', async () => {
-      requestDelegate.findUnique.mockResolvedValue({
-        status: RequestStatus.PROCESSING,
-      });
-      findOneMock.mockRejectedValue(new Error('missing integration'));
-
-      await expect(service.resolveForScene('scene-1')).resolves.toEqual({
-        state: 'DOWNLOADING',
-      });
-      expect(findMovieByStashIdMock).not.toHaveBeenCalled();
-      expect(getQueueSnapshotMock).not.toHaveBeenCalled();
-    });
-
-    it('returns NOT_REQUESTED when Whisparr has no movie match', async () => {
-      requestDelegate.findUnique.mockResolvedValue({
-        status: RequestStatus.PROCESSING,
-      });
-      findOneMock.mockResolvedValue(configuredWhisparrIntegration);
-      findMovieByStashIdMock.mockResolvedValue(null);
-      getQueueSnapshotMock.mockResolvedValue([]);
-
+    it('returns NOT_REQUESTED when no request, no Whisparr movie, and no Stash copy exist', async () => {
       await expect(service.resolveForScene('scene-1')).resolves.toEqual({
         state: 'NOT_REQUESTED',
       });
     });
 
-    it('returns DOWNLOADING when queue has in-flight state', async () => {
-      requestDelegate.findUnique.mockResolvedValue({
-        status: RequestStatus.FAILED,
+    it('returns REQUESTED when a fallback Request row exists without Whisparr evidence yet', async () => {
+      requestDelegate.findUnique.mockResolvedValue({ id: 'req-1' });
+
+      await expect(service.resolveForScene('scene-1')).resolves.toEqual({
+        state: 'REQUESTED',
       });
-      findOneMock.mockResolvedValue(configuredWhisparrIntegration);
+    });
+
+    it('returns REQUESTED when Whisparr knows the scene but acquisition has not started', async () => {
       findMovieByStashIdMock.mockResolvedValue({
-        movieId: 100,
+        movieId: 101,
+        stashId: 'scene-1',
+        hasFile: false,
+      });
+
+      await expect(service.resolveForScene('scene-1')).resolves.toEqual({
+        state: 'REQUESTED',
+      });
+    });
+
+    it('returns DOWNLOADING for an active Whisparr download queue item', async () => {
+      findMovieByStashIdMock.mockResolvedValue({
+        movieId: 101,
         stashId: 'scene-1',
         hasFile: false,
       });
       getQueueSnapshotMock.mockResolvedValue([
         {
-          movieId: 100,
-          trackedDownloadState: 'Importing',
-          trackedDownloadStatus: 'Warning',
+          movieId: 101,
+          trackedDownloadState: 'Downloading',
+          trackedDownloadStatus: 'Ok',
         },
       ]);
 
@@ -104,63 +131,34 @@ describe('SceneStatusService', () => {
       });
     });
 
-    it('returns AVAILABLE when hasFile=true and queue is not in-flight', async () => {
-      requestDelegate.findUnique.mockResolvedValue({
-        status: RequestStatus.REQUESTED,
-      });
-      findOneMock.mockResolvedValue(configuredWhisparrIntegration);
+    it('returns IMPORT_PENDING when Whisparr has the file but Stash does not', async () => {
       findMovieByStashIdMock.mockResolvedValue({
-        movieId: 100,
+        movieId: 101,
         stashId: 'scene-1',
         hasFile: true,
       });
-      getQueueSnapshotMock.mockResolvedValue([
+
+      await expect(service.resolveForScene('scene-1')).resolves.toEqual({
+        state: 'IMPORT_PENDING',
+      });
+    });
+
+    it('returns AVAILABLE when Stash has a linked scene copy', async () => {
+      findScenesByStashIdMock.mockResolvedValue([
         {
-          movieId: 100,
-          trackedDownloadState: 'Imported',
-          trackedDownloadStatus: 'Warning',
+          id: 'local-1',
+          width: 1920,
+          height: 1080,
+          viewUrl: 'http://stash.local/scenes/local-1',
+          label: '1080p',
         },
       ]);
 
       await expect(service.resolveForScene('scene-1')).resolves.toEqual({
         state: 'AVAILABLE',
       });
-    });
-
-    it('returns MISSING when hasFile=false and queue state is not in-flight', async () => {
-      requestDelegate.findUnique.mockResolvedValue({
-        status: RequestStatus.REQUESTED,
-      });
-      findOneMock.mockResolvedValue(configuredWhisparrIntegration);
-      findMovieByStashIdMock.mockResolvedValue({
-        movieId: 100,
-        stashId: 'scene-1',
-        hasFile: false,
-      });
-      getQueueSnapshotMock.mockResolvedValue([
-        {
-          movieId: 100,
-          trackedDownloadState: 'Failed',
-          trackedDownloadStatus: 'Error',
-        },
-      ]);
-
-      await expect(service.resolveForScene('scene-1')).resolves.toEqual({
-        state: 'MISSING',
-      });
-    });
-
-    it('keeps fallback status when Whisparr call fails', async () => {
-      requestDelegate.findUnique.mockResolvedValue({
-        status: RequestStatus.PROCESSING,
-      });
-      findOneMock.mockResolvedValue(configuredWhisparrIntegration);
-      findMovieByStashIdMock.mockRejectedValue(new Error('provider failed'));
-      getQueueSnapshotMock.mockResolvedValue([]);
-
-      await expect(service.resolveForScene('scene-1')).resolves.toEqual({
-        state: 'DOWNLOADING',
-      });
+      expect(findMovieByStashIdMock).not.toHaveBeenCalled();
+      expect(getQueueSnapshotMock).not.toHaveBeenCalled();
     });
   });
 
@@ -168,107 +166,87 @@ describe('SceneStatusService', () => {
     it('returns empty map for no ids', async () => {
       await expect(service.resolveForScenes([])).resolves.toEqual(new Map());
       expect(requestDelegate.findMany).not.toHaveBeenCalled();
+      expect(findScenesByStashIdMock).not.toHaveBeenCalled();
       expect(findMovieByStashIdMock).not.toHaveBeenCalled();
-      expect(getQueueSnapshotMock).not.toHaveBeenCalled();
     });
 
-    it('applies fallback statuses when Whisparr is unavailable', async () => {
-      requestDelegate.findMany.mockResolvedValue([
-        {
-          stashId: 'scene-1',
-          status: RequestStatus.REQUESTED,
-        },
-      ]);
-      findOneMock.mockRejectedValue(new Error('missing integration'));
-
-      const result = await service.resolveForScenes(['scene-1', 'scene-2']);
-
-      expect(result.get('scene-1')).toEqual({ state: 'DOWNLOADING' });
-      expect(result.get('scene-2')).toEqual({ state: 'NOT_REQUESTED' });
-      expect(findMovieByStashIdMock).not.toHaveBeenCalled();
-      expect(getQueueSnapshotMock).not.toHaveBeenCalled();
-    });
-
-    it('fetches queue once and resolves all scenes using movieId->queue join', async () => {
-      requestDelegate.findMany.mockResolvedValue([
-        {
-          stashId: 'scene-1',
-          status: RequestStatus.FAILED,
-        },
-        {
-          stashId: 'scene-2',
-          status: RequestStatus.PROCESSING,
-        },
-      ]);
-      findOneMock.mockResolvedValue(configuredWhisparrIntegration);
+    it('applies lifecycle precedence across fallback rows, Whisparr, and Stash', async () => {
+      requestDelegate.findMany.mockResolvedValue([{ stashId: 'scene-1' }]);
+      findScenesByStashIdMock.mockImplementation((stashId: string) =>
+        Promise.resolve(
+          stashId === 'scene-4'
+            ? [
+                {
+                  id: 'local-4',
+                  width: 1920,
+                  height: 1080,
+                  viewUrl: 'http://stash.local/scenes/local-4',
+                  label: '1080p',
+                },
+              ]
+            : [],
+        ),
+      );
       getQueueSnapshotMock.mockResolvedValue([
         {
-          movieId: 101,
+          movieId: 102,
           trackedDownloadState: 'Downloading',
-          trackedDownloadStatus: 'Warning',
+          trackedDownloadStatus: 'Ok',
         },
       ]);
       findMovieByStashIdMock.mockImplementation((stashId: string) => {
-        if (stashId === 'scene-1') {
-          return { movieId: 101, stashId, hasFile: false };
-        }
         if (stashId === 'scene-2') {
-          return { movieId: 102, stashId, hasFile: true };
+          return Promise.resolve({
+            movieId: 102,
+            stashId,
+            hasFile: false,
+          });
         }
-        return null;
+
+        if (stashId === 'scene-3') {
+          return Promise.resolve({
+            movieId: 103,
+            stashId,
+            hasFile: true,
+          });
+        }
+
+        if (stashId === 'scene-5') {
+          return Promise.resolve(null);
+        }
+
+        return Promise.resolve(null);
       });
 
       const result = await service.resolveForScenes([
         'scene-1',
-        ' scene-2 ',
+        'scene-2',
         'scene-3',
+        'scene-4',
+        'scene-5',
       ]);
 
       expect(getQueueSnapshotMock).toHaveBeenCalledTimes(1);
-      expect(result.get('scene-1')).toEqual({ state: 'DOWNLOADING' });
-      expect(result.get('scene-2')).toEqual({ state: 'AVAILABLE' });
-      expect(result.get('scene-3')).toEqual({ state: 'NOT_REQUESTED' });
+      expect(findMovieByStashIdMock).toHaveBeenCalledTimes(4);
+      expect(findMovieByStashIdMock).not.toHaveBeenCalledWith(
+        'scene-4',
+        configuredWhisparrIntegration,
+      );
+      expect(result.get('scene-1')).toEqual({ state: 'REQUESTED' });
+      expect(result.get('scene-2')).toEqual({ state: 'DOWNLOADING' });
+      expect(result.get('scene-3')).toEqual({ state: 'IMPORT_PENDING' });
+      expect(result.get('scene-4')).toEqual({ state: 'AVAILABLE' });
+      expect(result.get('scene-5')).toEqual({ state: 'NOT_REQUESTED' });
     });
 
-    it('keeps per-scene fallback status when movie lookup fails for one item', async () => {
-      requestDelegate.findMany.mockResolvedValue([
-        {
-          stashId: 'scene-1',
-          status: RequestStatus.PROCESSING,
-        },
-        {
-          stashId: 'scene-2',
-          status: RequestStatus.FAILED,
-        },
-      ]);
-      findOneMock.mockResolvedValue(configuredWhisparrIntegration);
-      getQueueSnapshotMock.mockResolvedValue([]);
-      findMovieByStashIdMock.mockImplementation((stashId: string) => {
-        if (stashId === 'scene-1') {
-          throw new Error('provider failed');
-        }
-        return { movieId: 200, stashId, hasFile: false };
-      });
+    it('keeps fallback-plus-stash resolution when Whisparr queue fetch fails', async () => {
+      requestDelegate.findMany.mockResolvedValue([{ stashId: 'scene-1' }]);
+      getQueueSnapshotMock.mockRejectedValue(new Error('provider failed'));
 
       const result = await service.resolveForScenes(['scene-1', 'scene-2']);
 
-      expect(result.get('scene-1')).toEqual({ state: 'DOWNLOADING' });
-      expect(result.get('scene-2')).toEqual({ state: 'MISSING' });
-    });
-
-    it('keeps fallback statuses when queue snapshot fetch fails', async () => {
-      requestDelegate.findMany.mockResolvedValue([
-        {
-          stashId: 'scene-1',
-          status: RequestStatus.FAILED,
-        },
-      ]);
-      findOneMock.mockResolvedValue(configuredWhisparrIntegration);
-      getQueueSnapshotMock.mockRejectedValue(new Error('provider failed'));
-
-      const result = await service.resolveForScenes(['scene-1']);
-
-      expect(result.get('scene-1')).toEqual({ state: 'MISSING' });
+      expect(result.get('scene-1')).toEqual({ state: 'REQUESTED' });
+      expect(result.get('scene-2')).toEqual({ state: 'NOT_REQUESTED' });
       expect(findMovieByStashIdMock).not.toHaveBeenCalled();
     });
   });

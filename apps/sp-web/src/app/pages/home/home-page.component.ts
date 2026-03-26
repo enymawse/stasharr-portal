@@ -545,27 +545,29 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return this.deletingRailId() === railId;
   }
 
-  protected updateRailForm<K extends keyof Pick<
-    HomeRailFormDraft,
-    | 'source'
-    | 'title'
-    | 'subtitle'
-    | 'enabled'
-    | 'sort'
-    | 'direction'
-    | 'titleQuery'
-    | 'favorites'
-    | 'stashdbFavorites'
-    | 'tagMode'
-    | 'favoritePerformersOnly'
-    | 'favoriteStudiosOnly'
-    | 'favoriteTagsOnly'
-    | 'stashFavoritePerformersOnly'
-    | 'stashFavoriteStudiosOnly'
-    | 'stashFavoriteTagsOnly'
-    | 'libraryAvailability'
-    | 'limit'
-  >>(field: K, value: HomeRailFormDraft[K]): void {
+  protected updateRailForm<
+    K extends keyof Pick<
+      HomeRailFormDraft,
+      | 'source'
+      | 'title'
+      | 'subtitle'
+      | 'enabled'
+      | 'sort'
+      | 'direction'
+      | 'titleQuery'
+      | 'favorites'
+      | 'stashdbFavorites'
+      | 'tagMode'
+      | 'favoritePerformersOnly'
+      | 'favoriteStudiosOnly'
+      | 'favoriteTagsOnly'
+      | 'stashFavoritePerformersOnly'
+      | 'stashFavoriteStudiosOnly'
+      | 'stashFavoriteTagsOnly'
+      | 'libraryAvailability'
+      | 'limit'
+    >,
+  >(field: K, value: HomeRailFormDraft[K]): void {
     this.railForm.update((current) => {
       if (!current) {
         return current;
@@ -607,8 +609,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
           tagMode: HomePageComponent.DEFAULT_TAG_MODE,
           favoritePerformersOnly: false,
           favoriteStudiosOnly: false,
-          favoriteTagsOnly:
-            current.source === 'HYBRID' ? current.stashFavoriteTagsOnly : false,
+          favoriteTagsOnly: current.source === 'HYBRID' ? current.stashFavoriteTagsOnly : false,
           stashFavoritePerformersOnly:
             current.source === 'HYBRID' ? current.stashFavoritePerformersOnly : false,
           stashFavoriteStudiosOnly:
@@ -801,7 +802,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
           item.id === stashId
             ? {
                 ...item,
-                status: { state: 'DOWNLOADING' },
+                status: { state: 'REQUESTED' },
               }
             : item,
         );
@@ -838,7 +839,9 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return 'StashDB';
   }
 
-  protected isStashRail(rail: HomeRailConfig): rail is Extract<HomeRailConfig, { source: 'STASH' }> {
+  protected isStashRail(
+    rail: HomeRailConfig,
+  ): rail is Extract<HomeRailConfig, { source: 'STASH' }> {
     return rail.source === 'STASH';
   }
 
@@ -913,17 +916,16 @@ export class HomePageComponent implements OnInit, OnDestroy {
 
     return forkJoin(
       enabledRails.map((rail) =>
-        this.loadSingleRail(rail)
-          .pipe(
-            map((response): RailLoadResult => response),
-            catchError(() =>
-              of<RailLoadResult>({
-                id: rail.id,
-                items: [],
-                error: this.railLoadErrorMessage(rail),
-              }),
-            ),
+        this.loadSingleRail(rail).pipe(
+          map((response): RailLoadResult => response),
+          catchError(() =>
+            of<RailLoadResult>({
+              id: rail.id,
+              items: [],
+              error: this.railLoadErrorMessage(rail),
+            }),
           ),
+        ),
       ),
     ).pipe(
       map((results) => {
@@ -969,7 +971,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
         rail.config.sort,
         rail.config.direction,
         rail.config.tagIds,
-        rail.config.tagIds.length > 0 ? rail.config.tagMode ?? 'OR' : undefined,
+        rail.config.tagIds.length > 0 ? (rail.config.tagMode ?? 'OR') : undefined,
         rail.config.favorites ?? undefined,
         rail.config.studioIds,
       )
@@ -979,7 +981,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
             id: rail.id,
             items: response.items.map((item) => ({
               ...item,
-              requestable: item.status.state === 'NOT_REQUESTED',
+              requestable: item.requestable,
               viewUrl: null,
             })),
             error: null,
@@ -1076,38 +1078,38 @@ export class HomePageComponent implements OnInit, OnDestroy {
       source: rail.source,
       sort: config.sort,
       direction: config.direction,
-      titleQuery: this.isStashConfig(config) ? config.titleQuery ?? '' : '',
-      favorites: this.isStashdbConfig(config) ? config.favorites ?? 'NONE' : 'NONE',
-      stashdbFavorites: this.isHybridConfig(config) ? config.stashdbFavorites ?? 'NONE' : 'NONE',
+      titleQuery: this.isStashConfig(config) ? (config.titleQuery ?? '') : '',
+      favorites: this.isStashdbConfig(config) ? (config.favorites ?? 'NONE') : 'NONE',
+      stashdbFavorites: this.isHybridConfig(config) ? (config.stashdbFavorites ?? 'NONE') : 'NONE',
       tagMode: config.tagMode ?? HomePageComponent.DEFAULT_TAG_MODE,
-      favoritePerformersOnly:
-        this.isStashConfig(config) ? config.favoritePerformersOnly : false,
+      favoritePerformersOnly: this.isStashConfig(config) ? config.favoritePerformersOnly : false,
       favoriteStudiosOnly: this.isStashConfig(config) ? config.favoriteStudiosOnly : false,
       favoriteTagsOnly: this.isStashConfig(config) ? config.favoriteTagsOnly : false,
-      stashFavoritePerformersOnly:
-        this.isHybridConfig(config) ? config.stashFavoritePerformersOnly : false,
-      stashFavoriteStudiosOnly:
-        this.isHybridConfig(config) ? config.stashFavoriteStudiosOnly : false,
-      stashFavoriteTagsOnly:
-        this.isHybridConfig(config) ? config.stashFavoriteTagsOnly : false,
+      stashFavoritePerformersOnly: this.isHybridConfig(config)
+        ? config.stashFavoritePerformersOnly
+        : false,
+      stashFavoriteStudiosOnly: this.isHybridConfig(config)
+        ? config.stashFavoriteStudiosOnly
+        : false,
+      stashFavoriteTagsOnly: this.isHybridConfig(config) ? config.stashFavoriteTagsOnly : false,
       libraryAvailability: this.isHybridConfig(config)
         ? config.libraryAvailability
         : HomePageComponent.DEFAULT_LIBRARY_AVAILABILITY,
       limit: config.limit,
       selectedTags: config.tagIds
         ? config.tagIds.map((id, index) => ({
-              id,
-              name: config.tagNames[index] ?? id,
-              description: null,
-              aliases: [],
-            }))
-          : [],
+            id,
+            name: config.tagNames[index] ?? id,
+            description: null,
+            aliases: [],
+          }))
+        : [],
       selectedStudios: config.studioIds
         ? config.studioIds.map((id, index) => ({
-              id,
-              label: config.studioNames[index] ?? id,
-            }))
-          : [],
+            id,
+            label: config.studioNames[index] ?? id,
+          }))
+        : [],
     };
   }
 
@@ -1193,7 +1195,10 @@ export class HomePageComponent implements OnInit, OnDestroy {
             : false,
           libraryAvailability: form.libraryAvailability,
           limit: Math.min(
-            Math.max(Math.round(Number(form.limit) || HomePageComponent.DEFAULT_LIMIT), HomePageComponent.LIMIT_MIN),
+            Math.max(
+              Math.round(Number(form.limit) || HomePageComponent.DEFAULT_LIMIT),
+              HomePageComponent.LIMIT_MIN,
+            ),
             HomePageComponent.LIMIT_MAX,
           ),
         },
@@ -1211,12 +1216,14 @@ export class HomePageComponent implements OnInit, OnDestroy {
         favorites: form.favorites === 'NONE' ? null : form.favorites,
         tagIds: form.selectedTags.map((tag) => tag.id),
         tagNames: form.selectedTags.map((tag) => tag.name),
-        tagMode:
-          form.selectedTags.length > 0 ? form.tagMode : null,
+        tagMode: form.selectedTags.length > 0 ? form.tagMode : null,
         studioIds: form.selectedStudios.map((studio) => studio.id),
         studioNames: form.selectedStudios.map((studio) => studio.label),
         limit: Math.min(
-          Math.max(Math.round(Number(form.limit) || HomePageComponent.DEFAULT_LIMIT), HomePageComponent.LIMIT_MIN),
+          Math.max(
+            Math.round(Number(form.limit) || HomePageComponent.DEFAULT_LIMIT),
+            HomePageComponent.LIMIT_MIN,
+          ),
           HomePageComponent.LIMIT_MAX,
         ),
       },
@@ -1380,21 +1387,15 @@ export class HomePageComponent implements OnInit, OnDestroy {
     );
   }
 
-  private isStashdbConfig(
-    config: HomeRailConfig['config'],
-  ): config is HomeStashdbSceneRailConfig {
+  private isStashdbConfig(config: HomeRailConfig['config']): config is HomeStashdbSceneRailConfig {
     return 'favorites' in config;
   }
 
-  private isHybridConfig(
-    config: HomeRailConfig['config'],
-  ): config is HomeHybridSceneRailConfig {
+  private isHybridConfig(config: HomeRailConfig['config']): config is HomeHybridSceneRailConfig {
     return 'libraryAvailability' in config;
   }
 
-  private isStashConfig(
-    config: HomeRailConfig['config'],
-  ): config is HomeStashSceneRailConfig {
+  private isStashConfig(config: HomeRailConfig['config']): config is HomeStashSceneRailConfig {
     return !this.isStashdbConfig(config) && !this.isHybridConfig(config);
   }
 

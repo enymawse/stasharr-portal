@@ -1,7 +1,7 @@
 import { resolveSceneStatus } from './scene-status.resolver';
 
 describe('resolveSceneStatus', () => {
-  it('returns DOWNLOADING when queue state is in-flight even if hasFile is true', () => {
+  it('returns AVAILABLE when Stash already has a linked scene copy', () => {
     expect(
       resolveSceneStatus({
         stashId: 'scene-1',
@@ -17,11 +17,35 @@ describe('resolveSceneStatus', () => {
             trackedDownloadStatus: 'Warning',
           },
         ],
+        stashAvailable: true,
+        requested: true,
+      }),
+    ).toEqual({ state: 'AVAILABLE' });
+  });
+
+  it('returns DOWNLOADING for an active download queue state', () => {
+    expect(
+      resolveSceneStatus({
+        stashId: 'scene-1',
+        movie: {
+          movieId: 101,
+          stashId: 'scene-1',
+          hasFile: false,
+        },
+        queueItems: [
+          {
+            movieId: 101,
+            trackedDownloadState: 'Downloading',
+            trackedDownloadStatus: 'Ok',
+          },
+        ],
+        stashAvailable: false,
+        requested: true,
       }),
     ).toEqual({ state: 'DOWNLOADING' });
   });
 
-  it('returns DOWNLOADING for ImportPending and Importing states', () => {
+  it('returns IMPORT_PENDING for ImportPending and Importing queue states', () => {
     expect(
       resolveSceneStatus({
         stashId: 'scene-1',
@@ -37,8 +61,10 @@ describe('resolveSceneStatus', () => {
             trackedDownloadStatus: null,
           },
         ],
+        stashAvailable: false,
+        requested: true,
       }),
-    ).toEqual({ state: 'DOWNLOADING' });
+    ).toEqual({ state: 'IMPORT_PENDING' });
 
     expect(
       resolveSceneStatus({
@@ -55,41 +81,13 @@ describe('resolveSceneStatus', () => {
             trackedDownloadStatus: 'Ok',
           },
         ],
+        stashAvailable: false,
+        requested: true,
       }),
-    ).toEqual({ state: 'DOWNLOADING' });
+    ).toEqual({ state: 'IMPORT_PENDING' });
   });
 
-  it('treats lowercase queue states as DOWNLOADING', () => {
-    expect(
-      resolveSceneStatus({
-        stashId: 'scene-1',
-        movie: {
-          movieId: 101,
-          stashId: 'scene-1',
-          hasFile: false,
-        },
-        queueItems: [
-          {
-            movieId: 101,
-            trackedDownloadState: 'downloading',
-            trackedDownloadStatus: 'ok',
-          },
-        ],
-      }),
-    ).toEqual({ state: 'DOWNLOADING' });
-  });
-
-  it('returns NOT_REQUESTED when no movie exists', () => {
-    expect(
-      resolveSceneStatus({
-        stashId: 'scene-1',
-        movie: null,
-        queueItems: [],
-      }),
-    ).toEqual({ state: 'NOT_REQUESTED' });
-  });
-
-  it('returns AVAILABLE when movie has file and no in-flight queue state', () => {
+  it('returns IMPORT_PENDING when Whisparr has the file but Stash does not', () => {
     expect(
       resolveSceneStatus({
         stashId: 'scene-1',
@@ -98,18 +96,14 @@ describe('resolveSceneStatus', () => {
           stashId: 'scene-1',
           hasFile: true,
         },
-        queueItems: [
-          {
-            movieId: 101,
-            trackedDownloadState: 'Imported',
-            trackedDownloadStatus: 'Ok',
-          },
-        ],
+        queueItems: [],
+        stashAvailable: false,
+        requested: true,
       }),
-    ).toEqual({ state: 'AVAILABLE' });
+    ).toEqual({ state: 'IMPORT_PENDING' });
   });
 
-  it('returns MISSING when movie exists without file and no in-flight queue state', () => {
+  it('returns REQUESTED when Whisparr knows the scene but acquisition has not started', () => {
     expect(
       resolveSceneStatus({
         stashId: 'scene-1',
@@ -118,39 +112,34 @@ describe('resolveSceneStatus', () => {
           stashId: 'scene-1',
           hasFile: false,
         },
-        queueItems: [
-          {
-            movieId: 101,
-            trackedDownloadState: 'Failed',
-            trackedDownloadStatus: 'Error',
-          },
-          {
-            movieId: 101,
-            trackedDownloadState: 'Ignored',
-            trackedDownloadStatus: null,
-          },
-        ],
+        queueItems: [],
+        stashAvailable: false,
+        requested: false,
       }),
-    ).toEqual({ state: 'MISSING' });
+    ).toEqual({ state: 'REQUESTED' });
   });
 
-  it('ignores queue entries for other movie ids', () => {
+  it('returns REQUESTED when only fallback request evidence exists', () => {
     expect(
       resolveSceneStatus({
         stashId: 'scene-1',
-        movie: {
-          movieId: 101,
-          stashId: 'scene-1',
-          hasFile: false,
-        },
-        queueItems: [
-          {
-            movieId: 999,
-            trackedDownloadState: 'Downloading',
-            trackedDownloadStatus: null,
-          },
-        ],
+        movie: null,
+        queueItems: [],
+        stashAvailable: false,
+        requested: true,
       }),
-    ).toEqual({ state: 'MISSING' });
+    ).toEqual({ state: 'REQUESTED' });
+  });
+
+  it('returns NOT_REQUESTED when no system knows the scene', () => {
+    expect(
+      resolveSceneStatus({
+        stashId: 'scene-1',
+        movie: null,
+        queueItems: [],
+        stashAvailable: false,
+        requested: false,
+      }),
+    ).toEqual({ state: 'NOT_REQUESTED' });
   });
 });

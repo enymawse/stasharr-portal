@@ -12,39 +12,63 @@ export interface WhisparrQueueSnapshotItem {
   trackedDownloadStatus: string | null;
 }
 
-const DOWNLOADING_STATES = new Set([
-  'downloading',
-  'importpending',
-  'importing',
-]);
+const DOWNLOADING_STATES = new Set(['downloading']);
+const IMPORT_PENDING_STATES = new Set(['importpending', 'importing']);
 
 export function resolveSceneStatus(input: {
   stashId: string;
   movie: WhisparrMovieLookup | null;
   queueItems: WhisparrQueueSnapshotItem[];
+  stashAvailable: boolean;
+  requested: boolean;
 }): SceneStatusDto {
-  const { movie, queueItems } = input;
+  const { movie, queueItems, requested, stashAvailable } = input;
 
-  if (movie) {
-    const hasActiveQueueItem = queueItems.some(
-      (item) =>
-        item.movieId === movie.movieId &&
-        item.trackedDownloadState !== null &&
-        DOWNLOADING_STATES.has(item.trackedDownloadState.trim().toLowerCase()),
-    );
-
-    if (hasActiveQueueItem) {
-      return { state: 'DOWNLOADING' };
-    }
-  }
-
-  if (!movie) {
-    return { state: 'NOT_REQUESTED' };
-  }
-
-  if (movie.hasFile) {
+  if (stashAvailable) {
     return { state: 'AVAILABLE' };
   }
 
-  return { state: 'MISSING' };
+  if (movie) {
+    const queueState = resolveQueueLifecycleState(movie.movieId, queueItems);
+
+    if (queueState) {
+      return { state: queueState };
+    }
+
+    if (movie.hasFile) {
+      return { state: 'IMPORT_PENDING' };
+    }
+
+    return { state: 'REQUESTED' };
+  }
+
+  return requested ? { state: 'REQUESTED' } : { state: 'NOT_REQUESTED' };
+}
+
+function resolveQueueLifecycleState(
+  movieId: number,
+  queueItems: WhisparrQueueSnapshotItem[],
+): SceneStatusDto['state'] | null {
+  let hasDownloadingState = false;
+
+  for (const item of queueItems) {
+    if (item.movieId !== movieId || item.trackedDownloadState === null) {
+      continue;
+    }
+
+    const normalizedState = item.trackedDownloadState.trim().toLowerCase();
+    if (IMPORT_PENDING_STATES.has(normalizedState)) {
+      return 'IMPORT_PENDING';
+    }
+
+    if (DOWNLOADING_STATES.has(normalizedState)) {
+      hasDownloadingState = true;
+    }
+  }
+
+  if (hasDownloadingState) {
+    return 'DOWNLOADING';
+  }
+
+  return null;
 }
