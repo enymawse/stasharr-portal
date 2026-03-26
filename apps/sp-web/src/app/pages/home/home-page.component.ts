@@ -559,10 +559,31 @@ export class HomePageComponent implements OnInit, OnDestroy {
     | 'tagMode'
     | 'favoritePerformersOnly'
     | 'favoriteStudiosOnly'
+    | 'favoriteTagsOnly'
+    | 'stashFavoritePerformersOnly'
+    | 'stashFavoriteStudiosOnly'
+    | 'stashFavoriteTagsOnly'
     | 'libraryAvailability'
     | 'limit'
   >>(field: K, value: HomeRailFormDraft[K]): void {
-    this.railForm.update((current) => (current ? { ...current, [field]: value } : current));
+    this.railForm.update((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const next = { ...current, [field]: value };
+      if (
+        field === 'libraryAvailability' &&
+        value === 'MISSING_FROM_LIBRARY' &&
+        next.source === 'HYBRID'
+      ) {
+        next.stashFavoritePerformersOnly = false;
+        next.stashFavoriteStudiosOnly = false;
+        next.stashFavoriteTagsOnly = false;
+      }
+
+      return next;
+    });
   }
 
   protected updateRailSource(nextSource: HomeRailSource): void {
@@ -586,6 +607,13 @@ export class HomePageComponent implements OnInit, OnDestroy {
           tagMode: HomePageComponent.DEFAULT_TAG_MODE,
           favoritePerformersOnly: false,
           favoriteStudiosOnly: false,
+          favoriteTagsOnly:
+            current.source === 'HYBRID' ? current.stashFavoriteTagsOnly : false,
+          stashFavoritePerformersOnly:
+            current.source === 'HYBRID' ? current.stashFavoritePerformersOnly : false,
+          stashFavoriteStudiosOnly:
+            current.source === 'HYBRID' ? current.stashFavoriteStudiosOnly : false,
+          stashFavoriteTagsOnly: false,
           libraryAvailability: HomePageComponent.DEFAULT_LIBRARY_AVAILABILITY,
           selectedTags: [],
           selectedStudios: [],
@@ -608,6 +636,10 @@ export class HomePageComponent implements OnInit, OnDestroy {
           tagMode: current.tagMode,
           favoritePerformersOnly: false,
           favoriteStudiosOnly: false,
+          favoriteTagsOnly: false,
+          stashFavoritePerformersOnly: false,
+          stashFavoriteStudiosOnly: false,
+          stashFavoriteTagsOnly: false,
           libraryAvailability: HomePageComponent.DEFAULT_LIBRARY_AVAILABILITY,
           selectedTags: current.source === 'STASH' ? [] : current.selectedTags,
           selectedStudios: current.source === 'STASH' ? [] : current.selectedStudios,
@@ -623,6 +655,10 @@ export class HomePageComponent implements OnInit, OnDestroy {
         stashdbFavorites: 'NONE',
         favoritePerformersOnly: false,
         favoriteStudiosOnly: false,
+        favoriteTagsOnly: false,
+        stashFavoritePerformersOnly: false,
+        stashFavoriteStudiosOnly: false,
+        stashFavoriteTagsOnly: false,
         libraryAvailability: HomePageComponent.DEFAULT_LIBRARY_AVAILABILITY,
         selectedTags: current.source === 'STASH' ? [] : current.selectedTags,
         selectedStudios: current.source === 'STASH' ? [] : current.selectedStudios,
@@ -820,19 +856,34 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return this.railForm()?.source === 'HYBRID';
   }
 
+  protected showHybridLocalFavoritesControls(): boolean {
+    const form = this.railForm();
+    return form?.source === 'HYBRID' && form.libraryAvailability === 'IN_LIBRARY';
+  }
+
   protected railFormSortOptions() {
     return this.isStashForm() ? this.stashSortOptions : this.sortOptions;
   }
 
   protected railFavoritesValue(rail: HomeRailConfig): string | null {
-    if (this.isStashdbConfig(rail.config)) {
-      return rail.config.favorites;
+    const config = rail.config;
+
+    if (this.isStashdbConfig(config)) {
+      return (
+        HomePageComponent.FAVORITES_OPTIONS.find(
+          (option) => option.value === (config.favorites ?? 'NONE'),
+        )?.label ?? 'No Favorites Filter'
+      );
     }
-    if (this.isHybridConfig(rail.config)) {
-      return rail.config.stashdbFavorites;
+    if (this.isHybridConfig(config)) {
+      return this.hybridFavoritesSummary(config);
     }
 
-    return this.stashFavoriteSummary(rail.config);
+    return this.stashFavoriteSummary(config);
+  }
+
+  protected railLocalFavoritesValue(rail: HomeRailConfig): string | null {
+    return this.stashLocalFavoritesLabelForRail(rail);
   }
 
   protected railTagCount(rail: HomeRailConfig): number {
@@ -963,6 +1014,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return {
       sortLabel: this.sortLabelForRail(rail),
       favoritesLabel: this.favoritesLabelForRail(rail),
+      stashLocalFavoritesLabel: this.stashLocalFavoritesLabelForRail(rail),
       titleQueryLabel: this.titleQueryLabelForRail(rail),
       libraryAvailabilityLabel: this.libraryAvailabilityLabelForRail(rail),
       tagCount: rail.config.tagIds.length,
@@ -1031,6 +1083,13 @@ export class HomePageComponent implements OnInit, OnDestroy {
       favoritePerformersOnly:
         this.isStashConfig(config) ? config.favoritePerformersOnly : false,
       favoriteStudiosOnly: this.isStashConfig(config) ? config.favoriteStudiosOnly : false,
+      favoriteTagsOnly: this.isStashConfig(config) ? config.favoriteTagsOnly : false,
+      stashFavoritePerformersOnly:
+        this.isHybridConfig(config) ? config.stashFavoritePerformersOnly : false,
+      stashFavoriteStudiosOnly:
+        this.isHybridConfig(config) ? config.stashFavoriteStudiosOnly : false,
+      stashFavoriteTagsOnly:
+        this.isHybridConfig(config) ? config.stashFavoriteTagsOnly : false,
       libraryAvailability: this.isHybridConfig(config)
         ? config.libraryAvailability
         : HomePageComponent.DEFAULT_LIBRARY_AVAILABILITY,
@@ -1066,6 +1125,10 @@ export class HomePageComponent implements OnInit, OnDestroy {
       tagMode: HomePageComponent.DEFAULT_TAG_MODE,
       favoritePerformersOnly: false,
       favoriteStudiosOnly: false,
+      favoriteTagsOnly: false,
+      stashFavoritePerformersOnly: false,
+      stashFavoriteStudiosOnly: false,
+      stashFavoriteTagsOnly: false,
       libraryAvailability: HomePageComponent.DEFAULT_LIBRARY_AVAILABILITY,
       limit: HomePageComponent.DEFAULT_LIMIT,
       selectedTags: [],
@@ -1091,6 +1154,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
           studioNames: form.selectedStudios.map((studio) => studio.label),
           favoritePerformersOnly: form.favoritePerformersOnly,
           favoriteStudiosOnly: form.favoriteStudiosOnly,
+          favoriteTagsOnly: form.favoriteTagsOnly,
           limit: Math.min(
             Math.max(
               Math.round(Number(form.limit) || HomePageComponent.DEFAULT_LIMIT),
@@ -1103,6 +1167,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
     }
 
     if (form.source === 'HYBRID') {
+      const usesStashLocalFavoriteOverlays = form.libraryAvailability === 'IN_LIBRARY';
       return {
         source: 'HYBRID',
         title: form.title.trim(),
@@ -1117,6 +1182,15 @@ export class HomePageComponent implements OnInit, OnDestroy {
           tagMode: form.selectedTags.length > 0 ? form.tagMode : null,
           studioIds: form.selectedStudios.map((studio) => studio.id),
           studioNames: form.selectedStudios.map((studio) => studio.label),
+          stashFavoritePerformersOnly: usesStashLocalFavoriteOverlays
+            ? form.stashFavoritePerformersOnly
+            : false,
+          stashFavoriteStudiosOnly: usesStashLocalFavoriteOverlays
+            ? form.stashFavoriteStudiosOnly
+            : false,
+          stashFavoriteTagsOnly: usesStashLocalFavoriteOverlays
+            ? form.stashFavoriteTagsOnly
+            : false,
           libraryAvailability: form.libraryAvailability,
           limit: Math.min(
             Math.max(Math.round(Number(form.limit) || HomePageComponent.DEFAULT_LIMIT), HomePageComponent.LIMIT_MIN),
@@ -1330,7 +1404,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
       return this.hybridFavoritesSummary(config);
     }
     if (this.isStashConfig(config)) {
-      return this.stashFavoriteSummary(config);
+      return 'Local Library';
     }
 
     return (
@@ -1364,17 +1438,13 @@ export class HomePageComponent implements OnInit, OnDestroy {
   }
 
   private stashFavoriteSummary(config: HomeStashSceneRailConfig): string {
-    if (config.favoritePerformersOnly && config.favoriteStudiosOnly) {
-      return 'Favorite Performers + Studios';
-    }
-    if (config.favoritePerformersOnly) {
-      return 'Favorite Performers';
-    }
-    if (config.favoriteStudiosOnly) {
-      return 'Favorite Studios';
-    }
-
-    return 'Local Library';
+    return (
+      this.stashLocalFavoritesSummary(
+        config.favoritePerformersOnly,
+        config.favoriteStudiosOnly,
+        config.favoriteTagsOnly,
+      ) ?? 'Local Library'
+    );
   }
 
   private hybridFavoritesSummary(config: HomeHybridSceneRailConfig): string {
@@ -1384,6 +1454,45 @@ export class HomePageComponent implements OnInit, OnDestroy {
       )?.label ?? 'No Favorites Filter';
 
     return `StashDB ${label}`;
+  }
+
+  private stashLocalFavoritesLabelForRail(rail: HomeRailConfig): string | null {
+    if (this.isStashConfig(rail.config)) {
+      return this.stashLocalFavoritesSummary(
+        rail.config.favoritePerformersOnly,
+        rail.config.favoriteStudiosOnly,
+        rail.config.favoriteTagsOnly,
+      );
+    }
+
+    if (this.isHybridConfig(rail.config)) {
+      return this.stashLocalFavoritesSummary(
+        rail.config.stashFavoritePerformersOnly,
+        rail.config.stashFavoriteStudiosOnly,
+        rail.config.stashFavoriteTagsOnly,
+      );
+    }
+
+    return null;
+  }
+
+  private stashLocalFavoritesSummary(
+    favoritePerformersOnly: boolean,
+    favoriteStudiosOnly: boolean,
+    favoriteTagsOnly: boolean,
+  ): string | null {
+    const labels: string[] = [];
+    if (favoritePerformersOnly) {
+      labels.push('Favorite Performers');
+    }
+    if (favoriteStudiosOnly) {
+      labels.push('Favorite Studios');
+    }
+    if (favoriteTagsOnly) {
+      labels.push('Favorite Tags');
+    }
+
+    return labels.length > 0 ? `Stash Local ${labels.join(' + ')}` : null;
   }
 
   private searchRailTags(query: string) {

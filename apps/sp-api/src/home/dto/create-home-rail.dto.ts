@@ -84,6 +84,26 @@ class HomeRailSceneConfigInputDto {
   favoriteStudiosOnly?: boolean;
 
   @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  favoriteTagsOnly?: boolean;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  stashFavoritePerformersOnly?: boolean;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  stashFavoriteStudiosOnly?: boolean;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  stashFavoriteTagsOnly?: boolean;
+
+  @IsOptional()
   @IsIn(HOME_RAIL_LIBRARY_AVAILABILITY_VALUES)
   libraryAvailability?: HomeRailLibraryAvailability;
 

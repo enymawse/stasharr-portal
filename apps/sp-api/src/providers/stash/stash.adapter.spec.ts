@@ -100,6 +100,15 @@ describe('StashAdapter', () => {
 
     const [, init] = fetchMock.mock.calls[0] ?? [];
     expect(typeof init?.body).toBe('string');
+    const body = JSON.parse(String(init?.body));
+    expect(body.variables).toEqual({
+      sceneFilter: {
+        stash_id_endpoint: {
+          modifier: 'EQUALS',
+          stash_id: 'stash-1',
+        },
+      },
+    });
   });
 
   it('falls back to Scene #id label when file dimensions are missing', async () => {
@@ -167,6 +176,46 @@ describe('StashAdapter', () => {
         label: '720p',
       },
     ]);
+  });
+
+  it('adds Stash-local favorite overlays to stashId matching when requested', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findScenes: {
+              count: 0,
+              scenes: [],
+            },
+          },
+        }),
+    } as Response);
+
+    await adapter.findScenesByStashId(
+      'stash-1',
+      { baseUrl: 'http://stash.local' },
+      {
+        favoritePerformersOnly: true,
+        favoriteStudiosOnly: false,
+        favoriteTagsOnly: true,
+      },
+    );
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    const body = JSON.parse(String(init?.body));
+    expect(body.variables.sceneFilter).toEqual({
+      stash_id_endpoint: {
+        modifier: 'EQUALS',
+        stash_id: 'stash-1',
+      },
+      performers_filter: {
+        filter_favorites: true,
+      },
+      tags_filter: {
+        favorite: true,
+      },
+    });
   });
 
   it('throws on malformed GraphQL payload', async () => {
@@ -313,7 +362,7 @@ describe('StashAdapter', () => {
     });
   });
 
-  it('adds title, tag, studio, and favorite filters to the local scene feed query', async () => {
+  it('adds title, tag, studio, and provider-scoped favorite filters to the local scene feed query', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       json: () =>
@@ -340,6 +389,7 @@ describe('StashAdapter', () => {
         studioIds: ['studio-1', 'studio-1', 'studio-2'],
         favoritePerformersOnly: true,
         favoriteStudiosOnly: true,
+        favoriteTagsOnly: true,
       },
     );
 
@@ -362,6 +412,9 @@ describe('StashAdapter', () => {
         filter_favorites: true,
       },
       studios_filter: {
+        favorite: true,
+      },
+      tags_filter: {
         favorite: true,
       },
     });

@@ -40,6 +40,7 @@ export interface HomeStashSceneRailConfig {
   studioNames: string[];
   favoritePerformersOnly: boolean;
   favoriteStudiosOnly: boolean;
+  favoriteTagsOnly: boolean;
   limit: number;
 }
 
@@ -52,6 +53,9 @@ export interface HomeHybridSceneRailConfig {
   tagMode: SceneTagMatchMode | null;
   studioIds: string[];
   studioNames: string[];
+  stashFavoritePerformersOnly: boolean;
+  stashFavoriteStudiosOnly: boolean;
+  stashFavoriteTagsOnly: boolean;
   libraryAvailability: HomeHybridLibraryAvailability;
   limit: number;
 }
@@ -127,6 +131,10 @@ export interface HomeRailFormDraft {
   tagMode: SceneTagMatchMode;
   favoritePerformersOnly: boolean;
   favoriteStudiosOnly: boolean;
+  favoriteTagsOnly: boolean;
+  stashFavoritePerformersOnly: boolean;
+  stashFavoriteStudiosOnly: boolean;
+  stashFavoriteTagsOnly: boolean;
   libraryAvailability: HomeHybridLibraryAvailability;
   limit: number;
   selectedTags: SceneTagOption[];
@@ -139,6 +147,7 @@ export interface HomeRailFormDraft {
 export interface HomeRailViewSummary {
   sortLabel: string;
   favoritesLabel: string;
+  stashLocalFavoritesLabel: string | null;
   titleQueryLabel: string | null;
   libraryAvailabilityLabel: string | null;
   tagCount: number;

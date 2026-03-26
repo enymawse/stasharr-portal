@@ -74,6 +74,7 @@ export class HomeRailStashSceneConfigDto {
   studioNames!: string[];
   favoritePerformersOnly!: boolean;
   favoriteStudiosOnly!: boolean;
+  favoriteTagsOnly!: boolean;
   limit!: number;
 }
 
@@ -86,6 +87,9 @@ export class HomeRailHybridSceneConfigDto {
   tagMode!: HomeRailTagMode | null;
   studioIds!: string[];
   studioNames!: string[];
+  stashFavoritePerformersOnly!: boolean;
+  stashFavoriteStudiosOnly!: boolean;
+  stashFavoriteTagsOnly!: boolean;
   libraryAvailability!: HomeRailLibraryAvailability;
   limit!: number;
 }

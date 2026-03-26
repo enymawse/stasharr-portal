@@ -36,6 +36,13 @@ export interface StashLocalSceneFeedConfig {
   studioIds?: string[];
   favoritePerformersOnly?: boolean;
   favoriteStudiosOnly?: boolean;
+  favoriteTagsOnly?: boolean;
+}
+
+export interface StashSceneMatchOverlayConfig {
+  favoritePerformersOnly?: boolean;
+  favoriteStudiosOnly?: boolean;
+  favoriteTagsOnly?: boolean;
 }
 
 export interface StashLocalSceneFeedItem {
@@ -161,6 +168,7 @@ export class StashAdapter {
   async findScenesByStashId(
     stashId: string,
     config: StashAdapterBaseConfig,
+    overlays?: StashSceneMatchOverlayConfig,
   ): Promise<StashSceneMatch[]> {
     const normalizedStashId = stashId.trim();
     if (!normalizedStashId) {
@@ -168,15 +176,8 @@ export class StashAdapter {
     }
 
     const query = `
-      query FindScenes($stashId: String!) {
-        findScenes(
-          scene_filter: {
-            stash_id_endpoint: {
-              modifier: EQUALS
-              stash_id: $stashId
-            }
-          }
-        ) {
+      query FindScenes($sceneFilter: SceneFilterType) {
+        findScenes(scene_filter: $sceneFilter) {
           count
           scenes {
             id
@@ -190,7 +191,7 @@ export class StashAdapter {
     `;
 
     const payload = await this.executeQuery(config, query, {
-      stashId: normalizedStashId,
+      sceneFilter: this.buildSceneMatchFilter(normalizedStashId, overlays),
     });
 
     const scenes = payload.data?.findScenes?.scenes ?? [];
@@ -548,6 +549,7 @@ export class StashAdapter {
     const studioIds = this.normalizeStringArray(feedConfig.studioIds);
     const favoritePerformersOnly = feedConfig.favoritePerformersOnly === true;
     const favoriteStudiosOnly = feedConfig.favoriteStudiosOnly === true;
+    const favoriteTagsOnly = feedConfig.favoriteTagsOnly === true;
     const filter: Record<string, unknown> = {};
 
     if (titleQuery) {
@@ -583,7 +585,45 @@ export class StashAdapter {
       };
     }
 
+    if (favoriteTagsOnly) {
+      filter['tags_filter'] = {
+        favorite: true,
+      };
+    }
+
     return Object.keys(filter).length > 0 ? filter : undefined;
+  }
+
+  private buildSceneMatchFilter(
+    stashId: string,
+    overlays?: StashSceneMatchOverlayConfig,
+  ): Record<string, unknown> {
+    const filter: Record<string, unknown> = {
+      stash_id_endpoint: {
+        modifier: 'EQUALS',
+        stash_id: stashId,
+      },
+    };
+
+    if (overlays?.favoritePerformersOnly === true) {
+      filter['performers_filter'] = {
+        filter_favorites: true,
+      };
+    }
+
+    if (overlays?.favoriteStudiosOnly === true) {
+      filter['studios_filter'] = {
+        favorite: true,
+      };
+    }
+
+    if (overlays?.favoriteTagsOnly === true) {
+      filter['tags_filter'] = {
+        favorite: true,
+      };
+    }
+
+    return filter;
   }
 
   private toTagOption(tag: StashTagRecord): StashLocalTagOption | null {

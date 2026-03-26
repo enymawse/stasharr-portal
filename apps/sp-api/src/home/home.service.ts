@@ -120,6 +120,7 @@ const DEFAULT_HOME_RAILS: Array<{
       studioNames: [],
       favoritePerformersOnly: false,
       favoriteStudiosOnly: false,
+      favoriteTagsOnly: false,
       limit: HOME_RAIL_SCENE_LIMIT_DEFAULT,
     },
   },
@@ -328,6 +329,7 @@ export class HomeService {
           studioIds: config.studioIds,
           favoritePerformersOnly: config.favoritePerformersOnly,
           favoriteStudiosOnly: config.favoriteStudiosOnly,
+          favoriteTagsOnly: config.favoriteTagsOnly,
         },
       );
 
@@ -614,6 +616,19 @@ export class HomeService {
     fallback: Partial<HomeRailSceneConfigDto> | null,
   ): HomeRailStashSceneConfigDto {
     this.ensureNullishField(record.favorites, 'favorites', 'STASH');
+    this.ensureNullishField(record.stashdbFavorites, 'stashdbFavorites', 'STASH');
+    this.ensureNullishField(record.libraryAvailability, 'libraryAvailability', 'STASH');
+    this.ensureFalseField(
+      record.stashFavoritePerformersOnly,
+      'stashFavoritePerformersOnly',
+      'STASH',
+    );
+    this.ensureFalseField(
+      record.stashFavoriteStudiosOnly,
+      'stashFavoriteStudiosOnly',
+      'STASH',
+    );
+    this.ensureFalseField(record.stashFavoriteTagsOnly, 'stashFavoriteTagsOnly', 'STASH');
 
     const fallbackConfig = this.asStashSceneConfig(fallback);
     const sort = this.parseOptionalStrictInSet(
@@ -652,6 +667,10 @@ export class HomeService {
       record.favoriteStudiosOnly,
       fallbackConfig?.favoriteStudiosOnly ?? false,
     );
+    const favoriteTagsOnly = this.parseBoolean(
+      record.favoriteTagsOnly,
+      fallbackConfig?.favoriteTagsOnly ?? false,
+    );
     const limit = this.parseLimit(record.limit, fallbackConfig?.limit ?? HOME_RAIL_SCENE_LIMIT_DEFAULT);
 
     return {
@@ -665,6 +684,7 @@ export class HomeService {
       studioNames: studios.names,
       favoritePerformersOnly,
       favoriteStudiosOnly,
+      favoriteTagsOnly,
       limit,
     };
   }
@@ -675,8 +695,9 @@ export class HomeService {
   ): HomeRailHybridSceneConfigDto {
     this.ensureNullishField(record.favorites, 'favorites', 'HYBRID');
     this.ensureNullishField(record.titleQuery, 'titleQuery', 'HYBRID');
-    this.ensureFalseField(record.favoritePerformersOnly, 'favoritePerformersOnly');
-    this.ensureFalseField(record.favoriteStudiosOnly, 'favoriteStudiosOnly');
+    this.ensureFalseField(record.favoritePerformersOnly, 'favoritePerformersOnly', 'HYBRID');
+    this.ensureFalseField(record.favoriteStudiosOnly, 'favoriteStudiosOnly', 'HYBRID');
+    this.ensureFalseField(record.favoriteTagsOnly, 'favoriteTagsOnly', 'HYBRID');
 
     const fallbackConfig = this.asHybridSceneConfig(fallback);
     const sort = this.parseOptionalStrictInSet(
@@ -715,10 +736,23 @@ export class HomeService {
       fallbackConfig?.libraryAvailability ?? 'MISSING_FROM_LIBRARY',
       'libraryAvailability',
     );
+    const stashFavoritePerformersOnly = this.parseBoolean(
+      record.stashFavoritePerformersOnly,
+      fallbackConfig?.stashFavoritePerformersOnly ?? false,
+    );
+    const stashFavoriteStudiosOnly = this.parseBoolean(
+      record.stashFavoriteStudiosOnly,
+      fallbackConfig?.stashFavoriteStudiosOnly ?? false,
+    );
+    const stashFavoriteTagsOnly = this.parseBoolean(
+      record.stashFavoriteTagsOnly,
+      fallbackConfig?.stashFavoriteTagsOnly ?? false,
+    );
     const limit = this.parseLimit(
       record.limit,
       fallbackConfig?.limit ?? HOME_RAIL_SCENE_LIMIT_DEFAULT,
     );
+    const usesStashLocalFavoriteOverlays = libraryAvailability === 'IN_LIBRARY';
 
     return {
       sort,
@@ -729,6 +763,13 @@ export class HomeService {
       tagMode,
       studioIds: studios.ids,
       studioNames: studios.names,
+      stashFavoritePerformersOnly: usesStashLocalFavoriteOverlays
+        ? stashFavoritePerformersOnly
+        : false,
+      stashFavoriteStudiosOnly: usesStashLocalFavoriteOverlays
+        ? stashFavoriteStudiosOnly
+        : false,
+      stashFavoriteTagsOnly: usesStashLocalFavoriteOverlays ? stashFavoriteTagsOnly : false,
       libraryAvailability,
       limit,
     };
@@ -771,12 +812,16 @@ export class HomeService {
     throw new BadRequestException(`Field ${fieldName} is not supported for ${source} Home rails.`);
   }
 
-  private ensureFalseField(value: unknown, fieldName: string): void {
+  private ensureFalseField(
+    value: unknown,
+    fieldName: string,
+    source: 'STASH' | 'HYBRID',
+  ): void {
     if (value === null || value === undefined || value === '' || value === false) {
       return;
     }
 
-    throw new BadRequestException(`Field ${fieldName} is not supported for HYBRID Home rails.`);
+    throw new BadRequestException(`Field ${fieldName} is not supported for ${source} Home rails.`);
   }
 
   private parseBoolean(value: unknown, fallback: boolean): boolean {
@@ -833,6 +878,8 @@ export class HomeService {
         'favoritePerformersOnly' in value && value.favoritePerformersOnly === true,
       favoriteStudiosOnly:
         'favoriteStudiosOnly' in value && value.favoriteStudiosOnly === true,
+      favoriteTagsOnly:
+        'favoriteTagsOnly' in value && value.favoriteTagsOnly === true,
       limit: value.limit,
     };
   }
@@ -994,6 +1041,7 @@ export class HomeService {
           const inLibrary = await this.resolveHybridLibraryAvailability(
             scene.id,
             stashConfig,
+            config,
             availabilityCache,
           );
           return { scene, inLibrary };
@@ -1024,6 +1072,7 @@ export class HomeService {
   private async resolveHybridLibraryAvailability(
     stashId: string,
     stashConfig: { baseUrl: string; apiKey?: string | null },
+    config: HomeRailHybridSceneConfigDto,
     cache: Map<string, boolean>,
   ): Promise<boolean> {
     const cached = cache.get(stashId);
@@ -1031,7 +1080,11 @@ export class HomeService {
       return cached;
     }
 
-    const matches = await this.stashAdapter.findScenesByStashId(stashId, stashConfig);
+    const matches = await this.stashAdapter.findScenesByStashId(stashId, stashConfig, {
+      favoritePerformersOnly: config.stashFavoritePerformersOnly,
+      favoriteStudiosOnly: config.stashFavoriteStudiosOnly,
+      favoriteTagsOnly: config.stashFavoriteTagsOnly,
+    });
     const inLibrary = matches.length > 0;
     cache.set(stashId, inLibrary);
     return inLibrary;
