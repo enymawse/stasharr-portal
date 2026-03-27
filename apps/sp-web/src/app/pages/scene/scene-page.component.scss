@@ -333,6 +333,12 @@ a.studio-logo-overlay:focus-visible {
   font-weight: 700;
 }
 
+.hero-action-helper {
+  color: color-mix(in srgb, var(--text-on-media) 84%, #d8ebff);
+  line-height: 1.45;
+  max-width: 36rem;
+}
+
 button {
   width: fit-content;
   padding: 0.42rem 0.72rem;

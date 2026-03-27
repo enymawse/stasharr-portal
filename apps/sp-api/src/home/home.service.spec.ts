@@ -1366,7 +1366,7 @@ describe('HomeService', () => {
       items: [
         expect.objectContaining({
           id: 'scene-13',
-          requestable: true,
+          requestable: false,
           status: { state: 'FAILED' },
         }),
         expect.objectContaining({

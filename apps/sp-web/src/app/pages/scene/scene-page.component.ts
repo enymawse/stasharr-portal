@@ -198,7 +198,7 @@ export class ScenePageComponent implements OnInit, OnDestroy {
       case 'AVAILABLE':
         return 'Imported into Stash and available in your local library.';
       case 'FAILED':
-        return 'The last known acquisition attempt failed. Retry the request to send it back through Whisparr.';
+        return 'The last known acquisition attempt failed in Whisparr. Resolve or retry this download in Whisparr.';
       case 'NOT_REQUESTED':
       default:
         return 'Discovered in StashDB and not yet sent into your local acquisition pipeline.';
@@ -222,8 +222,8 @@ export class ScenePageComponent implements OnInit, OnDestroy {
     return isSceneStatusRequestable(scene.status);
   }
 
-  protected requestButtonLabel(scene: SceneDetails): string {
-    return scene.status.state === 'FAILED' ? 'Retry in Whisparr' : 'Request in Whisparr';
+  protected failedRemediationVisible(scene: SceneDetails): boolean {
+    return scene.status.state === 'FAILED';
   }
 
   protected canToggleFavoriteStudio(scene: SceneDetails): boolean {
@@ -462,7 +462,7 @@ export class ScenePageComponent implements OnInit, OnDestroy {
           system: 'Whisparr',
           title: 'Failed',
           detail:
-            'The last known request failed and Whisparr is not currently downloading or importing this scene. Retry the request after checking the provider if needed.',
+            'The last known acquisition attempt failed. Resolve or retry this download in Whisparr because Stasharr does not remediate failed Whisparr jobs.',
           tone: 'active',
         };
       case 'NOT_REQUESTED':

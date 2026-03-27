@@ -458,7 +458,7 @@ describe('ScenesService', () => {
     });
   });
 
-  it('keeps failed hybrid missing-library scenes requestable for retry', async () => {
+  it('keeps failed hybrid missing-library scenes visible but not requestable', async () => {
     stashdbAdapter.getScenesBySort = jest.fn().mockResolvedValue({
       total: 1,
       scenes: [
@@ -503,7 +503,7 @@ describe('ScenesService', () => {
         expect.objectContaining({
           id: 'stashdb-scene-1',
           status: { state: 'FAILED' },
-          requestable: true,
+          requestable: false,
         }),
       ],
     });

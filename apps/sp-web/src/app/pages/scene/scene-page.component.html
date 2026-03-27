@@ -185,10 +185,14 @@
                   class="hero-action-button request-button"
                   (click)="openRequestPanel(scene)"
                 >
-                  {{ requestButtonLabel(scene) }}
+                  Request in Whisparr
                 </button>
               }
             </div>
+          }
+
+          @if (failedRemediationVisible(scene)) {
+            <p class="hero-action-helper">Resolve or retry this download in Whisparr.</p>
           }
         </div>
       </div>

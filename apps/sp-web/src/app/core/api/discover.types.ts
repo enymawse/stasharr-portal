@@ -11,7 +11,7 @@ export interface SceneStatus {
 }
 
 export function isSceneStatusRequestable(status: Pick<SceneStatus, 'state'>): boolean {
-  return status.state === 'NOT_REQUESTED' || status.state === 'FAILED';
+  return status.state === 'NOT_REQUESTED';
 }
 
 export interface DiscoverItem {
