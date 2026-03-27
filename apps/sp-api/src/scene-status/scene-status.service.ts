@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { IntegrationStatus, IntegrationType } from '@prisma/client';
+import {
+  IntegrationStatus,
+  IntegrationType,
+  RequestStatus,
+} from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
@@ -16,9 +20,19 @@ export class SceneStatusService {
     state: 'NOT_REQUESTED',
   };
   private static readonly STASH_BATCH_SIZE = 6;
+  private static readonly STASH_AVAILABILITY_CACHE_TTL_MS = 15_000;
+  private static readonly STASH_AVAILABILITY_CACHE_MAX_ENTRIES = 4000;
   private static readonly WHISPARR_BATCH_SIZE = 8;
 
   private readonly logger = new Logger(SceneStatusService.name);
+  private readonly stashAvailabilityCache = new Map<
+    string,
+    { available: boolean; expiresAt: number }
+  >();
+  private readonly stashAvailabilityLookups = new Map<
+    string,
+    Promise<boolean>
+  >();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -34,11 +48,12 @@ export class SceneStatusService {
       return SceneStatusService.NOT_REQUESTED;
     }
 
-    const [requested, stashConfig, whisparrConfig] = await Promise.all([
-      this.resolveFallbackStatusForScene(normalized),
-      this.getStashConfig(),
-      this.getWhisparrConfig(),
-    ]);
+    const [fallbackRequestStatus, stashConfig, whisparrConfig] =
+      await Promise.all([
+        this.resolveFallbackStatusForScene(normalized),
+        this.getStashConfig(),
+        this.getWhisparrConfig(),
+      ]);
     const stashAvailability = await this.resolveStashAvailabilityForScenes(
       [normalized],
       stashConfig,
@@ -47,7 +62,7 @@ export class SceneStatusService {
     this.logger.debug(
       `resolveForScene fallback status: ${this.safeJson({
         stashId: normalized,
-        requested,
+        fallbackRequestStatus,
         stashAvailable,
       })}`,
     );
@@ -65,7 +80,7 @@ export class SceneStatusService {
         movie: null,
         queueItems: [],
         stashAvailable,
-        requested,
+        fallbackRequestStatus,
       });
     }
 
@@ -80,7 +95,7 @@ export class SceneStatusService {
         movie,
         queueItems,
         stashAvailable,
-        requested,
+        fallbackRequestStatus,
       });
 
       this.logger.debug(
@@ -105,7 +120,7 @@ export class SceneStatusService {
         movie: null,
         queueItems: [],
         stashAvailable,
-        requested,
+        fallbackRequestStatus,
       });
     }
   }
@@ -238,7 +253,7 @@ export class SceneStatusService {
             movie: result.movie,
             queueItems,
             stashAvailable: false,
-            requested: fallbackStatuses.get(result.stashId) === true,
+            fallbackRequestStatus: fallbackStatuses.get(result.stashId) ?? null,
           }),
         );
       }
@@ -255,32 +270,32 @@ export class SceneStatusService {
 
   private async resolveFallbackStatusForScene(
     stashId: string,
-  ): Promise<boolean> {
+  ): Promise<RequestStatus | null> {
     const request = await this.prisma.request.findUnique({
       where: { stashId },
-      select: { id: true },
+      select: { status: true },
     });
 
     if (!request) {
       this.logger.debug(
         `No fallback Request row found for stashId=${stashId}; returning NOT_REQUESTED.`,
       );
-      return false;
+      return null;
     }
 
     this.logger.debug(
       `Fallback Request mapping for scene: ${this.safeJson({
         stashId,
-        requested: true,
+        fallbackRequestStatus: request.status,
       })}`,
     );
 
-    return true;
+    return request.status;
   }
 
   private async resolveFallbackStatusesForScenes(
     normalizedIds: string[],
-  ): Promise<Map<string, boolean>> {
+  ): Promise<Map<string, RequestStatus | null>> {
     const requests = await this.prisma.request.findMany({
       where: {
         stashId: {
@@ -289,24 +304,25 @@ export class SceneStatusService {
       },
       select: {
         stashId: true,
+        status: true,
       },
     });
 
-    const statusById = new Map<string, boolean>();
+    const statusById = new Map<string, RequestStatus | null>();
 
     for (const request of requests) {
-      statusById.set(request.stashId, true);
+      statusById.set(request.stashId, request.status);
     }
 
     for (const stashId of normalizedIds) {
       if (!statusById.has(stashId)) {
-        statusById.set(stashId, false);
+        statusById.set(stashId, null);
       }
     }
 
     this.logger.debug(
       `Fallback Request mapping for batch: ${this.safeJson({
-        requestedCount: normalizedIds.length,
+        inputCount: normalizedIds.length,
         foundRequestRows: requests.length,
         statuses: Array.from(statusById.entries()),
       })}`,
@@ -317,7 +333,7 @@ export class SceneStatusService {
 
   private resolveFallbackSceneStatuses(
     normalizedIds: string[],
-    fallbackStatuses: Map<string, boolean>,
+    fallbackStatuses: Map<string, RequestStatus | null>,
     stashAvailability: Map<string, boolean>,
   ): Map<string, SceneStatusDto> {
     const statusById = new Map<string, SceneStatusDto>();
@@ -330,7 +346,7 @@ export class SceneStatusService {
           movie: null,
           queueItems: [],
           stashAvailable: stashAvailability.get(stashId) === true,
-          requested: fallbackStatuses.get(stashId) === true,
+          fallbackRequestStatus: fallbackStatuses.get(stashId) ?? null,
         }),
       );
     }
@@ -347,6 +363,7 @@ export class SceneStatusService {
     }
 
     const stashAvailability = new Map<string, boolean>();
+    this.pruneStashAvailabilityCache();
 
     for (
       let i = 0;
@@ -360,13 +377,13 @@ export class SceneStatusService {
       const results = await Promise.all(
         batch.map(async (stashId) => {
           try {
-            const copies = await this.stashAdapter.findScenesByStashId(
+            const available = await this.lookupStashAvailability(
               stashId,
               stashConfig,
             );
             return {
               stashId,
-              available: copies.length > 0,
+              available,
               failed: false,
             };
           } catch (error) {
@@ -394,6 +411,93 @@ export class SceneStatusService {
     }
 
     return stashAvailability;
+  }
+
+  private async lookupStashAvailability(
+    stashId: string,
+    stashConfig: { baseUrl: string; apiKey: string | null },
+  ): Promise<boolean> {
+    const cacheKey = this.buildStashAvailabilityCacheKey(stashId, stashConfig);
+    const cached = this.readStashAvailabilityCache(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+
+    const inFlight = this.stashAvailabilityLookups.get(cacheKey);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const lookup = this.stashAdapter
+      .findScenesByStashId(stashId, stashConfig)
+      .then((copies) => {
+        const available = copies.length > 0;
+        this.writeStashAvailabilityCache(cacheKey, available);
+        return available;
+      })
+      .finally(() => {
+        this.stashAvailabilityLookups.delete(cacheKey);
+      });
+
+    this.stashAvailabilityLookups.set(cacheKey, lookup);
+    return lookup;
+  }
+
+  private buildStashAvailabilityCacheKey(
+    stashId: string,
+    stashConfig: { baseUrl: string; apiKey: string | null },
+  ): string {
+    return `${stashConfig.baseUrl.trim()}|${stashConfig.apiKey?.trim() ?? ''}|${stashId}`;
+  }
+
+  private readStashAvailabilityCache(cacheKey: string): boolean | null {
+    const cached = this.stashAvailabilityCache.get(cacheKey);
+    if (!cached) {
+      return null;
+    }
+
+    if (cached.expiresAt <= Date.now()) {
+      this.stashAvailabilityCache.delete(cacheKey);
+      return null;
+    }
+
+    return cached.available;
+  }
+
+  private writeStashAvailabilityCache(
+    cacheKey: string,
+    available: boolean,
+  ): void {
+    this.stashAvailabilityCache.set(cacheKey, {
+      available,
+      expiresAt:
+        Date.now() + SceneStatusService.STASH_AVAILABILITY_CACHE_TTL_MS,
+    });
+    this.pruneStashAvailabilityCache();
+  }
+
+  private pruneStashAvailabilityCache(now = Date.now()): void {
+    for (const [cacheKey, entry] of this.stashAvailabilityCache.entries()) {
+      if (entry.expiresAt <= now) {
+        this.stashAvailabilityCache.delete(cacheKey);
+      }
+    }
+
+    const overflow =
+      this.stashAvailabilityCache.size -
+      SceneStatusService.STASH_AVAILABILITY_CACHE_MAX_ENTRIES;
+    if (overflow <= 0) {
+      return;
+    }
+
+    let removed = 0;
+    for (const cacheKey of this.stashAvailabilityCache.keys()) {
+      this.stashAvailabilityCache.delete(cacheKey);
+      removed += 1;
+      if (removed >= overflow) {
+        break;
+      }
+    }
   }
 
   private async getWhisparrConfig(): Promise<{

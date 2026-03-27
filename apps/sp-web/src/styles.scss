@@ -41,6 +41,9 @@
   --badge-available-bg: #e2f4e6;
   --badge-available-border: #add8b8;
   --badge-available-text: #1b6231;
+  --badge-failed-bg: #fdeced;
+  --badge-failed-border: #efbcc1;
+  --badge-failed-text: #972536;
   --shadow-sm: 0 6px 16px rgb(8 16 27 / 12%);
 
   /* PrimeNG token bridge: keep framework controls aligned with app surfaces/colors. */
@@ -95,6 +98,9 @@
   --badge-available-bg: #1f4d33;
   --badge-available-border: #4c8d62;
   --badge-available-text: #ccefd4;
+  --badge-failed-bg: #522229;
+  --badge-failed-border: #92505a;
+  --badge-failed-text: #ffd5da;
   --shadow-sm: 0 10px 22px rgb(0 0 0 / 40%);
 
   --p-content-background: var(--surface-1);

@@ -26,7 +26,10 @@ import {
 import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import { PerformerStudioOptionDto } from '../performers/dto/performer-studio-option.dto';
 import { SceneTagOptionDto } from '../scenes/dto/scene-tag-option.dto';
-import { SceneStatusDto } from '../scene-status/dto/scene-status.dto';
+import {
+  SceneStatusDto,
+  isSceneStatusRequestable,
+} from '../scene-status/dto/scene-status.dto';
 import { SceneStatusService } from '../scene-status/scene-status.service';
 import {
   HOME_RAIL_CONTENT_TYPE_VALUES,
@@ -592,7 +595,7 @@ export class HomeService {
       status: effectiveStatus,
       requestable:
         libraryAvailability === 'MISSING_FROM_LIBRARY' &&
-        effectiveStatus.state === 'NOT_REQUESTED',
+        isSceneStatusRequestable(effectiveStatus),
       viewUrl: null,
     };
   }

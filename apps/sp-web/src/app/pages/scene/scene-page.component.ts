@@ -8,7 +8,12 @@ import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
-import { SceneDetails, ScenePerformer, SceneRequestContext } from '../../core/api/discover.types';
+import {
+  SceneDetails,
+  ScenePerformer,
+  SceneRequestContext,
+  isSceneStatusRequestable,
+} from '../../core/api/discover.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
@@ -192,6 +197,8 @@ export class ScenePageComponent implements OnInit, OnDestroy {
         return 'Whisparr has the file, but Stash has not imported it yet.';
       case 'AVAILABLE':
         return 'Imported into Stash and available in your local library.';
+      case 'FAILED':
+        return 'The last known acquisition attempt failed. Retry the request to send it back through Whisparr.';
       case 'NOT_REQUESTED':
       default:
         return 'Discovered in StashDB and not yet sent into your local acquisition pipeline.';
@@ -212,7 +219,11 @@ export class ScenePageComponent implements OnInit, OnDestroy {
   }
 
   protected canRequestScene(scene: SceneDetails): boolean {
-    return scene.status.state === 'NOT_REQUESTED';
+    return isSceneStatusRequestable(scene.status);
+  }
+
+  protected requestButtonLabel(scene: SceneDetails): string {
+    return scene.status.state === 'FAILED' ? 'Retry in Whisparr' : 'Request in Whisparr';
   }
 
   protected canToggleFavoriteStudio(scene: SceneDetails): boolean {
@@ -445,6 +456,14 @@ export class ScenePageComponent implements OnInit, OnDestroy {
             ? 'Whisparr has a linked record for this scene.'
             : 'The request pipeline has already handed this scene off to your library.',
           tone: 'complete',
+        };
+      case 'FAILED':
+        return {
+          system: 'Whisparr',
+          title: 'Failed',
+          detail:
+            'The last known request failed and Whisparr is not currently downloading or importing this scene. Retry the request after checking the provider if needed.',
+          tone: 'active',
         };
       case 'NOT_REQUESTED':
       default:

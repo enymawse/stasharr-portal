@@ -3,10 +3,15 @@ export type SceneStatusState =
   | 'REQUESTED'
   | 'DOWNLOADING'
   | 'IMPORT_PENDING'
-  | 'AVAILABLE';
+  | 'AVAILABLE'
+  | 'FAILED';
 
 export interface SceneStatus {
   state: SceneStatusState;
+}
+
+export function isSceneStatusRequestable(status: Pick<SceneStatus, 'state'>): boolean {
+  return status.state === 'NOT_REQUESTED' || status.state === 'FAILED';
 }
 
 export interface DiscoverItem {

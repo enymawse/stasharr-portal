@@ -185,7 +185,9 @@ describe('HomeService', () => {
     const result = await service.getRails();
 
     expect(upsertMock).toHaveBeenCalledTimes(3);
-    expect(findManyMock).toHaveBeenCalledWith({ orderBy: { sortOrder: 'asc' } });
+    expect(findManyMock).toHaveBeenCalledWith({
+      orderBy: { sortOrder: 'asc' },
+    });
     expect(result.map((rail) => rail.key)).toEqual([
       'FAVORITE_STUDIOS',
       'FAVORITE_PERFORMERS',
@@ -208,7 +210,9 @@ describe('HomeService', () => {
 
   it('creates a custom StashDB scenes rail', async () => {
     upsertMock.mockResolvedValue({});
-    findFirstMock.mockResolvedValue(buildStashRail({ id: 'built-in-3', sortOrder: 2 }));
+    findFirstMock.mockResolvedValue(
+      buildStashRail({ id: 'built-in-3', sortOrder: 2 }),
+    );
     createMock.mockResolvedValue(
       buildRail({
         id: 'custom-1',
@@ -279,7 +283,9 @@ describe('HomeService', () => {
 
   it('creates a custom Stash rail with the constrained local-library config', async () => {
     upsertMock.mockResolvedValue({});
-    findFirstMock.mockResolvedValue(buildStashRail({ id: 'built-in-3', sortOrder: 2 }));
+    findFirstMock.mockResolvedValue(
+      buildStashRail({ id: 'built-in-3', sortOrder: 2 }),
+    );
     createMock.mockResolvedValue(
       buildStashRail({
         id: 'custom-stash-1',
@@ -348,7 +354,9 @@ describe('HomeService', () => {
 
   it('creates a custom hybrid rail with explicit StashDB favorites and availability mode', async () => {
     upsertMock.mockResolvedValue({});
-    findFirstMock.mockResolvedValue(buildStashRail({ id: 'built-in-3', sortOrder: 2 }));
+    findFirstMock.mockResolvedValue(
+      buildStashRail({ id: 'built-in-3', sortOrder: 2 }),
+    );
     createMock.mockResolvedValue(
       buildHybridRail({
         id: 'custom-hybrid-1',
@@ -734,7 +742,9 @@ describe('HomeService', () => {
 
   it('deletes a custom rail and reindexes sort order', async () => {
     upsertMock.mockResolvedValue({});
-    findUniqueMock.mockResolvedValue(buildRail({ id: 'custom-1', sortOrder: 1 }));
+    findUniqueMock.mockResolvedValue(
+      buildRail({ id: 'custom-1', sortOrder: 1 }),
+    );
     deleteMock.mockResolvedValue({});
     findManyMock.mockResolvedValue([
       buildRail({
@@ -1008,7 +1018,8 @@ describe('HomeService', () => {
 
     await expect(service.getRailContent('built-in-3')).resolves.toEqual({
       items: [],
-      message: 'Configure and enable your Stash integration to populate this rail.',
+      message:
+        'Configure and enable your Stash integration to populate this rail.',
     });
     expect(stashGetLocalSceneFeedMock).not.toHaveBeenCalled();
   });
@@ -1161,7 +1172,9 @@ describe('HomeService', () => {
       ],
     });
     stashFindScenesByStashIdMock.mockImplementation((stashId: string) =>
-      Promise.resolve(stashId === 'scene-2' ? [] : [{ id: `local-${stashId}` }]),
+      Promise.resolve(
+        stashId === 'scene-2' ? [] : [{ id: `local-${stashId}` }],
+      ),
     );
 
     const result = await service.getRailContent('custom-hybrid-2');
@@ -1181,14 +1194,19 @@ describe('HomeService', () => {
       },
     });
     expect(stashFindScenesByStashIdMock).toHaveBeenCalledTimes(3);
-    expect(stashFindScenesByStashIdMock).toHaveBeenNthCalledWith(1, 'scene-1', {
-      baseUrl: 'http://stash.local',
-      apiKey: 'stash-secret',
-    }, {
-      favoritePerformersOnly: true,
-      favoriteStudiosOnly: false,
-      favoriteTagsOnly: true,
-    });
+    expect(stashFindScenesByStashIdMock).toHaveBeenNthCalledWith(
+      1,
+      'scene-1',
+      {
+        baseUrl: 'http://stash.local',
+        apiKey: 'stash-secret',
+      },
+      {
+        favoritePerformersOnly: true,
+        favoriteStudiosOnly: false,
+        favoriteTagsOnly: true,
+      },
+    );
     expect(sceneStatusResolveForScenesMock).not.toHaveBeenCalled();
     expect(result).toEqual({
       items: [
@@ -1209,7 +1227,7 @@ describe('HomeService', () => {
     });
   });
 
-  it('loads hybrid missing-library content with oversampling and status enrichment', async () => {
+  it('loads hybrid missing-library content with oversampling and actionable status enrichment', async () => {
     upsertMock.mockResolvedValue({});
     findUniqueMock.mockResolvedValue(
       buildHybridRail({
@@ -1308,7 +1326,7 @@ describe('HomeService', () => {
     );
     sceneStatusResolveForScenesMock.mockResolvedValue(
       new Map([
-        ['scene-13', { state: 'NOT_REQUESTED' }],
+        ['scene-13', { state: 'FAILED' }],
         ['scene-14', { state: 'DOWNLOADING' }],
       ]),
     );
@@ -1316,29 +1334,40 @@ describe('HomeService', () => {
     const result = await service.getRailContent('custom-hybrid-3');
 
     expect(stashdbGetScenesBySortMock).toHaveBeenCalledTimes(2);
-    expect(stashFindScenesByStashIdMock).toHaveBeenCalledWith('scene-13', {
-      baseUrl: 'http://stash.local',
-      apiKey: 'stash-secret',
-    }, {
-      favoritePerformersOnly: false,
-      favoriteStudiosOnly: false,
-      favoriteTagsOnly: false,
-    });
-    expect(stashFindScenesByStashIdMock).toHaveBeenCalledWith('scene-14', {
-      baseUrl: 'http://stash.local',
-      apiKey: 'stash-secret',
-    }, {
-      favoritePerformersOnly: false,
-      favoriteStudiosOnly: false,
-      favoriteTagsOnly: false,
-    });
-    expect(sceneStatusResolveForScenesMock).toHaveBeenCalledWith(['scene-13', 'scene-14']);
+    expect(stashFindScenesByStashIdMock).toHaveBeenCalledWith(
+      'scene-13',
+      {
+        baseUrl: 'http://stash.local',
+        apiKey: 'stash-secret',
+      },
+      {
+        favoritePerformersOnly: false,
+        favoriteStudiosOnly: false,
+        favoriteTagsOnly: false,
+      },
+    );
+    expect(stashFindScenesByStashIdMock).toHaveBeenCalledWith(
+      'scene-14',
+      {
+        baseUrl: 'http://stash.local',
+        apiKey: 'stash-secret',
+      },
+      {
+        favoritePerformersOnly: false,
+        favoriteStudiosOnly: false,
+        favoriteTagsOnly: false,
+      },
+    );
+    expect(sceneStatusResolveForScenesMock).toHaveBeenCalledWith([
+      'scene-13',
+      'scene-14',
+    ]);
     expect(result).toEqual({
       items: [
         expect.objectContaining({
           id: 'scene-13',
           requestable: true,
-          status: { state: 'NOT_REQUESTED' },
+          status: { state: 'FAILED' },
         }),
         expect.objectContaining({
           id: 'scene-14',
@@ -1361,7 +1390,8 @@ describe('HomeService', () => {
 
     await expect(service.getRailContent('custom-hybrid-4')).resolves.toEqual({
       items: [],
-      message: 'Configure and enable your StashDB integration to populate this hybrid rail.',
+      message:
+        'Configure and enable your StashDB integration to populate this hybrid rail.',
     });
 
     integrationFindUniqueMock.mockImplementation(({ where: { type } }) =>
@@ -1380,7 +1410,8 @@ describe('HomeService', () => {
 
     await expect(service.getRailContent('custom-hybrid-4')).resolves.toEqual({
       items: [],
-      message: 'Configure and enable your Stash integration to apply library matching.',
+      message:
+        'Configure and enable your Stash integration to apply library matching.',
     });
   });
 

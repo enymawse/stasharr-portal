@@ -34,6 +34,7 @@ import {
   SceneTagMatchMode,
   SceneTagOption,
   SortDirection,
+  isSceneStatusRequestable,
 } from '../../core/api/discover.types';
 import { HomeService } from '../../core/api/home.service';
 import {
@@ -774,7 +775,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
   }
 
   protected isRequestable(item: HomeRailItem): boolean {
-    return item.requestable && item.status.state === 'NOT_REQUESTED';
+    return item.requestable && isSceneStatusRequestable(item.status);
   }
 
   protected openRequestModal(item: HomeRailItem): void {
@@ -802,6 +803,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
           item.id === stashId
             ? {
                 ...item,
+                requestable: false,
                 status: { state: 'REQUESTED' },
               }
             : item,

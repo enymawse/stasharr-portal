@@ -252,7 +252,15 @@ describe('ScenesService', () => {
   });
 
   it('forwards PERFORMER favorites filter to stashdb adapter', async () => {
-    await service.getScenesFeed(1, 25, 'DATE', undefined, [], 'OR', 'PERFORMER');
+    await service.getScenesFeed(
+      1,
+      25,
+      'DATE',
+      undefined,
+      [],
+      'OR',
+      'PERFORMER',
+    );
 
     expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
       baseUrl: stashdbIntegration.baseUrl,
@@ -397,7 +405,7 @@ describe('ScenesService', () => {
     expect(sceneStatusService.resolveForScenes).not.toHaveBeenCalled();
   });
 
-  it('marks hybrid missing-library scenes as requestable only when status is NOT_REQUESTED', async () => {
+  it('marks hybrid missing-library scenes as requestable when status is actionable', async () => {
     stashdbAdapter.getScenesBySort = jest.fn().mockResolvedValue({
       total: 2,
       scenes: [
@@ -419,7 +427,9 @@ describe('ScenesService', () => {
     stashAdapter.findScenesByStashId = jest.fn().mockResolvedValue([]);
     sceneStatusService.resolveForScenes = jest
       .fn()
-      .mockResolvedValue(new Map([['stashdb-scene-1', { state: 'NOT_REQUESTED' }]]));
+      .mockResolvedValue(
+        new Map([['stashdb-scene-1', { state: 'NOT_REQUESTED' }]]),
+      );
 
     await expect(
       service.getScenesFeed(
@@ -442,6 +452,57 @@ describe('ScenesService', () => {
         expect.objectContaining({
           id: 'stashdb-scene-1',
           status: { state: 'NOT_REQUESTED' },
+          requestable: true,
+        }),
+      ],
+    });
+  });
+
+  it('keeps failed hybrid missing-library scenes requestable for retry', async () => {
+    stashdbAdapter.getScenesBySort = jest.fn().mockResolvedValue({
+      total: 1,
+      scenes: [
+        {
+          id: 'stashdb-scene-1',
+          title: 'Scene',
+          details: 'Description',
+          imageUrl: 'http://cdn.local/image.jpg',
+          studioId: 'studio-1',
+          studioName: 'Studio',
+          studioImageUrl: 'http://studio-image',
+          date: '2026-01-01',
+          releaseDate: '2026-01-02',
+          productionDate: '2026-01-03',
+          duration: 300,
+        },
+      ],
+    });
+    stashAdapter.findScenesByStashId = jest.fn().mockResolvedValue([]);
+    sceneStatusService.resolveForScenes = jest
+      .fn()
+      .mockResolvedValue(new Map([['stashdb-scene-1', { state: 'FAILED' }]]));
+
+    await expect(
+      service.getScenesFeed(
+        1,
+        25,
+        'DATE',
+        'DESC',
+        [],
+        'OR',
+        undefined,
+        [],
+        'MISSING_FROM_LIBRARY',
+      ),
+    ).resolves.toEqual({
+      total: null,
+      page: 1,
+      perPage: 25,
+      hasMore: false,
+      items: [
+        expect.objectContaining({
+          id: 'stashdb-scene-1',
+          status: { state: 'FAILED' },
           requestable: true,
         }),
       ],
@@ -492,16 +553,11 @@ describe('ScenesService', () => {
   });
 
   it('forwards normalized studioIds to stashdb adapter', async () => {
-    await service.getScenesFeed(
-      1,
-      25,
-      'DATE',
-      undefined,
-      [],
-      'OR',
-      undefined,
-      ['studio-1', 'studio-1', 'studio-2'],
-    );
+    await service.getScenesFeed(1, 25, 'DATE', undefined, [], 'OR', undefined, [
+      'studio-1',
+      'studio-1',
+      'studio-2',
+    ]);
 
     expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith({
       baseUrl: stashdbIntegration.baseUrl,

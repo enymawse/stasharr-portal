@@ -13,7 +13,11 @@ import { finalize } from 'rxjs';
 import { Message } from 'primeng/message';
 import { ProgressSpinner } from 'primeng/progressspinner';
 import { DiscoverService } from '../../core/api/discover.service';
-import { DiscoverItem, SceneRequestContext } from '../../core/api/discover.types';
+import {
+  DiscoverItem,
+  SceneRequestContext,
+  isSceneStatusRequestable,
+} from '../../core/api/discover.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
@@ -104,7 +108,7 @@ export class DiscoverPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected isRequestable(item: DiscoverItem): boolean {
-    return item.status.state === 'NOT_REQUESTED';
+    return isSceneStatusRequestable(item.status);
   }
 
   protected openRequestModal(item: DiscoverItem): void {

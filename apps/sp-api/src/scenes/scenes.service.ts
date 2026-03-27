@@ -11,7 +11,10 @@ import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
-import { SceneStatusDto } from '../scene-status/dto/scene-status.dto';
+import {
+  SceneStatusDto,
+  isSceneStatusRequestable,
+} from '../scene-status/dto/scene-status.dto';
 import { SceneStatusService } from '../scene-status/scene-status.service';
 import { SceneTagOptionDto } from './dto/scene-tag-option.dto';
 import {
@@ -98,7 +101,7 @@ export class ScenesService {
           return this.toScenesFeedItem(
             scene,
             status,
-            status.state === 'NOT_REQUESTED',
+            isSceneStatusRequestable(status),
           );
         }),
       };
@@ -144,8 +147,9 @@ export class ScenesService {
             ? { state: 'AVAILABLE' }
             : (statuses.get(scene.id) ?? { state: 'NOT_REQUESTED' }),
           !isInLibraryAvailability &&
-            (statuses.get(scene.id)?.state ?? 'NOT_REQUESTED') ===
-              'NOT_REQUESTED',
+            isSceneStatusRequestable(
+              statuses.get(scene.id) ?? { state: 'NOT_REQUESTED' },
+            ),
         ),
       ),
     };

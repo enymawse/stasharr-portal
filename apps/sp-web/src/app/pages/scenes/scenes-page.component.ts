@@ -36,6 +36,7 @@ import {
   SortDirection,
   SceneTagMatchMode,
   SceneTagOption,
+  isSceneStatusRequestable,
 } from '../../core/api/discover.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
@@ -236,7 +237,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected isRequestable(item: SceneExplorerItem): boolean {
-    return item.requestable && item.status.state === 'NOT_REQUESTED';
+    return item.requestable && isSceneStatusRequestable(item.status);
   }
 
   protected openRequestModal(item: SceneExplorerItem): void {
