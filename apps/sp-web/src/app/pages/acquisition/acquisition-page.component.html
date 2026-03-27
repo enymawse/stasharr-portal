@@ -1,0 +1,127 @@
+<main>
+  <header class="page-head">
+    <div>
+      <h1>Acquisition</h1>
+      <p>Track requested scenes through Whisparr and into your Stash library.</p>
+    </div>
+    @if (!loading() && !error()) {
+      <p class="summary">{{ activeSummaryText() }}</p>
+    }
+  </header>
+
+  <section class="filter-shell" aria-label="Acquisition lifecycle filters">
+    @for (option of filterOptions; track option.value) {
+      <button
+        type="button"
+        class="filter-pill"
+        [class.active]="selectedLifecycle() === option.value"
+        (click)="selectLifecycle(option.value)"
+      >
+        <span>{{ option.label }}</span>
+        <span class="count-chip">{{ countForLifecycle(option.value) }}</span>
+      </button>
+    }
+  </section>
+
+  @if (loading()) {
+    <div class="app-blocking-loader" role="status" aria-live="polite">
+      <p-progressspinner
+        styleClass="app-blocking-spinner"
+        strokeWidth="4"
+        [style]="{ width: '2.25rem', height: '2.25rem' }"
+      />
+      <p>Loading acquisition feed...</p>
+    </div>
+  } @else if (error()) {
+    <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
+    <button type="button" (click)="retryInitialLoad()">Retry</button>
+  } @else if (!hasItems()) {
+    <p class="empty-state">{{ emptyStateMessage() }}</p>
+  } @else {
+    <section class="grid">
+      @for (item of items(); track item.id) {
+        <article class="card" [attr.data-state]="item.status.state">
+          <div class="media">
+            <a
+              class="media-link-stretch"
+              [routerLink]="['/scene', item.id]"
+              [queryParams]="{ returnTo: currentRouteUrl() }"
+              [attr.aria-label]="item.title"
+            ></a>
+
+            @if (item.cardImageUrl || item.imageUrl) {
+              <img
+                class="thumbnail"
+                [src]="item.cardImageUrl ?? item.imageUrl"
+                [alt]="item.title"
+                loading="lazy"
+              />
+            } @else {
+              <div class="thumbnail placeholder" aria-hidden="true"></div>
+            }
+
+            <div class="media-top">
+              @if (item.studioImageUrl) {
+                <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                  <img
+                    [src]="item.studioImageUrl"
+                    [alt]="item.studio ?? 'Studio logo'"
+                    loading="lazy"
+                  />
+                </div>
+              } @else if (item.studio) {
+                <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+              }
+            </div>
+
+            <div class="media-bottom">
+              <div class="status-row">
+                <app-scene-status-badge class="footer-status-badge" [status]="item.status" />
+                @if (item.releaseDate) {
+                  <p class="media-date">
+                    <time [attr.datetime]="item.releaseDate">{{ item.releaseDate }}</time>
+                  </p>
+                }
+              </div>
+
+              <h2 class="media-title">{{ item.title }}</h2>
+              <p class="helper" [class.helper-failed]="item.status.state === 'FAILED'">
+                {{ lifecycleHelperText(item) }}
+              </p>
+
+              <div class="card-actions">
+                @if (item.whisparrViewUrl) {
+                  <a
+                    class="whisparr-link"
+                    [href]="item.whisparrViewUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="View in Whisparr in a new tab"
+                    title="View in Whisparr in a new tab"
+                  >
+                    View in Whisparr
+                  </a>
+                }
+              </div>
+            </div>
+          </div>
+        </article>
+      }
+    </section>
+
+    <div #loadMoreSentinel class="load-sentinel"></div>
+
+    @if (loadingMore()) {
+      <p class="summary">Loading more acquisition scenes...</p>
+    }
+
+    @if (loadMoreError()) {
+      <div class="load-more-error">
+        <p-message severity="error" styleClass="app-inline-message">{{
+          loadMoreError()
+        }}</p-message>
+        <button type="button" (click)="retryLoadMore()">Retry</button>
+      </div>
+    }
+  }
+</main>

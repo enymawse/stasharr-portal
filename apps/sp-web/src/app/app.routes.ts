@@ -6,10 +6,10 @@ import {
 import { AppShellLayoutComponent } from './layouts/app-shell-layout/app-shell-layout.component';
 import { DiscoverPageComponent } from './features/discover/discover-page.component';
 import { SetupPageComponent } from './features/setup/setup-page.component';
+import { AcquisitionPageComponent } from './pages/acquisition/acquisition-page.component';
 import { ScenesPageComponent } from './pages/scenes/scenes-page.component';
 import { ScenePageComponent } from './pages/scene/scene-page.component';
 import { SettingsPageComponent } from './pages/settings/settings-page.component';
-import { RequestsPageComponent } from './pages/requests/requests-page.component';
 import { PerformersPageComponent } from './pages/performers/performers-page.component';
 import { PerformerPageComponent } from './pages/performer/performer-page.component';
 import { StudiosPageComponent } from './pages/studios/studios-page.component';
@@ -29,9 +29,7 @@ export const routes: Routes = [
       {
         path: 'home',
         loadComponent: () =>
-          import('./pages/home/home-page.component').then(
-            (module) => module.HomePageComponent,
-          ),
+          import('./pages/home/home-page.component').then((module) => module.HomePageComponent),
       },
       {
         path: 'discover',
@@ -46,8 +44,8 @@ export const routes: Routes = [
         component: ScenesPageComponent,
       },
       {
-        path: 'requests',
-        component: RequestsPageComponent,
+        path: 'acquisition',
+        component: AcquisitionPageComponent,
       },
       {
         path: 'performers',

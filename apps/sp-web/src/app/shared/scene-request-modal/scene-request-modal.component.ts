@@ -209,7 +209,10 @@ export class SceneRequestModalComponent implements OnChanges, OnDestroy {
       )
       .subscribe({
         next: () => {
-          this.notifications.success('Scene request submitted to Whisparr');
+          this.notifications.success(
+            'Scene request submitted to Whisparr',
+            'Track progress on Acquisition.',
+          );
           this.submitted.emit(currentSceneId);
           this.closed.emit();
         },

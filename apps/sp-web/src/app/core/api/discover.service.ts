@@ -17,6 +17,7 @@ import {
   SceneTagMatchMode,
   SceneTagOption,
   SceneDetails,
+  SceneLifecycleFilter,
   SceneLibraryAvailability,
   SceneRequestOptions,
   ScenesFeedResponse,
@@ -32,9 +33,7 @@ export class DiscoverService {
   private readonly http = inject(HttpClient);
 
   getDiscoverFeed(page: number, perPage: number): Observable<DiscoverResponse> {
-    const params = new HttpParams()
-      .set('page', page.toString())
-      .set('perPage', perPage.toString());
+    const params = new HttpParams().set('page', page.toString()).set('perPage', perPage.toString());
     return this.http.get<DiscoverResponse>('/api/discover', { params });
   }
 
@@ -48,13 +47,12 @@ export class DiscoverService {
     favorites?: SceneFavoritesFilter,
     studioIds?: string[],
     libraryAvailability?: SceneLibraryAvailability,
+    lifecycle?: SceneLifecycleFilter,
     stashFavoritePerformersOnly?: boolean,
     stashFavoriteStudiosOnly?: boolean,
     stashFavoriteTagsOnly?: boolean,
   ): Observable<ScenesFeedResponse> {
-    let params = new HttpParams()
-      .set('page', page.toString())
-      .set('perPage', perPage.toString());
+    let params = new HttpParams().set('page', page.toString()).set('perPage', perPage.toString());
 
     if (sort) {
       params = params.set('sort', sort);
@@ -77,6 +75,9 @@ export class DiscoverService {
     if (libraryAvailability) {
       params = params.set('libraryAvailability', libraryAvailability);
     }
+    if (lifecycle && lifecycle !== 'ANY') {
+      params = params.set('lifecycle', lifecycle);
+    }
     if (stashFavoritePerformersOnly) {
       params = params.set('stashFavoritePerformersOnly', '1');
     }
@@ -95,17 +96,8 @@ export class DiscoverService {
     return this.http.get<SceneTagOption[]>('/api/scenes/tags', { params });
   }
 
-  getRequestsFeed(page: number, perPage: number): Observable<DiscoverResponse> {
-    const params = new HttpParams()
-      .set('page', page.toString())
-      .set('perPage', perPage.toString());
-    return this.http.get<DiscoverResponse>('/api/requests', { params });
-  }
-
   getSceneDetails(stashId: string): Observable<SceneDetails> {
-    return this.http.get<SceneDetails>(
-      `/api/scenes/${encodeURIComponent(stashId)}`,
-    );
+    return this.http.get<SceneDetails>(`/api/scenes/${encodeURIComponent(stashId)}`);
   }
 
   getSceneRequestOptions(stashId: string): Observable<SceneRequestOptions> {
@@ -135,9 +127,7 @@ export class DiscoverService {
       favoritesOnly?: boolean;
     },
   ): Observable<PerformerFeedResponse> {
-    let params = new HttpParams()
-      .set('page', page.toString())
-      .set('perPage', perPage.toString());
+    let params = new HttpParams().set('page', page.toString()).set('perPage', perPage.toString());
 
     if (filters?.name) {
       params = params.set('name', filters.name);
@@ -158,9 +148,7 @@ export class DiscoverService {
   }
 
   getPerformerDetails(performerId: string): Observable<PerformerDetails> {
-    return this.http.get<PerformerDetails>(
-      `/api/performers/${encodeURIComponent(performerId)}`,
-    );
+    return this.http.get<PerformerDetails>(`/api/performers/${encodeURIComponent(performerId)}`);
   }
 
   getPerformerScenesFeed(
@@ -175,9 +163,7 @@ export class DiscoverService {
       onlyFavoriteStudios?: boolean;
     },
   ): Observable<DiscoverResponse> {
-    let params = new HttpParams()
-      .set('page', page.toString())
-      .set('perPage', perPage.toString());
+    let params = new HttpParams().set('page', page.toString()).set('perPage', perPage.toString());
 
     if (filters?.sort) {
       params = params.set('sort', filters.sort);
@@ -208,20 +194,14 @@ export class DiscoverService {
     });
   }
 
-  favoritePerformer(
-    performerId: string,
-    favorite: boolean,
-  ): Observable<FavoriteMutationResponse> {
+  favoritePerformer(performerId: string, favorite: boolean): Observable<FavoriteMutationResponse> {
     return this.http.post<FavoriteMutationResponse>(
       `/api/performers/${encodeURIComponent(performerId)}/favorite`,
       { favorite },
     );
   }
 
-  favoriteStudio(
-    studioId: string,
-    favorite: boolean,
-  ): Observable<FavoriteMutationResponse> {
+  favoriteStudio(studioId: string, favorite: boolean): Observable<FavoriteMutationResponse> {
     return this.http.post<FavoriteMutationResponse>(
       `/api/scenes/studios/${encodeURIComponent(studioId)}/favorite`,
       { favorite },
@@ -238,9 +218,7 @@ export class DiscoverService {
       favoritesOnly?: boolean;
     },
   ): Observable<StudioFeedResponse> {
-    let params = new HttpParams()
-      .set('page', page.toString())
-      .set('perPage', perPage.toString());
+    let params = new HttpParams().set('page', page.toString()).set('perPage', perPage.toString());
 
     if (filters?.name) {
       params = params.set('name', filters.name);
@@ -259,8 +237,6 @@ export class DiscoverService {
   }
 
   getStudioDetails(studioId: string): Observable<StudioDetails> {
-    return this.http.get<StudioDetails>(
-      `/api/studios/${encodeURIComponent(studioId)}`,
-    );
+    return this.http.get<StudioDetails>(`/api/studios/${encodeURIComponent(studioId)}`);
   }
 }

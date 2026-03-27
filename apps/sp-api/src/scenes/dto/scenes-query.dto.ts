@@ -1,6 +1,16 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { DiscoverQueryDto } from '../../discover/dto/discover-query.dto';
+import {
+  SCENE_STATUS_VALUES,
+  SceneStatus,
+} from '../../scene-status/dto/scene-status.dto';
 
 export const SCENE_FEED_SORT_VALUES = [
   'DATE',
@@ -31,6 +41,12 @@ export const SCENE_LIBRARY_AVAILABILITY_VALUES = [
 ] as const;
 export type SceneLibraryAvailability =
   (typeof SCENE_LIBRARY_AVAILABILITY_VALUES)[number];
+
+export const SCENE_LIFECYCLE_FILTER_VALUES = [
+  'ANY',
+  ...SCENE_STATUS_VALUES,
+] as const;
+export type SceneLifecycleFilter = 'ANY' | SceneStatus;
 
 export class ScenesQueryDto extends DiscoverQueryDto {
   @IsOptional()
@@ -88,6 +104,10 @@ export class ScenesQueryDto extends DiscoverQueryDto {
   @IsOptional()
   @IsIn(SCENE_LIBRARY_AVAILABILITY_VALUES)
   libraryAvailability?: SceneLibraryAvailability;
+
+  @IsOptional()
+  @IsIn(SCENE_LIFECYCLE_FILTER_VALUES)
+  lifecycle?: SceneLifecycleFilter;
 
   @IsOptional()
   @Transform(({ value }) => value === true || value === 'true' || value === '1')

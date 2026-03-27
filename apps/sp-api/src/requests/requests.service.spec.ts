@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import {
   IntegrationStatus,
   IntegrationType,
@@ -8,20 +8,16 @@ import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
-import { SceneStatusService } from '../scene-status/scene-status.service';
 import { RequestsService } from './requests.service';
 
 describe('RequestsService', () => {
   const findOneMock = jest.fn();
-  const getQueueSnapshotMock = jest.fn();
-  const findMovieByIdMock = jest.fn();
   const findMovieByStashIdMock = jest.fn();
   const getRootFoldersMock = jest.fn();
   const getQualityProfilesMock = jest.fn();
   const getTagsMock = jest.fn();
   const createMovieMock = jest.fn();
   const getSceneByIdMock = jest.fn();
-  const resolveForScenesMock = jest.fn();
   const upsertRequestMock = jest.fn();
 
   const integrationsService = {
@@ -29,8 +25,6 @@ describe('RequestsService', () => {
   } as unknown as IntegrationsService;
 
   const whisparrAdapter = {
-    getQueueSnapshot: getQueueSnapshotMock,
-    findMovieById: findMovieByIdMock,
     findMovieByStashId: findMovieByStashIdMock,
     getRootFolders: getRootFoldersMock,
     getQualityProfiles: getQualityProfilesMock,
@@ -41,10 +35,6 @@ describe('RequestsService', () => {
   const stashdbAdapter = {
     getSceneById: getSceneByIdMock,
   } as unknown as StashdbAdapter;
-
-  const sceneStatusService = {
-    resolveForScenes: resolveForScenesMock,
-  } as unknown as SceneStatusService;
 
   const prismaService = {
     request: {
@@ -75,7 +65,6 @@ describe('RequestsService', () => {
       integrationsService,
       whisparrAdapter,
       stashdbAdapter,
-      sceneStatusService,
       prismaService,
     );
 
@@ -91,7 +80,6 @@ describe('RequestsService', () => {
       throw new Error('Unexpected integration type');
     });
 
-    resolveForScenesMock.mockResolvedValue(new Map());
     getSceneByIdMock.mockImplementation((stashId: string) =>
       Promise.resolve({
         id: stashId,
@@ -109,62 +97,6 @@ describe('RequestsService', () => {
         sourceUrls: [],
       }),
     );
-  });
-
-  it('builds queue-scoped feed with stable deduped order and pagination', async () => {
-    getQueueSnapshotMock.mockResolvedValue([
-      {
-        movieId: 2,
-        trackedDownloadState: 'downloading',
-        trackedDownloadStatus: 'ok',
-      },
-      {
-        movieId: 1,
-        trackedDownloadState: 'downloading',
-        trackedDownloadStatus: 'ok',
-      },
-      {
-        movieId: 2,
-        trackedDownloadState: 'importing',
-        trackedDownloadStatus: 'ok',
-      },
-      {
-        movieId: 3,
-        trackedDownloadState: 'downloading',
-        trackedDownloadStatus: 'ok',
-      },
-    ]);
-
-    findMovieByIdMock.mockImplementation((movieId: number) => {
-      if (movieId === 1) {
-        return { movieId, stashId: 'scene-a', hasFile: false };
-      }
-      if (movieId === 2) {
-        return { movieId, stashId: 'scene-b', hasFile: false };
-      }
-      if (movieId === 3) {
-        return { movieId, stashId: 'scene-c', hasFile: false };
-      }
-      return null;
-    });
-
-    resolveForScenesMock.mockResolvedValue(
-      new Map([
-        ['scene-b', { state: 'DOWNLOADING' }],
-        ['scene-a', { state: 'REQUESTED' }],
-      ]),
-    );
-
-    const result = await service.getRequestsFeed(1, 2);
-
-    expect(result.total).toBe(3);
-    expect(result.page).toBe(1);
-    expect(result.perPage).toBe(2);
-    expect(result.hasMore).toBe(true);
-    expect(result.items.map((item) => item.id)).toEqual(['scene-b', 'scene-a']);
-    expect(resolveForScenesMock).toHaveBeenCalledWith(['scene-b', 'scene-a']);
-    expect(findMovieByIdMock).toHaveBeenCalledTimes(3);
-    expect(getSceneByIdMock).toHaveBeenCalledTimes(2);
   });
 
   it('returns normalized request options with defaults', async () => {
@@ -334,54 +266,8 @@ describe('RequestsService', () => {
       return configuredWhisparrIntegration;
     });
 
-    await expect(service.getRequestsFeed()).rejects.toBeInstanceOf(
+    await expect(service.getRequestOptions('scene-1')).rejects.toBeInstanceOf(
       BadRequestException,
     );
-  });
-
-  it('skips unmappable queue items and logs warnings', async () => {
-    const warnSpy = jest
-      .spyOn(Logger.prototype, 'warn')
-      .mockImplementation(() => undefined);
-
-    getQueueSnapshotMock.mockResolvedValue([
-      {
-        movieId: 1,
-        trackedDownloadState: 'downloading',
-        trackedDownloadStatus: 'ok',
-      },
-      {
-        movieId: 2,
-        trackedDownloadState: 'downloading',
-        trackedDownloadStatus: 'ok',
-      },
-      {
-        movieId: 3,
-        trackedDownloadState: 'downloading',
-        trackedDownloadStatus: 'ok',
-      },
-    ]);
-
-    findMovieByIdMock.mockImplementation((movieId: number) => {
-      if (movieId === 1) {
-        return null;
-      }
-      if (movieId === 2) {
-        throw new Error('lookup failed');
-      }
-      return { movieId, stashId: 'scene-3', hasFile: false };
-    });
-
-    resolveForScenesMock.mockResolvedValue(
-      new Map([['scene-3', { state: 'DOWNLOADING' }]]),
-    );
-
-    const result = await service.getRequestsFeed(1, 25);
-
-    expect(result.total).toBe(1);
-    expect(result.items.map((item) => item.id)).toEqual(['scene-3']);
-    expect(warnSpy).toHaveBeenCalled();
-
-    warnSpy.mockRestore();
   });
 });

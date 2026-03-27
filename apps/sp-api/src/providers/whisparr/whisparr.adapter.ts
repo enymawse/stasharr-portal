@@ -221,6 +221,35 @@ export class WhisparrAdapter {
     return normalized;
   }
 
+  async getMovieSnapshot(
+    config: WhisparrAdapterBaseConfig,
+  ): Promise<WhisparrMovieLookupResult[]> {
+    this.logger.debug(
+      `Fetching Whisparr movie snapshot: ${this.safeJson({
+        baseUrl: config.baseUrl,
+        hasApiKey: Boolean(config.apiKey?.trim()),
+      })}`,
+    );
+
+    const payload = await this.fetchJsonPayload(
+      this.resolveMovieCollectionEndpoint(config.baseUrl),
+      config,
+    );
+    const records = this.extractCollectionRecords(payload, 'movie');
+    const normalized = records
+      .map((entry) => this.parseMovieLookupEntry(entry))
+      .filter((entry): entry is WhisparrMovieLookupResult => entry !== null);
+
+    this.logger.debug(
+      `Whisparr movie normalized snapshot: ${this.safeJson({
+        count: normalized.length,
+        sample: normalized.slice(0, 5),
+      })}`,
+    );
+
+    return normalized;
+  }
+
   async getRootFolders(
     config: WhisparrAdapterBaseConfig,
   ): Promise<WhisparrRootFolderOption[]> {
@@ -247,7 +276,9 @@ export class WhisparrAdapter {
       .filter((entry): entry is WhisparrQualityProfileOption => entry !== null);
   }
 
-  async getTags(config: WhisparrAdapterBaseConfig): Promise<WhisparrTagOption[]> {
+  async getTags(
+    config: WhisparrAdapterBaseConfig,
+  ): Promise<WhisparrTagOption[]> {
     const payload = await this.fetchArrayPayload(
       this.resolveTagsEndpoint(config.baseUrl),
       config,
@@ -263,7 +294,7 @@ export class WhisparrAdapter {
     config: WhisparrAdapterBaseConfig,
   ): Promise<WhisparrCreateMovieResult> {
     const payload = await this.fetchJsonPayload(
-      this.resolveMovieCreateEndpoint(config.baseUrl),
+      this.resolveMovieCollectionEndpoint(config.baseUrl),
       config,
       {
         method: 'POST',
@@ -515,7 +546,9 @@ export class WhisparrAdapter {
     };
   }
 
-  private parseRootFolderEntry(entry: unknown): WhisparrRootFolderOption | null {
+  private parseRootFolderEntry(
+    entry: unknown,
+  ): WhisparrRootFolderOption | null {
     if (!entry || typeof entry !== 'object') {
       return null;
     }
@@ -645,7 +678,7 @@ export class WhisparrAdapter {
     return parsed.toString();
   }
 
-  private resolveMovieCreateEndpoint(baseUrl: string): string {
+  private resolveMovieCollectionEndpoint(baseUrl: string): string {
     const parsed = new URL(baseUrl);
     const cleanPath = parsed.pathname.replace(/\/+$/, '');
     parsed.pathname = `${cleanPath}/api/v3/movie`;
@@ -668,6 +701,44 @@ export class WhisparrAdapter {
       count: payload.length,
       sample: payload.slice(0, 3),
     });
+  }
+
+  private extractCollectionRecords(
+    payload: unknown,
+    collectionName: string,
+  ): unknown[] {
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+
+    if (payload && typeof payload === 'object') {
+      const payloadRecord = payload as Record<string, unknown>;
+      const records = payloadRecord.records;
+      if (Array.isArray(records)) {
+        this.logger.debug(
+          `Whisparr ${collectionName} payload includes records wrapper: ${this.safeJson(
+            {
+              topLevelKeys: Object.keys(payloadRecord),
+              recordsCount: records.length,
+              totalRecords: this.readNumber(payloadRecord.totalRecords),
+            },
+          )}`,
+        );
+        return records;
+      }
+    }
+
+    this.logger.error(
+      `Whisparr ${collectionName} payload has unexpected shape: ${this.safeJson(
+        {
+          payloadShape: this.describePayloadShape(payload),
+          payloadPreview: this.previewPayload(payload),
+        },
+      )}`,
+    );
+    throw new BadGatewayException(
+      `Whisparr provider returned an unexpected ${collectionName} response shape.`,
+    );
   }
 
   private extractQueuePage(payload: unknown): {

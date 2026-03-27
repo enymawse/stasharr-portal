@@ -9,9 +9,11 @@ import { HybridScenesService } from '../hybrid-scenes/hybrid-scenes.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
+import { StashdbScene } from '../providers/stashdb/stashdb.adapter';
 import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
 import {
+  SceneStatus,
   SceneStatusDto,
   isSceneStatusRequestable,
 } from '../scene-status/dto/scene-status.dto';
@@ -26,6 +28,7 @@ import { ScenesFeedResponseDto } from './dto/scenes-feed.dto';
 import {
   SceneFavoritesFilter,
   SceneFeedSort,
+  SceneLifecycleFilter,
   SceneLibraryAvailability,
   SortDirection,
   SceneTagMatchMode,
@@ -35,6 +38,7 @@ import {
 export class ScenesService {
   private static readonly DEFAULT_PAGE = 1;
   private static readonly DEFAULT_PER_PAGE = 25;
+  private static readonly LIFECYCLE_SCAN_PAGE_SIZE = 50;
 
   constructor(
     private readonly integrationsService: IntegrationsService,
@@ -55,6 +59,7 @@ export class ScenesService {
     favorites?: SceneFavoritesFilter,
     studioIds: string[] = [],
     libraryAvailability: SceneLibraryAvailability = 'ANY',
+    lifecycle: SceneLifecycleFilter = 'ANY',
     stashFavoritePerformersOnly = false,
     stashFavoriteStudiosOnly = false,
     stashFavoriteTagsOnly = false,
@@ -67,6 +72,28 @@ export class ScenesService {
       stashFavoritePerformersOnly ||
       stashFavoriteStudiosOnly ||
       stashFavoriteTagsOnly;
+    const lifecycleFilter = lifecycle === 'ANY' ? null : lifecycle;
+
+    if (lifecycleFilter) {
+      return this.getLifecycleFilteredScenesFeed({
+        stashdbConfig,
+        stashConfig: hybridActive ? await this.getStashConfig() : null,
+        page,
+        perPage,
+        sort,
+        direction,
+        favorites,
+        tagIds: normalizedTagIds,
+        tagMode,
+        studioIds: normalizedStudioIds,
+        libraryAvailability,
+        lifecycleFilter,
+        stashFavoritePerformersOnly,
+        stashFavoriteStudiosOnly,
+        stashFavoriteTagsOnly,
+        hybridActive,
+      });
+    }
 
     if (!hybridActive) {
       const scenes = await this.stashdbAdapter.getScenesBySort({
@@ -152,6 +179,161 @@ export class ScenesService {
             ),
         ),
       ),
+    };
+  }
+
+  private async getLifecycleFilteredScenesFeed(config: {
+    stashdbConfig: { baseUrl: string; apiKey: string | null };
+    stashConfig: { baseUrl: string; apiKey: string | null } | null;
+    page: number;
+    perPage: number;
+    sort: SceneFeedSort;
+    direction: SortDirection;
+    favorites?: SceneFavoritesFilter;
+    tagIds: string[];
+    tagMode: SceneTagMatchMode;
+    studioIds: string[];
+    libraryAvailability: SceneLibraryAvailability;
+    lifecycleFilter: SceneStatus;
+    stashFavoritePerformersOnly: boolean;
+    stashFavoriteStudiosOnly: boolean;
+    stashFavoriteTagsOnly: boolean;
+    hybridActive: boolean;
+  }): Promise<ScenesFeedResponseDto> {
+    const startIndex = Math.max(0, (config.page - 1) * config.perPage);
+    const targetMatchCount = startIndex + config.perPage + 1;
+    const batchSize = Math.max(
+      config.perPage,
+      ScenesService.LIFECYCLE_SCAN_PAGE_SIZE,
+    );
+    const matched: Array<{ scene: StashdbScene; status: SceneStatusDto }> = [];
+    let candidatePage = 1;
+    let hasMoreCandidates = true;
+
+    while (hasMoreCandidates && matched.length < targetMatchCount) {
+      const batchResult = await this.fetchLifecycleCandidateBatch(
+        config,
+        candidatePage,
+        batchSize,
+      );
+      hasMoreCandidates = batchResult.hasMore;
+      candidatePage += 1;
+
+      if (batchResult.scenes.length === 0) {
+        break;
+      }
+
+      const statuses = batchResult.forcedAvailable
+        ? new Map<string, SceneStatusDto>(
+            batchResult.scenes.map((scene) => [
+              scene.id,
+              { state: 'AVAILABLE' as const },
+            ]),
+          )
+        : await this.sceneStatusService.resolveForScenes(
+            batchResult.scenes.map((scene) => scene.id),
+          );
+
+      for (const scene of batchResult.scenes) {
+        const status: SceneStatusDto = batchResult.forcedAvailable
+          ? { state: 'AVAILABLE' }
+          : (statuses.get(scene.id) ?? { state: 'NOT_REQUESTED' });
+        if (status.state === config.lifecycleFilter) {
+          matched.push({ scene, status });
+          if (matched.length >= targetMatchCount) {
+            break;
+          }
+        }
+      }
+    }
+
+    const pageMatches = matched.slice(startIndex, startIndex + config.perPage);
+    return {
+      total: null,
+      page: config.page,
+      perPage: config.perPage,
+      hasMore: matched.length > startIndex + config.perPage,
+      items: pageMatches.map(({ scene, status }) =>
+        this.toScenesFeedItem(scene, status, isSceneStatusRequestable(status)),
+      ),
+    };
+  }
+
+  private async fetchLifecycleCandidateBatch(
+    config: {
+      stashdbConfig: { baseUrl: string; apiKey: string | null };
+      stashConfig: { baseUrl: string; apiKey: string | null } | null;
+      sort: SceneFeedSort;
+      direction: SortDirection;
+      favorites?: SceneFavoritesFilter;
+      tagIds: string[];
+      tagMode: SceneTagMatchMode;
+      studioIds: string[];
+      libraryAvailability: SceneLibraryAvailability;
+      stashFavoritePerformersOnly: boolean;
+      stashFavoriteStudiosOnly: boolean;
+      stashFavoriteTagsOnly: boolean;
+      hybridActive: boolean;
+    },
+    page: number,
+    perPage: number,
+  ): Promise<{
+    scenes: StashdbScene[];
+    hasMore: boolean;
+    forcedAvailable: boolean;
+  }> {
+    if (!config.hybridActive) {
+      const scenes = await this.stashdbAdapter.getScenesBySort({
+        ...config.stashdbConfig,
+        page,
+        perPage,
+        sort: config.sort,
+        direction: config.direction,
+        favorites: config.favorites,
+        studioIds: config.studioIds,
+        tagFilter:
+          config.tagIds.length > 0
+            ? {
+                tagIds: config.tagIds,
+                mode: config.tagMode,
+              }
+            : undefined,
+      });
+
+      return {
+        scenes: scenes.scenes,
+        hasMore: page * perPage < scenes.total,
+        forcedAvailable: false,
+      };
+    }
+
+    if (!config.stashConfig) {
+      return { scenes: [], hasMore: false, forcedAvailable: false };
+    }
+
+    const hybridFeed = await this.hybridScenesService.getHybridSceneFeed(
+      config.stashdbConfig,
+      config.stashConfig,
+      {
+        page,
+        perPage,
+        sort: config.sort,
+        direction: config.direction,
+        stashdbFavorites: config.favorites,
+        tagIds: config.tagIds,
+        tagMode: config.tagMode,
+        studioIds: config.studioIds,
+        libraryAvailability: config.libraryAvailability,
+        stashFavoritePerformersOnly: config.stashFavoritePerformersOnly,
+        stashFavoriteStudiosOnly: config.stashFavoriteStudiosOnly,
+        stashFavoriteTagsOnly: config.stashFavoriteTagsOnly,
+      },
+    );
+
+    return {
+      scenes: hybridFeed.scenes,
+      hasMore: hybridFeed.hasMore,
+      forcedAvailable: hybridFeed.effectiveAvailability === 'IN_LIBRARY',
     };
   }
 

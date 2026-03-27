@@ -128,11 +128,31 @@
           />
         </label>
       </div>
+
+      <div class="control-group">
+        <div class="control-group-head">
+          <span class="control-group-title">Acquisition Lifecycle</span>
+        </div>
+
+        <label class="control-field">
+          <span>Lifecycle Status</span>
+          <p-select
+            inputId="scenes-lifecycle"
+            [ngModel]="selectedLifecycle()"
+            (ngModelChange)="onLifecycleChanged($event)"
+            [options]="lifecycleOptions"
+            optionLabel="label"
+            optionValue="value"
+            [appendTo]="'body'"
+            panelStyleClass="scenes-filter-select-panel"
+          />
+        </label>
+      </div>
     </div>
 
     <p class="controls-note">
-      These filters stay rooted in StashDB discovery. Scene badges show Whisparr and Stash lifecycle
-      state.
+      Discovery filters come from StashDB. Lifecycle status comes from the Whisparr → Stash
+      acquisition pipeline.
     </p>
   </section>
 

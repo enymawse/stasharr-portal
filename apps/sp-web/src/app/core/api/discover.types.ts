@@ -39,6 +39,7 @@ export interface DiscoverResponse {
 }
 
 export type SceneLibraryAvailability = 'ANY' | 'IN_LIBRARY' | 'MISSING_FROM_LIBRARY';
+export type SceneLifecycleFilter = 'ANY' | SceneStatusState;
 
 export interface SceneExplorerItem extends DiscoverItem {
   requestable: boolean;

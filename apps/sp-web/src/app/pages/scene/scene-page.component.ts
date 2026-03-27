@@ -543,8 +543,8 @@ export class ScenePageComponent implements OnInit, OnDestroy {
     if (returnTo.startsWith('/scenes')) {
       return 'Back to Scenes';
     }
-    if (returnTo.startsWith('/requests')) {
-      return 'Back to Requests';
+    if (returnTo.startsWith('/acquisition')) {
+      return 'Back to Acquisition';
     }
     if (returnTo.startsWith('/performers')) {
       return 'Back to Performers';

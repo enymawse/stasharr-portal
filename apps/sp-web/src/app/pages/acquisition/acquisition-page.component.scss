@@ -1,0 +1,330 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+  color: var(--text-primary);
+  font-family: var(--app-font-family);
+}
+
+main {
+  max-width: min(1540px, 96vw);
+  margin: 0 auto;
+  padding: 1.2rem 1rem 1.5rem;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+.page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.page-head p {
+  margin-top: 0.45rem;
+  color: var(--text-muted);
+}
+
+.summary {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.filter-shell {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-pill {
+  border: 1px solid color-mix(in srgb, var(--border-strong) 60%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-elevated) 95%, #fff),
+    color-mix(in srgb, var(--surface-2) 92%, transparent)
+  );
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 0.5rem 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease,
+    background 140ms ease;
+}
+
+.filter-pill.active {
+  border-color: color-mix(in srgb, var(--focus-ring) 65%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--focus-ring) 18%, var(--surface-elevated)),
+    color-mix(in srgb, var(--focus-ring) 8%, var(--surface-2))
+  );
+}
+
+.filter-pill:hover {
+  transform: translateY(-1px);
+}
+
+.count-chip {
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.42rem;
+  border-radius: 999px;
+  background: rgb(12 22 34 / 10%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.76rem;
+}
+
+.grid {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.card {
+  border-radius: 10px;
+  overflow: hidden;
+  background: transparent;
+}
+
+.media {
+  position: relative;
+  aspect-ratio: 10 / 7;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: 0 14px 30px rgb(12 20 30 / 10%);
+}
+
+.card[data-state='FAILED'] .media {
+  box-shadow:
+    0 14px 30px rgb(96 22 22 / 18%),
+    inset 0 0 0 1px rgb(159 54 54 / 22%);
+}
+
+.card[data-state='DOWNLOADING'] .media {
+  box-shadow:
+    0 14px 30px rgb(16 63 106 / 18%),
+    inset 0 0 0 1px rgb(53 113 168 / 18%);
+}
+
+.media-link-stretch {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 10px;
+}
+
+.media-link-stretch:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnail.placeholder {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--surface-2) 90%, #fff),
+      color-mix(in srgb, var(--surface-2) 72%, #9cb4c8)
+    ),
+    radial-gradient(circle at 18% 25%, rgb(255 255 255 / 45%), transparent 55%);
+}
+
+.media-top {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  justify-content: flex-start;
+  padding: 0.6rem;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.studio-badge {
+  border: 1px solid color-mix(in srgb, var(--border-strong) 65%, transparent);
+  box-shadow:
+    0 4px 12px rgb(12 22 33 / 26%),
+    inset 0 1px 0 rgb(255 255 255 / 25%);
+  backdrop-filter: blur(7px);
+}
+
+.logo-plaque {
+  min-width: 1.8rem;
+  height: 1.16rem;
+  border-radius: 0.55rem;
+  padding: 0.12rem 0.28rem;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-elevated) 92%, #fff),
+      color-mix(in srgb, var(--surface-2) 88%, transparent)
+    ),
+    rgb(21 34 48 / 24%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-plaque img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.text-badge {
+  max-width: min(6.2rem, 40%);
+  min-width: 1.8rem;
+  height: 1.16rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.55rem;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-elevated) 92%, #fff),
+      color-mix(in srgb, var(--surface-2) 85%, transparent)
+    ),
+    rgb(17 27 38 / 52%);
+  color: var(--text-primary);
+  font-size: 0.58rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media-bottom {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 0.8rem;
+  color: #fff;
+  background: linear-gradient(
+    to top,
+    rgb(9 14 20 / 94%) 0%,
+    rgb(9 14 20 / 76%) 52%,
+    rgb(9 14 20 / 24%) 100%
+  );
+  display: grid;
+  gap: 0.38rem;
+  z-index: 3;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+:host ::ng-deep .footer-status-badge .badge {
+  padding: 0.14rem 0.52rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  box-shadow: none;
+}
+
+.media-title {
+  font-size: 1.02rem;
+  line-height: 1.2;
+  text-shadow: 0 2px 5px rgb(0 0 0 / 42%);
+}
+
+.media-date {
+  font-size: 0.72rem;
+  color: rgb(225 237 249 / 90%);
+}
+
+.helper {
+  font-size: 0.79rem;
+  line-height: 1.35;
+  color: rgb(225 237 249 / 92%);
+  max-width: 32ch;
+}
+
+.helper-failed {
+  color: rgb(255 213 205 / 96%);
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-start;
+  pointer-events: none;
+}
+
+.whisparr-link {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgb(183 211 236 / 44%);
+  background: rgb(14 31 48 / 72%);
+  color: #eff7ff;
+  text-decoration: none;
+  font-size: 0.73rem;
+  font-weight: 700;
+}
+
+.empty-state {
+  margin-top: 1.2rem;
+  color: var(--text-muted);
+}
+
+.load-sentinel {
+  height: 1px;
+}
+
+button {
+  margin-top: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--button-border);
+  background: var(--button-bg);
+  color: var(--button-text);
+  cursor: pointer;
+}
+
+.load-more-error {
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 720px) {
+  .page-head {
+    align-items: start;
+  }
+}
+
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+  }
+
+  .media {
+    aspect-ratio: 16 / 10;
+  }
+}

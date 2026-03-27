@@ -25,6 +25,7 @@ export class ScenesController {
       query.favorites,
       query.studioIds,
       query.libraryAvailability,
+      query.lifecycle,
       query.stashFavoritePerformersOnly,
       query.stashFavoriteStudiosOnly,
       query.stashFavoriteTagsOnly,
@@ -32,7 +33,9 @@ export class ScenesController {
   }
 
   @Get('tags')
-  getSceneTagOptions(@Query() query: ScenesTagsQueryDto): Promise<SceneTagOptionDto[]> {
+  getSceneTagOptions(
+    @Query() query: ScenesTagsQueryDto,
+  ): Promise<SceneTagOptionDto[]> {
     return this.scenesService.searchSceneTags(query.query);
   }
 

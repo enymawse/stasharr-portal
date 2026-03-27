@@ -909,8 +909,8 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (returnTo.startsWith('/discover')) {
       return 'Back to Discover';
     }
-    if (returnTo.startsWith('/requests')) {
-      return 'Back to Requests';
+    if (returnTo.startsWith('/acquisition')) {
+      return 'Back to Acquisition';
     }
     if (returnTo.startsWith('/performer/')) {
       return 'Back to Performer';

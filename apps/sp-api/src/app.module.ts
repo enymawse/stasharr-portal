@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AcquisitionModule } from './acquisition/acquisition.module';
 import { DiscoverModule } from './discover/discover.module';
 import { HealthModule } from './health/health.module';
 import { HomeModule } from './home/home.module';
@@ -24,6 +25,7 @@ import { StudiosModule } from './studios/studios.module';
     MediaModule,
     IntegrationsModule,
     SetupModule,
+    AcquisitionModule,
     DiscoverModule,
     ScenesModule,
     RequestsModule,

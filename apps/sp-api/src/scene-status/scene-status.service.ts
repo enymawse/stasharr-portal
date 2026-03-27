@@ -7,7 +7,10 @@ import {
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
-import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
+import {
+  WhisparrAdapter,
+  WhisparrMovieLookupResult,
+} from '../providers/whisparr/whisparr.adapter';
 import { SceneStatusDto } from './dto/scene-status.dto';
 import {
   resolveSceneStatus,
@@ -128,6 +131,26 @@ export class SceneStatusService {
   async resolveForScenes(
     stashIds: string[],
   ): Promise<Map<string, SceneStatusDto>> {
+    return this.resolveForScenesInternal(stashIds);
+  }
+
+  async resolveForScenesWithEvidence(
+    stashIds: string[],
+    evidence: {
+      queueItems?: WhisparrQueueSnapshotItem[];
+      movieByStashId?: Map<string, WhisparrMovieLookupResult>;
+    },
+  ): Promise<Map<string, SceneStatusDto>> {
+    return this.resolveForScenesInternal(stashIds, evidence);
+  }
+
+  private async resolveForScenesInternal(
+    stashIds: string[],
+    evidence?: {
+      queueItems?: WhisparrQueueSnapshotItem[];
+      movieByStashId?: Map<string, WhisparrMovieLookupResult>;
+    },
+  ): Promise<Map<string, SceneStatusDto>> {
     const normalizedIds = Array.from(
       new Set(
         stashIds
@@ -179,30 +202,66 @@ export class SceneStatusService {
       return resolvedStatuses;
     }
 
-    let queueItems: WhisparrQueueSnapshotItem[];
-    try {
-      queueItems = await this.whisparrAdapter.getQueueSnapshot(whisparrConfig);
-      this.logger.debug(
-        `resolveForScenes queue snapshot loaded once: ${this.safeJson({
-          queueCount: queueItems.length,
-          queueSample: queueItems.slice(0, 5),
-        })}`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `resolveForScenes failed to fetch Whisparr queue snapshot; returning fallback map. error=${this.safeJson(
-          this.serializeError(error),
-        )}`,
-      );
-      return resolvedStatuses;
+    let queueItems = evidence?.queueItems;
+    if (!queueItems) {
+      try {
+        queueItems =
+          await this.whisparrAdapter.getQueueSnapshot(whisparrConfig);
+        this.logger.debug(
+          `resolveForScenes queue snapshot loaded once: ${this.safeJson({
+            queueCount: queueItems.length,
+            queueSample: queueItems.slice(0, 5),
+          })}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `resolveForScenes failed to fetch Whisparr queue snapshot; returning fallback map. error=${this.safeJson(
+            this.serializeError(error),
+          )}`,
+        );
+        return resolvedStatuses;
+      }
     }
+
+    const movieByStashId =
+      evidence?.movieByStashId ??
+      (await this.lookupWhisparrMoviesForScenes(unresolvedIds, whisparrConfig));
+    const resolvedQueueItems = queueItems ?? [];
+
+    for (const stashId of unresolvedIds) {
+      resolvedStatuses.set(
+        stashId,
+        resolveSceneStatus({
+          stashId,
+          movie: movieByStashId.get(stashId) ?? null,
+          queueItems: resolvedQueueItems,
+          stashAvailable: false,
+          fallbackRequestStatus: fallbackStatuses.get(stashId) ?? null,
+        }),
+      );
+    }
+
+    this.logger.debug(
+      `resolveForScenes final resolved map: ${this.safeJson(
+        Array.from(resolvedStatuses.entries()),
+      )}`,
+    );
+
+    return resolvedStatuses;
+  }
+
+  private async lookupWhisparrMoviesForScenes(
+    stashIds: string[],
+    whisparrConfig: { baseUrl: string; apiKey: string | null },
+  ): Promise<Map<string, WhisparrMovieLookupResult>> {
+    const movieByStashId = new Map<string, WhisparrMovieLookupResult>();
 
     for (
       let i = 0;
-      i < unresolvedIds.length;
+      i < stashIds.length;
       i += SceneStatusService.WHISPARR_BATCH_SIZE
     ) {
-      const batch = unresolvedIds.slice(
+      const batch = stashIds.slice(
         i,
         i + SceneStatusService.WHISPARR_BATCH_SIZE,
       );
@@ -242,30 +301,15 @@ export class SceneStatusService {
       );
 
       for (const result of batchLookups) {
-        if (result.failed) {
+        if (result.failed || !result.movie) {
           continue;
         }
 
-        resolvedStatuses.set(
-          result.stashId,
-          resolveSceneStatus({
-            stashId: result.stashId,
-            movie: result.movie,
-            queueItems,
-            stashAvailable: false,
-            fallbackRequestStatus: fallbackStatuses.get(result.stashId) ?? null,
-          }),
-        );
+        movieByStashId.set(result.stashId, result.movie);
       }
     }
 
-    this.logger.debug(
-      `resolveForScenes final resolved map: ${this.safeJson(
-        Array.from(resolvedStatuses.entries()),
-      )}`,
-    );
-
-    return resolvedStatuses;
+    return movieByStashId;
   }
 
   private async resolveFallbackStatusForScene(
