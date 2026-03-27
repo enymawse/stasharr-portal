@@ -13,8 +13,10 @@ export interface WhisparrMovieLookupResult {
 
 export interface WhisparrQueueSnapshotItem {
   movieId: number;
+  status: string | null;
   trackedDownloadState: string | null;
   trackedDownloadStatus: string | null;
+  errorMessage: string | null;
 }
 
 export interface WhisparrRootFolderOption {
@@ -500,11 +502,15 @@ export class WhisparrAdapter {
 
     return {
       movieId,
+      status: this.readString((entry as Record<string, unknown>).status),
       trackedDownloadState: this.readString(
         (entry as Record<string, unknown>).trackedDownloadState,
       ),
       trackedDownloadStatus: this.readString(
         (entry as Record<string, unknown>).trackedDownloadStatus,
+      ),
+      errorMessage: this.readString(
+        (entry as Record<string, unknown>).errorMessage,
       ),
     };
   }

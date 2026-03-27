@@ -1,4 +1,8 @@
-import { IntegrationStatus, IntegrationType } from '@prisma/client';
+import {
+  IntegrationStatus,
+  IntegrationType,
+  RequestStatus,
+} from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
@@ -93,10 +97,22 @@ describe('SceneStatusService', () => {
     });
 
     it('returns REQUESTED when a fallback Request row exists without Whisparr evidence yet', async () => {
-      requestDelegate.findUnique.mockResolvedValue({ id: 'req-1' });
+      requestDelegate.findUnique.mockResolvedValue({
+        status: RequestStatus.REQUESTED,
+      });
 
       await expect(service.resolveForScene('scene-1')).resolves.toEqual({
         state: 'REQUESTED',
+      });
+    });
+
+    it('returns FAILED when the fallback Request row failed and no stronger live state exists', async () => {
+      requestDelegate.findUnique.mockResolvedValue({
+        status: RequestStatus.FAILED,
+      });
+
+      await expect(service.resolveForScene('scene-1')).resolves.toEqual({
+        state: 'FAILED',
       });
     });
 
@@ -112,7 +128,10 @@ describe('SceneStatusService', () => {
       });
     });
 
-    it('returns DOWNLOADING for an active Whisparr download queue item', async () => {
+    it('returns DOWNLOADING when a failed fallback row is overridden by an active Whisparr download', async () => {
+      requestDelegate.findUnique.mockResolvedValue({
+        status: RequestStatus.FAILED,
+      });
       findMovieByStashIdMock.mockResolvedValue({
         movieId: 101,
         stashId: 'scene-1',
@@ -121,8 +140,10 @@ describe('SceneStatusService', () => {
       getQueueSnapshotMock.mockResolvedValue([
         {
           movieId: 101,
+          status: 'downloading',
           trackedDownloadState: 'Downloading',
           trackedDownloadStatus: 'Ok',
+          errorMessage: null,
         },
       ]);
 
@@ -131,7 +152,34 @@ describe('SceneStatusService', () => {
       });
     });
 
-    it('returns IMPORT_PENDING when Whisparr has the file but Stash does not', async () => {
+    it('returns FAILED when Whisparr queue status reports an operational problem', async () => {
+      requestDelegate.findUnique.mockResolvedValue({
+        status: RequestStatus.REQUESTED,
+      });
+      findMovieByStashIdMock.mockResolvedValue({
+        movieId: 101,
+        stashId: 'scene-1',
+        hasFile: false,
+      });
+      getQueueSnapshotMock.mockResolvedValue([
+        {
+          movieId: 101,
+          status: 'warning',
+          trackedDownloadState: 'Downloading',
+          trackedDownloadStatus: 'Ok',
+          errorMessage: 'The download is stalled with no connections',
+        },
+      ]);
+
+      await expect(service.resolveForScene('scene-1')).resolves.toEqual({
+        state: 'FAILED',
+      });
+    });
+
+    it('returns IMPORT_PENDING when a failed fallback row is overridden by Whisparr file/import state', async () => {
+      requestDelegate.findUnique.mockResolvedValue({
+        status: RequestStatus.FAILED,
+      });
       findMovieByStashIdMock.mockResolvedValue({
         movieId: 101,
         stashId: 'scene-1',
@@ -143,7 +191,10 @@ describe('SceneStatusService', () => {
       });
     });
 
-    it('returns AVAILABLE when Stash has a linked scene copy', async () => {
+    it('returns AVAILABLE when a failed fallback row is overridden by Stash availability', async () => {
+      requestDelegate.findUnique.mockResolvedValue({
+        status: RequestStatus.FAILED,
+      });
       findScenesByStashIdMock.mockResolvedValue([
         {
           id: 'local-1',
@@ -171,7 +222,10 @@ describe('SceneStatusService', () => {
     });
 
     it('applies lifecycle precedence across fallback rows, Whisparr, and Stash', async () => {
-      requestDelegate.findMany.mockResolvedValue([{ stashId: 'scene-1' }]);
+      requestDelegate.findMany.mockResolvedValue([
+        { stashId: 'scene-1', status: RequestStatus.REQUESTED },
+        { stashId: 'scene-5', status: RequestStatus.FAILED },
+      ]);
       findScenesByStashIdMock.mockImplementation((stashId: string) =>
         Promise.resolve(
           stashId === 'scene-4'
@@ -190,8 +244,10 @@ describe('SceneStatusService', () => {
       getQueueSnapshotMock.mockResolvedValue([
         {
           movieId: 102,
+          status: 'downloading',
           trackedDownloadState: 'Downloading',
           trackedDownloadStatus: 'Ok',
+          errorMessage: null,
         },
       ]);
       findMovieByStashIdMock.mockImplementation((stashId: string) => {
@@ -209,10 +265,6 @@ describe('SceneStatusService', () => {
             stashId,
             hasFile: true,
           });
-        }
-
-        if (stashId === 'scene-5') {
-          return Promise.resolve(null);
         }
 
         return Promise.resolve(null);
@@ -236,17 +288,88 @@ describe('SceneStatusService', () => {
       expect(result.get('scene-2')).toEqual({ state: 'DOWNLOADING' });
       expect(result.get('scene-3')).toEqual({ state: 'IMPORT_PENDING' });
       expect(result.get('scene-4')).toEqual({ state: 'AVAILABLE' });
-      expect(result.get('scene-5')).toEqual({ state: 'NOT_REQUESTED' });
+      expect(result.get('scene-5')).toEqual({ state: 'FAILED' });
+    });
+
+    it('uses queue status as the batch classifier for stalled/problem downloads', async () => {
+      requestDelegate.findMany.mockResolvedValue([
+        { stashId: 'scene-1', status: RequestStatus.REQUESTED },
+      ]);
+      getQueueSnapshotMock.mockResolvedValue([
+        {
+          movieId: 201,
+          status: 'warning',
+          trackedDownloadState: 'Downloading',
+          trackedDownloadStatus: 'Ok',
+          errorMessage: 'The download is stalled with no connections',
+        },
+        {
+          movieId: 202,
+          status: 'completed',
+          trackedDownloadState: 'Downloading',
+          trackedDownloadStatus: 'Ok',
+          errorMessage: null,
+        },
+      ]);
+      findMovieByStashIdMock.mockImplementation((stashId: string) => {
+        if (stashId === 'scene-2') {
+          return Promise.resolve({
+            movieId: 201,
+            stashId,
+            hasFile: false,
+          });
+        }
+
+        if (stashId === 'scene-3') {
+          return Promise.resolve({
+            movieId: 202,
+            stashId,
+            hasFile: false,
+          });
+        }
+
+        return Promise.resolve(null);
+      });
+
+      const result = await service.resolveForScenes([
+        'scene-1',
+        'scene-2',
+        'scene-3',
+      ]);
+
+      expect(result.get('scene-1')).toEqual({ state: 'REQUESTED' });
+      expect(result.get('scene-2')).toEqual({ state: 'FAILED' });
+      expect(result.get('scene-3')).toEqual({ state: 'IMPORT_PENDING' });
     });
 
     it('keeps fallback-plus-stash resolution when Whisparr queue fetch fails', async () => {
-      requestDelegate.findMany.mockResolvedValue([{ stashId: 'scene-1' }]);
+      requestDelegate.findMany.mockResolvedValue([
+        { stashId: 'scene-1', status: RequestStatus.FAILED },
+      ]);
       getQueueSnapshotMock.mockRejectedValue(new Error('provider failed'));
 
       const result = await service.resolveForScenes(['scene-1', 'scene-2']);
 
-      expect(result.get('scene-1')).toEqual({ state: 'REQUESTED' });
+      expect(result.get('scene-1')).toEqual({ state: 'FAILED' });
       expect(result.get('scene-2')).toEqual({ state: 'NOT_REQUESTED' });
+      expect(findMovieByStashIdMock).not.toHaveBeenCalled();
+    });
+
+    it('reuses cached Stash availability results across repeated lookups within the ttl window', async () => {
+      findScenesByStashIdMock.mockResolvedValue([
+        {
+          id: 'local-1',
+          width: 1920,
+          height: 1080,
+          viewUrl: 'http://stash.local/scenes/local-1',
+          label: '1080p',
+        },
+      ]);
+
+      await service.resolveForScenes(['scene-1']);
+      await service.resolveForScenes(['scene-1']);
+
+      expect(findScenesByStashIdMock).toHaveBeenCalledTimes(1);
       expect(findMovieByStashIdMock).not.toHaveBeenCalled();
     });
   });

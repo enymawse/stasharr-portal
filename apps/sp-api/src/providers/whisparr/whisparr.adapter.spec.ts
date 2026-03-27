@@ -217,19 +217,25 @@ describe('WhisparrAdapter', () => {
             records: [
               {
                 movieId: 100,
+                status: 'downloading',
                 trackedDownloadState: 'downloading',
                 trackedDownloadStatus: 'ok',
+                errorMessage: null,
               },
               {
                 movie: { id: 101 },
+                status: 'warning',
                 trackedDownloadState: 'ImportPending',
                 trackedDownloadStatus: 'Warning',
+                errorMessage: 'The download is stalled with no connections',
               },
               {
                 movie: {},
+                status: 'completed',
                 trackedDownloadState: 'Downloading',
               },
               {
+                status: 'queued',
                 trackedDownloadState: 'Downloading',
               },
             ],
@@ -244,13 +250,17 @@ describe('WhisparrAdapter', () => {
       ).resolves.toEqual([
         {
           movieId: 100,
+          status: 'downloading',
           trackedDownloadState: 'downloading',
           trackedDownloadStatus: 'ok',
+          errorMessage: null,
         },
         {
           movieId: 101,
+          status: 'warning',
           trackedDownloadState: 'ImportPending',
           trackedDownloadStatus: 'Warning',
+          errorMessage: 'The download is stalled with no connections',
         },
       ]);
 
@@ -272,13 +282,17 @@ describe('WhisparrAdapter', () => {
               records: [
                 {
                   movieId: 200,
+                  status: 'downloading',
                   trackedDownloadState: 'downloading',
                   trackedDownloadStatus: 'ok',
+                  errorMessage: null,
                 },
                 {
                   movieId: 201,
+                  status: 'completed',
                   trackedDownloadState: 'Importing',
                   trackedDownloadStatus: 'ok',
+                  errorMessage: null,
                 },
               ],
             }),
@@ -293,8 +307,10 @@ describe('WhisparrAdapter', () => {
               records: [
                 {
                   movieId: 202,
+                  status: 'warning',
                   trackedDownloadState: 'ImportPending',
                   trackedDownloadStatus: 'ok',
+                  errorMessage: 'Temporary provider failure',
                 },
               ],
             }),
@@ -307,18 +323,24 @@ describe('WhisparrAdapter', () => {
       ).resolves.toEqual([
         {
           movieId: 200,
+          status: 'downloading',
           trackedDownloadState: 'downloading',
           trackedDownloadStatus: 'ok',
+          errorMessage: null,
         },
         {
           movieId: 201,
+          status: 'completed',
           trackedDownloadState: 'Importing',
           trackedDownloadStatus: 'ok',
+          errorMessage: null,
         },
         {
           movieId: 202,
+          status: 'warning',
           trackedDownloadState: 'ImportPending',
           trackedDownloadStatus: 'ok',
+          errorMessage: 'Temporary provider failure',
         },
       ]);
 
