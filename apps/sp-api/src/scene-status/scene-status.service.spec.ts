@@ -25,10 +25,13 @@ describe('SceneStatusService', () => {
   const getQueueSnapshotMock = jest.fn();
   const findScenesByStashIdMock = jest.fn();
   const getFreshSceneIndexRowsMock = jest.fn();
+  const canResolveUnknownScenesAsNotRequestedMock = jest.fn();
   const toSceneStatusMock = jest.fn();
 
   const indexingService = {
     getFreshSceneIndexRows: getFreshSceneIndexRowsMock,
+    canResolveUnknownScenesAsNotRequested:
+      canResolveUnknownScenesAsNotRequestedMock,
     toSceneStatus: toSceneStatusMock,
   } as unknown as IndexingService;
 
@@ -88,9 +91,12 @@ describe('SceneStatusService', () => {
     findMovieByStashIdMock.mockResolvedValue(null);
     getQueueSnapshotMock.mockResolvedValue([]);
     getFreshSceneIndexRowsMock.mockResolvedValue(new Map());
-    toSceneStatusMock.mockImplementation((row: { computedLifecycle: string }) => ({
-      state: row.computedLifecycle,
-    }));
+    canResolveUnknownScenesAsNotRequestedMock.mockResolvedValue(false);
+    toSceneStatusMock.mockImplementation(
+      (row: { computedLifecycle: string }) => ({
+        state: row.computedLifecycle,
+      }),
+    );
   });
 
   describe('resolveForScene', () => {
@@ -125,6 +131,18 @@ describe('SceneStatusService', () => {
       await expect(service.resolveForScene('scene-1')).resolves.toEqual({
         state: 'DOWNLOADING',
       });
+      expect(findScenesByStashIdMock).not.toHaveBeenCalled();
+      expect(findMovieByStashIdMock).not.toHaveBeenCalled();
+      expect(getQueueSnapshotMock).not.toHaveBeenCalled();
+    });
+
+    it('returns NOT_REQUESTED without remote fallback when the evidence index is fresh and comprehensive', async () => {
+      canResolveUnknownScenesAsNotRequestedMock.mockResolvedValue(true);
+
+      await expect(service.resolveForScene('scene-1')).resolves.toEqual({
+        state: 'NOT_REQUESTED',
+      });
+      expect(requestDelegate.findUnique).not.toHaveBeenCalled();
       expect(findScenesByStashIdMock).not.toHaveBeenCalled();
       expect(findMovieByStashIdMock).not.toHaveBeenCalled();
       expect(getQueueSnapshotMock).not.toHaveBeenCalled();
@@ -350,6 +368,34 @@ describe('SceneStatusService', () => {
         ]),
       );
       expect(findScenesByStashIdMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns NOT_REQUESTED for unresolved scenes without provider fanout when the evidence index is fresh', async () => {
+      getFreshSceneIndexRowsMock.mockResolvedValue(
+        new Map([
+          [
+            'scene-1',
+            {
+              stashId: 'scene-1',
+              computedLifecycle: 'AVAILABLE',
+            },
+          ],
+        ]),
+      );
+      canResolveUnknownScenesAsNotRequestedMock.mockResolvedValue(true);
+
+      const result = await service.resolveForScenes(['scene-1', 'scene-2']);
+
+      expect(result).toEqual(
+        new Map([
+          ['scene-1', { state: 'AVAILABLE' }],
+          ['scene-2', { state: 'NOT_REQUESTED' }],
+        ]),
+      );
+      expect(requestDelegate.findMany).not.toHaveBeenCalled();
+      expect(findScenesByStashIdMock).not.toHaveBeenCalled();
+      expect(findMovieByStashIdMock).not.toHaveBeenCalled();
+      expect(getQueueSnapshotMock).not.toHaveBeenCalled();
     });
 
     it('uses queue status as the batch classifier for stalled/problem downloads', async () => {

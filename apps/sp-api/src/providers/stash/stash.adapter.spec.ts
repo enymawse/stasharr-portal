@@ -261,9 +261,7 @@ describe('StashAdapter', () => {
                     name: 'Archive',
                     image_path: 'http://stash.local/studios/archive.jpg',
                   },
-                  files: [
-                    { width: 1920, height: 1080, duration: 1800 },
-                  ],
+                  files: [{ width: 1920, height: 1080, duration: 1800 }],
                 },
               ],
             },
@@ -315,8 +313,98 @@ describe('StashAdapter', () => {
       },
     });
     expect(body.variables.sceneFilter).toBeUndefined();
-    expect(String(body.query)).toContain('findScenes(filter: $filter, scene_filter: $sceneFilter)');
+    expect(String(body.query)).toContain(
+      'findScenes(filter: $filter, scene_filter: $sceneFilter)',
+    );
     expect(String(body.query)).toContain('paths');
+  });
+
+  it('returns paginated local scene identity snapshots for bulk stash sync', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findScenes: {
+              count: 3,
+              scenes: [
+                {
+                  id: '411',
+                  stash_ids: [
+                    {
+                      endpoint: 'https://stashdb.org/graphql',
+                      stash_id: 'scene-1',
+                    },
+                    {
+                      endpoint: '',
+                      stash_id: 'ignore-me',
+                    },
+                  ],
+                },
+                {
+                  id: '412',
+                  stash_ids: null,
+                },
+                {
+                  id: '',
+                  stash_ids: [
+                    {
+                      endpoint: 'https://stashdb.org/graphql',
+                      stash_id: 'scene-2',
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.getLocalSceneIdentityPage(
+        {
+          baseUrl: 'http://stash.local',
+          apiKey: 'secret',
+        },
+        {
+          page: 1,
+          perPage: 2,
+        },
+      ),
+    ).resolves.toEqual({
+      total: 3,
+      page: 1,
+      perPage: 2,
+      hasMore: true,
+      items: [
+        {
+          id: '411',
+          linkedStashIds: [
+            {
+              endpoint: 'https://stashdb.org/graphql',
+              stashId: 'scene-1',
+            },
+          ],
+        },
+        {
+          id: '412',
+          linkedStashIds: [],
+        },
+      ],
+    });
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    expect(typeof init?.body).toBe('string');
+    const body = JSON.parse(String(init?.body));
+    expect(body.variables).toEqual({
+      filter: {
+        page: 1,
+        per_page: 2,
+      },
+    });
+    expect(String(body.query)).toContain('stash_ids');
+    expect(String(body.query)).toContain('endpoint');
+    expect(String(body.query)).toContain('stash_id');
   });
 
   it('supports updated_at and title local scene feed sorts', async () => {

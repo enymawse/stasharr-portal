@@ -21,9 +21,11 @@ export const STASH_SCENE_FEED_SORT_VALUES = [
 export type StashSceneFeedSort = (typeof STASH_SCENE_FEED_SORT_VALUES)[number];
 
 export const STASH_SCENE_FEED_DIRECTION_VALUES = ['ASC', 'DESC'] as const;
-export type StashSceneFeedDirection = (typeof STASH_SCENE_FEED_DIRECTION_VALUES)[number];
+export type StashSceneFeedDirection =
+  (typeof STASH_SCENE_FEED_DIRECTION_VALUES)[number];
 export const STASH_SCENE_FEED_TAG_MODE_VALUES = ['OR', 'AND'] as const;
-export type StashSceneFeedTagMode = (typeof STASH_SCENE_FEED_TAG_MODE_VALUES)[number];
+export type StashSceneFeedTagMode =
+  (typeof STASH_SCENE_FEED_TAG_MODE_VALUES)[number];
 
 export interface StashLocalSceneFeedConfig {
   page: number;
@@ -37,6 +39,29 @@ export interface StashLocalSceneFeedConfig {
   favoritePerformersOnly?: boolean;
   favoriteStudiosOnly?: boolean;
   favoriteTagsOnly?: boolean;
+}
+
+export interface StashLocalSceneIdentityPageConfig {
+  page: number;
+  perPage: number;
+}
+
+export interface StashLinkedSceneStashId {
+  endpoint: string;
+  stashId: string;
+}
+
+export interface StashLocalSceneIdentityItem {
+  id: string;
+  linkedStashIds: StashLinkedSceneStashId[];
+}
+
+export interface StashLocalSceneIdentityPage {
+  total: number;
+  page: number;
+  perPage: number;
+  hasMore: boolean;
+  items: StashLocalSceneIdentityItem[];
 }
 
 export interface StashSceneMatchOverlayConfig {
@@ -90,6 +115,10 @@ interface StashLocalSceneRecord {
   title?: unknown;
   details?: unknown;
   date?: unknown;
+  stash_ids?: Array<{
+    endpoint?: unknown;
+    stash_id?: unknown;
+  }> | null;
   paths?: {
     screenshot?: unknown;
   } | null;
@@ -272,13 +301,64 @@ export class StashAdapter {
     });
 
     const scenes = payload.data?.findScenes?.scenes ?? [];
-    const total = typeof payload.data?.findScenes?.count === 'number' ? payload.data.findScenes.count : 0;
+    const total =
+      typeof payload.data?.findScenes?.count === 'number'
+        ? payload.data.findScenes.count
+        : 0;
 
     return {
       total,
       items: scenes
         .map((scene) => this.toLocalSceneFeedItem(scene, config.baseUrl))
         .filter((scene): scene is StashLocalSceneFeedItem => scene !== null),
+    };
+  }
+
+  async getLocalSceneIdentityPage(
+    config: StashAdapterBaseConfig,
+    pageConfig: StashLocalSceneIdentityPageConfig,
+  ): Promise<StashLocalSceneIdentityPage> {
+    const page = this.normalizePositiveInteger(pageConfig.page, 1);
+    const perPage = this.normalizePositiveInteger(pageConfig.perPage, 250);
+
+    const query = `
+      query FindScenes($filter: FindFilterType) {
+        findScenes(filter: $filter) {
+          count
+          scenes {
+            id
+            stash_ids {
+              endpoint
+              stash_id
+            }
+          }
+        }
+      }
+    `;
+
+    const payload = await this.executeQuery(config, query, {
+      filter: {
+        page,
+        per_page: perPage,
+      },
+    });
+
+    const scenes = payload.data?.findScenes?.scenes ?? [];
+    const total =
+      typeof payload.data?.findScenes?.count === 'number'
+        ? payload.data.findScenes.count
+        : 0;
+
+    return {
+      total,
+      page,
+      perPage,
+      hasMore: page * perPage < total,
+      items: scenes
+        .map((scene) => this.toLocalSceneIdentityItem(scene))
+        .filter(
+          (scene): scene is StashLocalSceneIdentityItem => scene !== null,
+        ),
     };
   }
 
@@ -375,8 +455,12 @@ export class StashAdapter {
       }
     `;
 
-    const payload = await this.executeQuery(config, query, { id: normalizedSceneId });
-    const screenshotUrl = this.parseAssetUrl(payload.data?.findScene?.paths?.screenshot);
+    const payload = await this.executeQuery(config, query, {
+      id: normalizedSceneId,
+    });
+    const screenshotUrl = this.parseAssetUrl(
+      payload.data?.findScene?.paths?.screenshot,
+    );
     if (!screenshotUrl) {
       return null;
     }
@@ -402,7 +486,9 @@ export class StashAdapter {
       }
     `;
 
-    const payload = await this.executeQuery(config, query, { id: normalizedStudioId });
+    const payload = await this.executeQuery(config, query, {
+      id: normalizedStudioId,
+    });
     const imageUrl = this.parseAssetUrl(payload.data?.findStudio?.image_path);
     if (!imageUrl) {
       return null;
@@ -473,7 +559,9 @@ export class StashAdapter {
     }
 
     if (!response.ok) {
-      throw new BadGatewayException(`Stash provider returned ${response.status} for media request.`);
+      throw new BadGatewayException(
+        `Stash provider returned ${response.status} for media request.`,
+      );
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
@@ -494,9 +582,10 @@ export class StashAdapter {
       return null;
     }
 
-    const title = typeof scene.title === 'string' && scene.title.trim().length > 0
-      ? scene.title.trim()
-      : `Scene #${scene.id}`;
+    const title =
+      typeof scene.title === 'string' && scene.title.trim().length > 0
+        ? scene.title.trim()
+        : `Scene #${scene.id}`;
     const description =
       typeof scene.details === 'string' && scene.details.trim().length > 0
         ? scene.details.trim()
@@ -506,15 +595,21 @@ export class StashAdapter {
         ? scene.date.trim()
         : null;
     const imageUrl =
-      scene.paths && typeof scene.paths.screenshot === 'string' && scene.paths.screenshot.trim().length > 0
+      scene.paths &&
+      typeof scene.paths.screenshot === 'string' &&
+      scene.paths.screenshot.trim().length > 0
         ? scene.paths.screenshot.trim()
         : null;
     const studioId =
-      scene.studio && typeof scene.studio.id === 'string' && scene.studio.id.trim().length > 0
+      scene.studio &&
+      typeof scene.studio.id === 'string' &&
+      scene.studio.id.trim().length > 0
         ? scene.studio.id.trim()
         : null;
     const studio =
-      scene.studio && typeof scene.studio.name === 'string' && scene.studio.name.trim().length > 0
+      scene.studio &&
+      typeof scene.studio.name === 'string' &&
+      scene.studio.name.trim().length > 0
         ? scene.studio.name.trim()
         : null;
     const studioImageUrl =
@@ -538,6 +633,42 @@ export class StashAdapter {
       releaseDate,
       duration,
       viewUrl: this.resolveSceneViewUrl(baseUrl, scene.id),
+    };
+  }
+
+  private toLocalSceneIdentityItem(
+    scene: StashLocalSceneRecord,
+  ): StashLocalSceneIdentityItem | null {
+    const id = this.normalizeOptionalString(scene.id);
+    if (!id) {
+      return null;
+    }
+
+    const linkedStashIds = Array.isArray(scene.stash_ids)
+      ? scene.stash_ids
+          .map((entry) => this.toLinkedSceneStashId(entry))
+          .filter((entry): entry is StashLinkedSceneStashId => entry !== null)
+      : [];
+
+    return {
+      id,
+      linkedStashIds,
+    };
+  }
+
+  private toLinkedSceneStashId(value: {
+    endpoint?: unknown;
+    stash_id?: unknown;
+  }): StashLinkedSceneStashId | null {
+    const endpoint = this.normalizeOptionalString(value.endpoint);
+    const stashId = this.normalizeOptionalString(value.stash_id);
+    if (!endpoint || !stashId) {
+      return null;
+    }
+
+    return {
+      endpoint,
+      stashId,
     };
   }
 
@@ -636,7 +767,9 @@ export class StashAdapter {
     return { id, name };
   }
 
-  private toStudioOptions(studios: StashStudioSearchRecord[]): StashLocalStudioOption[] {
+  private toStudioOptions(
+    studios: StashStudioSearchRecord[],
+  ): StashLocalStudioOption[] {
     const grouped = new Map<
       string,
       {
@@ -654,10 +787,16 @@ export class StashAdapter {
       }
 
       const parentId = this.normalizeOptionalString(studio.parent_studio?.id);
-      const parentName = this.normalizeOptionalString(studio.parent_studio?.name);
+      const parentName = this.normalizeOptionalString(
+        studio.parent_studio?.name,
+      );
 
       if (parentId && parentName) {
-        const group = this.getOrCreateStudioGroup(grouped, parentId, parentName);
+        const group = this.getOrCreateStudioGroup(
+          grouped,
+          parentId,
+          parentName,
+        );
         group.childStudios.set(studioId, studioName);
         continue;
       }
@@ -727,7 +866,9 @@ export class StashAdapter {
   }
 
   private normalizeOptionalString(value: unknown): string | null {
-    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+    return typeof value === 'string' && value.trim().length > 0
+      ? value.trim()
+      : null;
   }
 
   private normalizeStringArray(values: string[] | undefined): string[] {
@@ -743,7 +884,9 @@ export class StashAdapter {
   }
 
   private parseAssetUrl(value: unknown): string | null {
-    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+    return typeof value === 'string' && value.trim().length > 0
+      ? value.trim()
+      : null;
   }
 
   private resolveProtectedAssetUrl(baseUrl: string, assetUrl: string): string {
@@ -751,7 +894,9 @@ export class StashAdapter {
     const candidate = new URL(assetUrl, base);
 
     if (candidate.origin !== base.origin) {
-      throw new BadGatewayException('Stash provider returned an unexpected media URL.');
+      throw new BadGatewayException(
+        'Stash provider returned an unexpected media URL.',
+      );
     }
 
     return candidate.toString();

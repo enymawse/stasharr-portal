@@ -12,20 +12,28 @@ describe('SyncStateService', () => {
           String(left.jobName).localeCompare(String(right.jobName)),
         ),
       ),
-      findUnique: jest.fn(async ({ where }: { where: { jobName: string } }) =>
-        syncStateStore.get(where.jobName) ?? null,
+      findUnique: jest.fn(
+        async ({ where }: { where: { jobName: string } }) =>
+          syncStateStore.get(where.jobName) ?? null,
       ),
       upsert: jest.fn(
         async ({
           where,
           create,
+          update,
         }: {
           where: { jobName: string };
           create: Record<string, unknown>;
+          update?: Record<string, unknown>;
         }) => {
           const existing = syncStateStore.get(where.jobName);
           if (existing) {
-            return existing;
+            const next = {
+              ...existing,
+              ...(update ?? {}),
+            };
+            syncStateStore.set(where.jobName, next);
+            return next;
           }
 
           const next = {
@@ -67,8 +75,12 @@ describe('SyncStateService', () => {
               return leaseUntil === null;
             }
 
-            const nextLease = (condition as { leaseUntil: { lte: Date } }).leaseUntil;
-            return leaseUntil instanceof Date && leaseUntil.getTime() <= nextLease.lte.getTime();
+            const nextLease = (condition as { leaseUntil: { lte: Date } })
+              .leaseUntil;
+            return (
+              leaseUntil instanceof Date &&
+              leaseUntil.getTime() <= nextLease.lte.getTime()
+            );
           });
 
           if (!claimable) {
@@ -146,6 +158,17 @@ describe('SyncStateService', () => {
     await expect(service.listStates()).resolves.toEqual([
       expect.objectContaining({
         jobName: 'queue-sync',
+        status: SyncJobStatus.SUCCEEDED,
+      }),
+    ]);
+  });
+
+  it('records success for standalone sync markers without an acquired lease row', async () => {
+    await service.recordSuccess('request-sync');
+
+    await expect(service.listStates()).resolves.toEqual([
+      expect.objectContaining({
+        jobName: 'request-sync',
         status: SyncJobStatus.SUCCEEDED,
       }),
     ]);

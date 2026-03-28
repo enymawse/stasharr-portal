@@ -6,6 +6,7 @@ import {
   RequestStatus,
   SceneIndex,
   SceneLifecycle,
+  SyncJobStatus,
 } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -29,6 +30,7 @@ import { SyncStateService } from './sync-state.service';
 
 export const INDEXING_JOB_NAMES = {
   BOOTSTRAP: 'scene-index-bootstrap',
+  REQUEST_ROWS: 'scene-index-request-rows',
   WHISPARR_QUEUE: 'scene-index-whisparr-queue',
   WHISPARR_MOVIES: 'scene-index-whisparr-movies',
   STASH_AVAILABILITY: 'scene-index-stash-availability',
@@ -76,11 +78,12 @@ interface SyncRunSummary {
 @Injectable()
 export class IndexingService {
   private static readonly INDEX_STATUS_MAX_AGE_MS = 30 * 60_000;
-  private static readonly METADATA_REFRESH_MAX_AGE_MS =
-    7 * 24 * 60 * 60_000;
+  private static readonly REQUEST_ROWS_FRESHNESS_MAX_AGE_MS = 2 * 60_000;
+  private static readonly SNAPSHOT_FRESHNESS_MAX_AGE_MS = 15 * 60_000;
+  private static readonly METADATA_REFRESH_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
   private static readonly APPLY_PATCH_CHUNK_SIZE = 100;
   private static readonly WHISPARR_LOOKUP_BATCH_SIZE = 8;
-  private static readonly STASH_SYNC_BATCH_SIZE = 120;
+  private static readonly STASH_IDENTITY_PAGE_SIZE = 250;
   private static readonly METADATA_BATCH_SIZE = 24;
   private static readonly METADATA_QUERY_BATCH_SIZE = 8;
   private static readonly METADATA_ACCELERATED_INTERVAL_MS = 10_000;
@@ -356,32 +359,36 @@ export class IndexingService {
   }
 
   async getSyncStatus() {
-    const [jobs, totalIndexedScenes, acquisitionTrackedScenes, missingMetadata] =
-      await this.prisma.$transaction([
-        this.prisma.syncState.findMany({
-          orderBy: {
-            jobName: 'asc',
+    const [
+      jobs,
+      totalIndexedScenes,
+      acquisitionTrackedScenes,
+      missingMetadata,
+    ] = await this.prisma.$transaction([
+      this.prisma.syncState.findMany({
+        orderBy: {
+          jobName: 'asc',
+        },
+      }),
+      this.prisma.sceneIndex.count(),
+      this.prisma.sceneIndex.count({
+        where: {
+          computedLifecycle: {
+            in: ACQUISITION_LIFECYCLES,
           },
-        }),
-        this.prisma.sceneIndex.count(),
-        this.prisma.sceneIndex.count({
-          where: {
-            computedLifecycle: {
-              in: ACQUISITION_LIFECYCLES,
-            },
-          },
-        }),
-        this.prisma.sceneIndex.count({
-          where: {
-            OR: [
-              { title: null },
-              { imageUrl: null },
-              { studioName: null },
-              { metadataLastSyncedAt: null },
-            ],
-          },
-        }),
-      ]);
+        },
+      }),
+      this.prisma.sceneIndex.count({
+        where: {
+          OR: [
+            { title: null },
+            { imageUrl: null },
+            { studioName: null },
+            { metadataLastSyncedAt: null },
+          ],
+        },
+      }),
+    ]);
 
     return {
       totals: {
@@ -402,7 +409,9 @@ export class IndexingService {
     };
   }
 
-  async getSceneIndexRows(stashIds: string[]): Promise<Map<string, SceneIndex>> {
+  async getSceneIndexRows(
+    stashIds: string[],
+  ): Promise<Map<string, SceneIndex>> {
     const normalizedIds = this.normalizeStashIds(stashIds);
     if (normalizedIds.length === 0) {
       return new Map();
@@ -448,6 +457,45 @@ export class IndexingService {
     return (
       Date.now() - row.lastSyncedAt.getTime() <=
       IndexingService.INDEX_STATUS_MAX_AGE_MS
+    );
+  }
+
+  async canResolveUnknownScenesAsNotRequested(): Promise<boolean> {
+    const [hasWhisparr, hasStash, states] = await Promise.all([
+      this.isIntegrationConfigured(IntegrationType.WHISPARR),
+      this.isIntegrationConfigured(IntegrationType.STASH),
+      this.prisma.syncState.findMany({
+        where: {
+          jobName: {
+            in: [
+              INDEXING_JOB_NAMES.REQUEST_ROWS,
+              INDEXING_JOB_NAMES.WHISPARR_MOVIES,
+              INDEXING_JOB_NAMES.STASH_AVAILABILITY,
+            ],
+          },
+        },
+      }),
+    ]);
+
+    const stateByJobName = new Map(
+      states.map((state) => [state.jobName, state]),
+    );
+
+    return (
+      this.isSuccessfulSyncFresh(
+        stateByJobName.get(INDEXING_JOB_NAMES.REQUEST_ROWS) ?? null,
+        IndexingService.REQUEST_ROWS_FRESHNESS_MAX_AGE_MS,
+      ) &&
+      (!hasWhisparr ||
+        this.isSuccessfulSyncFresh(
+          stateByJobName.get(INDEXING_JOB_NAMES.WHISPARR_MOVIES) ?? null,
+          IndexingService.SNAPSHOT_FRESHNESS_MAX_AGE_MS,
+        )) &&
+      (!hasStash ||
+        this.isSuccessfulSyncFresh(
+          stateByJobName.get(INDEXING_JOB_NAMES.STASH_AVAILABILITY) ?? null,
+          IndexingService.SNAPSHOT_FRESHNESS_MAX_AGE_MS,
+        ))
     );
   }
 
@@ -592,7 +640,10 @@ export class IndexingService {
     const existingByMovieId = new Map<number, SceneIndex>();
 
     for (const row of existingRows) {
-      if (row.whisparrMovieId !== null && !existingByMovieId.has(row.whisparrMovieId)) {
+      if (
+        row.whisparrMovieId !== null &&
+        !existingByMovieId.has(row.whisparrMovieId)
+      ) {
         existingByMovieId.set(row.whisparrMovieId, row);
       }
     }
@@ -618,7 +669,9 @@ export class IndexingService {
               stashId: row.stashId,
               hasFile: row.whisparrHasFile === true,
             }
-          : null) ?? lookedUpMovies.get(movieId) ?? null;
+          : null) ??
+        lookedUpMovies.get(movieId) ??
+        null;
 
       if (!movie) {
         this.logger.warn(
@@ -729,58 +782,40 @@ export class IndexingService {
       };
     }
 
-    const candidateIds = stashIds?.length
-      ? this.normalizeStashIds(stashIds)
-      : await this.getStashSyncCandidateIds(forceFullPass);
-    if (candidateIds.length === 0) {
-      return {
-        processedCount: 0,
-        updatedCount: 0,
-      };
-    }
-
     const now = new Date();
+    const targetedIds =
+      stashIds && stashIds.length > 0 ? this.normalizeStashIds(stashIds) : null;
+    const fullReconciliation = forceFullPass || targetedIds === null;
+    const snapshot = await this.collectLocalStashIdentitySnapshot(config);
     const patches: SceneIndexPatch[] = [];
 
-    for (
-      let i = 0;
-      i < candidateIds.length;
-      i += IndexingService.WHISPARR_LOOKUP_BATCH_SIZE
-    ) {
-      const batch = candidateIds.slice(
-        i,
-        i + IndexingService.WHISPARR_LOOKUP_BATCH_SIZE,
-      );
-      const batchResults = await Promise.all(
-        batch.map(async (stashId) => {
-          try {
-            const matches = await this.stashAdapter.findScenesByStashId(
-              stashId,
-              config,
-            );
-            return {
-              stashId,
-              available: matches.length > 0,
-            };
-          } catch (error) {
-            this.logger.warn(
-              `Failed Stash availability lookup for stashId=${stashId}. error=${this.safeJson(
-                this.serializeError(error),
-              )}`,
-            );
-            return null;
-          }
-        }),
-      );
+    for (const stashId of targetedIds ?? snapshot.availableStashIds) {
+      patches.push({
+        stashId,
+        stashAvailable: snapshot.availableStashIds.has(stashId),
+        stashLastSyncedAt: now,
+        lastSyncedAt: now,
+      });
+    }
 
-      for (const result of batchResults) {
-        if (!result) {
+    if (fullReconciliation) {
+      const previouslyAvailableRows = await this.prisma.sceneIndex.findMany({
+        where: {
+          stashAvailable: true,
+        },
+        select: {
+          stashId: true,
+        },
+      });
+
+      for (const row of previouslyAvailableRows) {
+        if (snapshot.availableStashIds.has(row.stashId)) {
           continue;
         }
 
         patches.push({
-          stashId: result.stashId,
-          stashAvailable: result.available,
+          stashId: row.stashId,
+          stashAvailable: false,
           stashLastSyncedAt: now,
           lastSyncedAt: now,
         });
@@ -791,14 +826,16 @@ export class IndexingService {
     this.logger.debug(
       `Stash availability sync completed: ${this.safeJson({
         reason,
-        candidates: candidateIds.length,
+        localSceneCount: snapshot.localSceneCount,
+        indexedAvailableIds: snapshot.availableStashIds.size,
+        targetedIds: targetedIds?.length ?? null,
         updated: patches.length,
       })}`,
     );
 
     return {
-      processedCount: candidateIds.length,
-      updatedCount: patches.length,
+      processedCount: snapshot.localSceneCount,
+      updatedCount: this.mergePatchesByStashId(patches).length,
     };
   }
 
@@ -919,6 +956,7 @@ export class IndexingService {
   private async syncRequestRows(stashIds?: string[]): Promise<string[]> {
     const normalizedIds =
       stashIds && stashIds.length > 0 ? this.normalizeStashIds(stashIds) : null;
+    const isFullSync = normalizedIds === null;
     const requestRows = await this.prisma.request.findMany({
       where: normalizedIds
         ? {
@@ -934,19 +972,23 @@ export class IndexingService {
       },
     });
 
-    if (requestRows.length === 0) {
-      return [];
+    const now = new Date();
+    if (requestRows.length > 0) {
+      await this.applySceneIndexPatches(
+        requestRows.map((requestRow) => ({
+          stashId: requestRow.stashId,
+          requestStatus: requestRow.status,
+          requestUpdatedAt: requestRow.updatedAt,
+          lastSyncedAt: now,
+        })),
+      );
     }
 
-    const now = new Date();
-    await this.applySceneIndexPatches(
-      requestRows.map((requestRow) => ({
-        stashId: requestRow.stashId,
-        requestStatus: requestRow.status,
-        requestUpdatedAt: requestRow.updatedAt,
-        lastSyncedAt: now,
-      })),
-    );
+    if (isFullSync) {
+      await this.syncStateService.recordSuccess(
+        INDEXING_JOB_NAMES.REQUEST_ROWS,
+      );
+    }
 
     return requestRows.map((requestRow) => requestRow.stashId);
   }
@@ -1353,61 +1395,62 @@ export class IndexingService {
     return 4;
   }
 
-  private async getStashSyncCandidateIds(
-    forceFullPass: boolean,
-  ): Promise<string[]> {
-    if (forceFullPass) {
-      const rows = await this.prisma.sceneIndex.findMany({
-        select: {
-          stashId: true,
-        },
-        orderBy: {
-          requestUpdatedAt: 'desc',
-        },
-      });
+  private async collectLocalStashIdentitySnapshot(config: {
+    baseUrl: string;
+    apiKey: string | null;
+  }): Promise<{
+    localSceneCount: number;
+    availableStashIds: Set<string>;
+  }> {
+    const availableStashIds = new Set<string>();
+    let page = 1;
+    let localSceneCount = 0;
 
-      return rows.map((row) => row.stashId);
+    while (true) {
+      const snapshotPage = await this.stashAdapter.getLocalSceneIdentityPage(
+        config,
+        {
+          page,
+          perPage: IndexingService.STASH_IDENTITY_PAGE_SIZE,
+        },
+      );
+
+      localSceneCount += snapshotPage.items.length;
+      for (const item of snapshotPage.items) {
+        for (const linkedStashId of item.linkedStashIds) {
+          availableStashIds.add(linkedStashId.stashId);
+        }
+      }
+
+      if (!snapshotPage.hasMore || snapshotPage.items.length === 0) {
+        break;
+      }
+
+      page += 1;
     }
 
-    const availableRefreshCutoff = new Date(Date.now() - 60 * 60_000);
-    const rows = await this.prisma.sceneIndex.findMany({
-      where: {
-        OR: [
-          {
-            computedLifecycle: {
-              in: ACQUISITION_LIFECYCLES,
-            },
-          },
-          {
-            stashAvailable: true,
-            stashLastSyncedAt: {
-              lte: availableRefreshCutoff,
-            },
-          },
-          {
-            stashAvailable: true,
-            stashLastSyncedAt: null,
-          },
-        ],
-      },
-      select: {
-        stashId: true,
-      },
-      orderBy: [
-        {
-          lifecycleSortOrder: 'asc',
-        },
-        {
-          stashLastSyncedAt: 'asc',
-        },
-        {
-          stashId: 'asc',
-        },
-      ],
-      take: IndexingService.STASH_SYNC_BATCH_SIZE,
-    });
+    return {
+      localSceneCount,
+      availableStashIds,
+    };
+  }
 
-    return rows.map((row) => row.stashId);
+  private isSuccessfulSyncFresh(
+    state: {
+      status: SyncJobStatus;
+      lastSuccessAt: Date | null;
+    } | null,
+    maxAgeMs: number,
+  ): boolean {
+    if (
+      !state ||
+      state.status !== SyncJobStatus.SUCCEEDED ||
+      !state.lastSuccessAt
+    ) {
+      return false;
+    }
+
+    return Date.now() - state.lastSuccessAt.getTime() <= maxAgeMs;
   }
 
   private async getMetadataBackfillTargets(
@@ -1519,11 +1562,7 @@ export class IndexingService {
         {
           AND: [
             {
-              OR: [
-                { title: null },
-                { imageUrl: null },
-                { studioName: null },
-              ],
+              OR: [{ title: null }, { imageUrl: null }, { studioName: null }],
             },
             {
               OR: [

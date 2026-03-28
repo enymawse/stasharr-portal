@@ -61,6 +61,10 @@ export class SceneStatusService {
       return this.indexingService.toSceneStatus(indexedRow);
     }
 
+    if (await this.indexingService.canResolveUnknownScenesAsNotRequested()) {
+      return SceneStatusService.NOT_REQUESTED;
+    }
+
     const [fallbackRequestStatus, stashConfig, whisparrConfig] =
       await Promise.all([
         this.resolveFallbackStatusForScene(normalized),
@@ -174,9 +178,8 @@ export class SceneStatusService {
       return new Map();
     }
 
-    const indexedRows = await this.indexingService.getFreshSceneIndexRows(
-      normalizedIds,
-    );
+    const indexedRows =
+      await this.indexingService.getFreshSceneIndexRows(normalizedIds);
     if (indexedRows.size === normalizedIds.length) {
       return this.mergeResolvedStatuses(normalizedIds, indexedRows, new Map());
     }
@@ -184,6 +187,23 @@ export class SceneStatusService {
     const unresolvedIds = normalizedIds.filter(
       (stashId) => !indexedRows.has(stashId),
     );
+    if (unresolvedIds.length === 0) {
+      return this.mergeResolvedStatuses(normalizedIds, indexedRows, new Map());
+    }
+
+    if (await this.indexingService.canResolveUnknownScenesAsNotRequested()) {
+      return this.mergeResolvedStatuses(
+        normalizedIds,
+        indexedRows,
+        new Map(
+          unresolvedIds.map((stashId) => [
+            stashId,
+            SceneStatusService.NOT_REQUESTED,
+          ]),
+        ),
+      );
+    }
+
     const [fallbackStatuses, stashConfig, whisparrConfig] = await Promise.all([
       this.resolveFallbackStatusesForScenes(unresolvedIds),
       this.getStashConfig(),
@@ -283,7 +303,11 @@ export class SceneStatusService {
       )}`,
     );
 
-    return this.mergeResolvedStatuses(normalizedIds, indexedRows, resolvedStatuses);
+    return this.mergeResolvedStatuses(
+      normalizedIds,
+      indexedRows,
+      resolvedStatuses,
+    );
   }
 
   private mergeResolvedStatuses(

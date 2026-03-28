@@ -81,10 +81,11 @@ export class SyncStateService {
     });
   }
 
-  async markSuccess(
-    jobName: string,
-    cursor?: string | null,
-  ): Promise<void> {
+  async markSuccess(jobName: string, cursor?: string | null): Promise<void> {
+    await this.recordSuccess(jobName, cursor);
+  }
+
+  async recordSuccess(jobName: string, cursor?: string | null): Promise<void> {
     const now = new Date();
     const data: Prisma.SyncStateUpdateInput = {
       status: SyncJobStatus.SUCCEEDED,
@@ -98,9 +99,24 @@ export class SyncStateService {
       data.cursor = cursor;
     }
 
-    await this.prisma.syncState.update({
+    const create: Prisma.SyncStateCreateInput = {
+      jobName,
+      status: SyncJobStatus.SUCCEEDED,
+      startedAt: null,
+      finishedAt: now,
+      leaseUntil: null,
+      lastError: null,
+      lastSuccessAt: now,
+    };
+
+    if (cursor !== undefined) {
+      create.cursor = cursor;
+    }
+
+    await this.prisma.syncState.upsert({
       where: { jobName },
-      data,
+      create,
+      update: data,
     });
   }
 
