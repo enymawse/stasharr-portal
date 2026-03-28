@@ -45,6 +45,10 @@ describe('SyncStateService', () => {
             cursor: null,
             lastError: null,
             lastSuccessAt: null,
+            lastDurationMs: null,
+            lastProcessedCount: null,
+            lastUpdatedCount: null,
+            lastRunReason: null,
             createdAt: new Date('2026-03-27T00:00:00.000Z'),
             updatedAt: new Date('2026-03-27T00:00:00.000Z'),
             ...create,
@@ -164,12 +168,49 @@ describe('SyncStateService', () => {
   });
 
   it('records success for standalone sync markers without an acquired lease row', async () => {
-    await service.recordSuccess('request-sync');
+    await service.recordSuccess('request-sync', {
+      processedCount: 4,
+      updatedCount: 2,
+      durationMs: 150,
+      runReason: 'manual',
+    });
 
     await expect(service.listStates()).resolves.toEqual([
       expect.objectContaining({
         jobName: 'request-sync',
         status: SyncJobStatus.SUCCEEDED,
+        lastProcessedCount: 4,
+        lastUpdatedCount: 2,
+        lastDurationMs: 150,
+        lastRunReason: 'manual',
+      }),
+    ]);
+  });
+
+  it('records duration, counts, and reason from leased runs', async () => {
+    await service.runWithLease(
+      {
+        jobName: 'movie-sync',
+        leaseMs: 60_000,
+        onSuccess: (_result, context) => ({
+          processedCount: 10,
+          updatedCount: 3,
+          durationMs: context.durationMs,
+          runReason: 'interval',
+          cursor: 'scene-10',
+        }),
+      },
+      async () => 'ok',
+    );
+
+    await expect(service.listStates()).resolves.toEqual([
+      expect.objectContaining({
+        jobName: 'movie-sync',
+        status: SyncJobStatus.SUCCEEDED,
+        lastProcessedCount: 10,
+        lastUpdatedCount: 3,
+        lastRunReason: 'interval',
+        cursor: 'scene-10',
       }),
     ]);
   });

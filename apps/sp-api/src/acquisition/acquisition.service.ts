@@ -2,11 +2,13 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
   IntegrationStatus,
   IntegrationType,
+  MetadataHydrationState,
   Prisma,
   SceneIndex,
   SceneLifecycle,
@@ -36,6 +38,7 @@ export class AcquisitionService {
     SceneLifecycle.IMPORT_PENDING,
     SceneLifecycle.FAILED,
   ];
+  private readonly logger = new Logger(AcquisitionService.name);
 
   constructor(
     private readonly indexingService: IndexingService,
@@ -49,8 +52,9 @@ export class AcquisitionService {
     perPage = AcquisitionService.DEFAULT_PER_PAGE,
     lifecycle: AcquisitionLifecycleFilter = 'ANY',
   ): Promise<AcquisitionScenesFeedDto> {
+    const startedAt = Date.now();
     const where = this.buildWhereClause(lifecycle);
-    const [rows, total, countsByLifecycle, whisparrConfig] = await Promise.all([
+    const [rows, summary, whisparrConfig] = await Promise.all([
       this.prisma.sceneIndex.findMany({
         where,
         orderBy: [
@@ -73,10 +77,14 @@ export class AcquisitionService {
         skip: (page - 1) * perPage,
         take: perPage,
       }),
-      this.prisma.sceneIndex.count({ where }),
-      this.getCountsByLifecycle(),
+      this.indexingService.getSceneIndexSummary(),
       this.getWhisparrConfig(),
     ]);
+    const countsByLifecycle = this.toCountsByLifecycle(summary);
+    const total =
+      lifecycle === 'ANY'
+        ? summary.acquisitionTrackedScenes
+        : this.getLifecycleTotal(countsByLifecycle, lifecycle);
 
     const missingMetadataIds = rows
       .filter((row) => this.needsMetadataHydration(row))
@@ -87,6 +95,17 @@ export class AcquisitionService {
         'acquisition-page',
       );
     }
+
+    this.logger.debug(
+      `Acquisition feed served from summary: ${JSON.stringify({
+        page,
+        perPage,
+        lifecycle,
+        total,
+        rowCount: rows.length,
+        durationMs: Date.now() - startedAt,
+      })}`,
+    );
 
     return {
       total,
@@ -100,37 +119,25 @@ export class AcquisitionService {
     };
   }
 
-  private async getCountsByLifecycle(): Promise<AcquisitionCountsByLifecycleDto> {
-    const [requested, downloading, importPending, failed] =
-      await this.prisma.$transaction([
-        this.prisma.sceneIndex.count({
-          where: {
-            computedLifecycle: SceneLifecycle.REQUESTED,
-          },
-        }),
-        this.prisma.sceneIndex.count({
-          where: {
-            computedLifecycle: SceneLifecycle.DOWNLOADING,
-          },
-        }),
-        this.prisma.sceneIndex.count({
-          where: {
-            computedLifecycle: SceneLifecycle.IMPORT_PENDING,
-          },
-        }),
-        this.prisma.sceneIndex.count({
-          where: {
-            computedLifecycle: SceneLifecycle.FAILED,
-          },
-        }),
-      ]);
-
+  private toCountsByLifecycle(summary: {
+    requestedCount: number;
+    downloadingCount: number;
+    importPendingCount: number;
+    failedCount: number;
+  }): AcquisitionCountsByLifecycleDto {
     return {
-      REQUESTED: requested,
-      DOWNLOADING: downloading,
-      IMPORT_PENDING: importPending,
-      FAILED: failed,
+      REQUESTED: summary.requestedCount,
+      DOWNLOADING: summary.downloadingCount,
+      IMPORT_PENDING: summary.importPendingCount,
+      FAILED: summary.failedCount,
     };
+  }
+
+  private getLifecycleTotal(
+    countsByLifecycle: AcquisitionCountsByLifecycleDto,
+    lifecycle: AcquisitionLifecycle,
+  ): number {
+    return countsByLifecycle[lifecycle];
   }
 
   private buildWhereClause(
@@ -150,7 +157,21 @@ export class AcquisitionService {
   }
 
   private needsMetadataHydration(row: SceneIndex): boolean {
-    return !row.title || !row.metadataLastSyncedAt;
+    if (row.metadataHydrationState === MetadataHydrationState.PENDING) {
+      return true;
+    }
+
+    if (
+      row.metadataHydrationState !== MetadataHydrationState.FAILED_RETRYABLE
+    ) {
+      return false;
+    }
+
+    if (!row.metadataRetryAfterAt) {
+      return true;
+    }
+
+    return row.metadataRetryAfterAt.getTime() <= Date.now();
   }
 
   private toAcquisitionItem(

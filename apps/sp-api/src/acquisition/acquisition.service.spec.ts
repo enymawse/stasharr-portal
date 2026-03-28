@@ -1,4 +1,8 @@
-import { IntegrationStatus, IntegrationType } from '@prisma/client';
+import {
+  IntegrationStatus,
+  IntegrationType,
+  MetadataHydrationState,
+} from '@prisma/client';
 import { IndexingService } from '../indexing/indexing.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -27,7 +31,9 @@ function buildIndexedRow(overrides: Record<string, unknown> = {}) {
     stashAvailable: false,
     computedLifecycle: 'DOWNLOADING',
     lifecycleSortOrder: 1,
+    metadataHydrationState: MetadataHydrationState.HYDRATED,
     metadataLastSyncedAt: new Date('2026-03-10T00:00:00.000Z'),
+    metadataRetryAfterAt: null,
     whisparrLastSyncedAt: new Date('2026-03-10T00:00:00.000Z'),
     stashLastSyncedAt: new Date('2026-03-10T00:00:00.000Z'),
     lastSyncedAt: new Date('2026-03-10T00:00:00.000Z'),
@@ -42,12 +48,13 @@ describe('AcquisitionService', () => {
   const buildSceneViewUrlMock = jest.fn();
   const requestMetadataHydrationForStashIdsMock = jest.fn();
   const toSceneStatusMock = jest.fn();
+  const getSceneIndexSummaryMock = jest.fn();
   const sceneIndexFindManyMock = jest.fn();
-  const sceneIndexCountMock = jest.fn();
-  const transactionMock = jest.fn();
 
   const indexingService = {
-    requestMetadataHydrationForStashIds: requestMetadataHydrationForStashIdsMock,
+    requestMetadataHydrationForStashIds:
+      requestMetadataHydrationForStashIdsMock,
+    getSceneIndexSummary: getSceneIndexSummaryMock,
     toSceneStatus: toSceneStatusMock,
   } as unknown as IndexingService;
 
@@ -62,9 +69,7 @@ describe('AcquisitionService', () => {
   const prismaService = {
     sceneIndex: {
       findMany: sceneIndexFindManyMock,
-      count: sceneIndexCountMock,
     },
-    $transaction: transactionMock,
   } as unknown as PrismaService;
 
   const configuredWhisparrIntegration = {
@@ -89,11 +94,10 @@ describe('AcquisitionService', () => {
     buildSceneViewUrlMock.mockImplementation(
       (baseUrl: string, movieId: number) => `${baseUrl}/movie/${movieId}`,
     );
-    toSceneStatusMock.mockImplementation((row: { computedLifecycle: string }) => ({
-      state: row.computedLifecycle,
-    }));
-    transactionMock.mockImplementation((operations: Array<Promise<unknown>>) =>
-      Promise.all(operations),
+    toSceneStatusMock.mockImplementation(
+      (row: { computedLifecycle: string }) => ({
+        state: row.computedLifecycle,
+      }),
     );
     findOneMock.mockImplementation((type: IntegrationType) => {
       if (type === IntegrationType.WHISPARR) {
@@ -102,36 +106,17 @@ describe('AcquisitionService', () => {
 
       throw new Error(`Unexpected integration type: ${type}`);
     });
-
-    sceneIndexCountMock.mockImplementation(
-      (args?: { where?: { computedLifecycle?: unknown } }) => {
-        const lifecycle = args?.where?.computedLifecycle;
-        if (!lifecycle) {
-          return Promise.resolve(4);
-        }
-
-        if (typeof lifecycle === 'string') {
-          return Promise.resolve(
-            lifecycle === 'REQUESTED' ||
-              lifecycle === 'DOWNLOADING' ||
-              lifecycle === 'IMPORT_PENDING' ||
-              lifecycle === 'FAILED'
-              ? 1
-              : 0,
-          );
-        }
-
-        if (
-          lifecycle &&
-          typeof lifecycle === 'object' &&
-          Array.isArray((lifecycle as { in?: unknown[] }).in)
-        ) {
-          return Promise.resolve(4);
-        }
-
-        return Promise.resolve(0);
-      },
-    );
+    getSceneIndexSummaryMock.mockResolvedValue({
+      indexedScenes: 10,
+      acquisitionTrackedScenes: 4,
+      requestedCount: 1,
+      downloadingCount: 1,
+      importPendingCount: 1,
+      failedCount: 1,
+      metadataPendingCount: 0,
+      metadataRetryableCount: 0,
+      lastIndexWriteAt: new Date('2026-03-10T00:00:00.000Z'),
+    });
 
     sceneIndexFindManyMock.mockResolvedValue([
       buildIndexedRow({
@@ -182,6 +167,7 @@ describe('AcquisitionService', () => {
         take: 2,
       }),
     );
+    expect(getSceneIndexSummaryMock).toHaveBeenCalledTimes(1);
     expect(requestMetadataHydrationForStashIdsMock).not.toHaveBeenCalled();
   });
 
@@ -199,24 +185,17 @@ describe('AcquisitionService', () => {
           computedLifecycle: lifecycle,
         }),
       ]);
-      sceneIndexCountMock.mockImplementation(
-        (args?: { where?: { computedLifecycle?: unknown } }) => {
-          const filter = args?.where?.computedLifecycle;
-          if (filter === lifecycle) {
-            return Promise.resolve(expectedTotal);
-          }
-
-          if (
-            filter &&
-            typeof filter === 'object' &&
-            Array.isArray((filter as { in?: unknown[] }).in)
-          ) {
-            return Promise.resolve(4);
-          }
-
-          return Promise.resolve(1);
-        },
-      );
+      getSceneIndexSummaryMock.mockResolvedValue({
+        indexedScenes: 10,
+        acquisitionTrackedScenes: 4,
+        requestedCount: lifecycle === 'REQUESTED' ? expectedTotal : 1,
+        downloadingCount: lifecycle === 'DOWNLOADING' ? expectedTotal : 1,
+        importPendingCount: lifecycle === 'IMPORT_PENDING' ? expectedTotal : 1,
+        failedCount: lifecycle === 'FAILED' ? expectedTotal : 1,
+        metadataPendingCount: 0,
+        metadataRetryableCount: 0,
+        lastIndexWriteAt: new Date('2026-03-10T00:00:00.000Z'),
+      });
 
       const result = await service.getScenesFeed(1, 25, lifecycle);
 
@@ -238,27 +217,23 @@ describe('AcquisitionService', () => {
       buildIndexedRow({
         stashId: 'scene-missing-metadata',
         title: null,
+        metadataHydrationState: MetadataHydrationState.PENDING,
         metadataLastSyncedAt: null,
         computedLifecycle: 'REQUESTED',
         whisparrMovieId: 99,
       }),
     ]);
-    sceneIndexCountMock.mockImplementation(
-      (args?: { where?: { computedLifecycle?: unknown } }) => {
-        const filter = args?.where?.computedLifecycle;
-        if (filter === 'REQUESTED') {
-          return Promise.resolve(1);
-        }
-        if (
-          filter &&
-          typeof filter === 'object' &&
-          Array.isArray((filter as { in?: unknown[] }).in)
-        ) {
-          return Promise.resolve(1);
-        }
-        return Promise.resolve(0);
-      },
-    );
+    getSceneIndexSummaryMock.mockResolvedValue({
+      indexedScenes: 10,
+      acquisitionTrackedScenes: 1,
+      requestedCount: 1,
+      downloadingCount: 0,
+      importPendingCount: 0,
+      failedCount: 0,
+      metadataPendingCount: 1,
+      metadataRetryableCount: 0,
+      lastIndexWriteAt: new Date('2026-03-10T00:00:00.000Z'),
+    });
 
     const result = await service.getScenesFeed(1, 25, 'REQUESTED');
 

@@ -2,6 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, SyncJobStatus, SyncState } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
+export interface SyncStateSuccessInput {
+  cursor?: string | null;
+  processedCount?: number | null;
+  updatedCount?: number | null;
+  durationMs?: number | null;
+  runReason?: string | null;
+}
+
 @Injectable()
 export class SyncStateService {
   private readonly logger = new Logger(SyncStateService.name);
@@ -12,7 +20,12 @@ export class SyncStateService {
     config: {
       jobName: string;
       leaseMs: number;
-      onSuccessCursor?: (result: T) => string | null | undefined;
+      onSuccess?: (
+        result: T,
+        context: {
+          durationMs: number;
+        },
+      ) => SyncStateSuccessInput;
     },
     handler: () => Promise<T>,
   ): Promise<T | null> {
@@ -22,12 +35,15 @@ export class SyncStateService {
       return null;
     }
 
+    const startedAt = Date.now();
+
     try {
       const result = await handler();
-      await this.markSuccess(
-        config.jobName,
-        config.onSuccessCursor?.(result) ?? undefined,
-      );
+      const durationMs = Date.now() - startedAt;
+      await this.markSuccess(config.jobName, {
+        durationMs,
+        ...(config.onSuccess?.(result, { durationMs }) ?? {}),
+      });
       return result;
     } catch (error) {
       await this.markFailure(config.jobName, error);
@@ -81,11 +97,17 @@ export class SyncStateService {
     });
   }
 
-  async markSuccess(jobName: string, cursor?: string | null): Promise<void> {
-    await this.recordSuccess(jobName, cursor);
+  async markSuccess(
+    jobName: string,
+    input?: SyncStateSuccessInput,
+  ): Promise<void> {
+    await this.recordSuccess(jobName, input);
   }
 
-  async recordSuccess(jobName: string, cursor?: string | null): Promise<void> {
+  async recordSuccess(
+    jobName: string,
+    input?: SyncStateSuccessInput,
+  ): Promise<void> {
     const now = new Date();
     const data: Prisma.SyncStateUpdateInput = {
       status: SyncJobStatus.SUCCEEDED,
@@ -95,8 +117,20 @@ export class SyncStateService {
       lastError: null,
     };
 
-    if (cursor !== undefined) {
-      data.cursor = cursor;
+    if (input?.cursor !== undefined) {
+      data.cursor = input.cursor;
+    }
+    if (input?.processedCount !== undefined) {
+      data.lastProcessedCount = input.processedCount;
+    }
+    if (input?.updatedCount !== undefined) {
+      data.lastUpdatedCount = input.updatedCount;
+    }
+    if (input?.durationMs !== undefined) {
+      data.lastDurationMs = input.durationMs;
+    }
+    if (input?.runReason !== undefined) {
+      data.lastRunReason = input.runReason;
     }
 
     const create: Prisma.SyncStateCreateInput = {
@@ -107,10 +141,14 @@ export class SyncStateService {
       leaseUntil: null,
       lastError: null,
       lastSuccessAt: now,
+      lastProcessedCount: input?.processedCount ?? null,
+      lastUpdatedCount: input?.updatedCount ?? null,
+      lastDurationMs: input?.durationMs ?? null,
+      lastRunReason: input?.runReason ?? null,
     };
 
-    if (cursor !== undefined) {
-      create.cursor = cursor;
+    if (input?.cursor !== undefined) {
+      create.cursor = input.cursor;
     }
 
     await this.prisma.syncState.upsert({

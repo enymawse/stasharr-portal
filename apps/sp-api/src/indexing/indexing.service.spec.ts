@@ -1,6 +1,7 @@
 import {
   IntegrationStatus,
   IntegrationType,
+  MetadataHydrationState,
   RequestStatus,
   SyncJobStatus,
 } from '@prisma/client';
@@ -39,7 +40,9 @@ function buildSceneIndexRow(
     stashAvailable: null,
     computedLifecycle: 'NOT_REQUESTED',
     lifecycleSortOrder: 100,
+    metadataHydrationState: MetadataHydrationState.PENDING,
     metadataLastSyncedAt: null,
+    metadataRetryAfterAt: null,
     whisparrLastSyncedAt: null,
     stashLastSyncedAt: null,
     lastSyncedAt: null,
@@ -181,6 +184,7 @@ function createPrismaMock(config: {
   }>;
   syncStateRow?: Record<string, unknown> | null;
   syncStateRows?: Array<Record<string, unknown>>;
+  sceneIndexSummaryRow?: Record<string, unknown> | null;
 }) {
   const sceneIndexStore = new Map<string, SceneIndexRow>(
     (config.sceneIndexRows ?? []).map((row) => [String(row.stashId), row]),
@@ -197,6 +201,28 @@ function createPrismaMock(config: {
     syncStateStore.set(jobName, {
       jobName,
       ...config.syncStateRow,
+    });
+  }
+
+  const sceneIndexSummaryStore = new Map<string, Record<string, unknown>>();
+  if (config.sceneIndexSummaryRow) {
+    const key = config.sceneIndexSummaryRow.key
+      ? String(config.sceneIndexSummaryRow.key)
+      : 'GLOBAL';
+    sceneIndexSummaryStore.set(key, {
+      key,
+      indexedScenes: 0,
+      acquisitionTrackedScenes: 0,
+      requestedCount: 0,
+      downloadingCount: 0,
+      importPendingCount: 0,
+      failedCount: 0,
+      metadataPendingCount: 0,
+      metadataRetryableCount: 0,
+      lastIndexWriteAt: null,
+      createdAt: new Date('2026-03-27T00:00:00.000Z'),
+      updatedAt: new Date('2026-03-27T00:00:00.000Z'),
+      ...config.sceneIndexSummaryRow,
     });
   }
 
@@ -224,6 +250,26 @@ function createPrismaMock(config: {
       return Array.from(sceneIndexStore.values()).filter((row) =>
         matchesWhere(row, args?.where as Record<string, unknown> | undefined),
       ).length;
+    }),
+    findFirst: jest.fn(async (args?: Record<string, unknown>) => {
+      const filtered = Array.from(sceneIndexStore.values()).filter((row) =>
+        matchesWhere(row, args?.where as Record<string, unknown> | undefined),
+      );
+      const ordered = sortRows(
+        filtered,
+        args?.orderBy as Record<string, 'asc' | 'desc'> | undefined,
+      );
+      const first = ordered[0];
+      if (!first) {
+        return null;
+      }
+
+      return (
+        applySelect(
+          [first],
+          args?.select as Record<string, boolean> | undefined,
+        )[0] ?? null
+      );
     }),
     upsert: jest.fn(
       (args: {
@@ -285,9 +331,74 @@ function createPrismaMock(config: {
     }),
   };
 
+  const sceneIndexSummary = {
+    findUnique: jest.fn(async (args?: { where?: { key?: string } }) => {
+      const key = args?.where?.key;
+      if (!key) {
+        return null;
+      }
+
+      return sceneIndexSummaryStore.get(key) ?? null;
+    }),
+    update: jest.fn(
+      (args: { where: { key: string }; data: Record<string, unknown> }) =>
+        async () => {
+          const existing = sceneIndexSummaryStore.get(args.where.key);
+          if (!existing) {
+            throw new Error(`Missing scene index summary: ${args.where.key}`);
+          }
+
+          const next = {
+            ...existing,
+            ...Object.fromEntries(
+              Object.entries(args.data).map(([field, value]) => {
+                if (
+                  value &&
+                  typeof value === 'object' &&
+                  !Array.isArray(value) &&
+                  Object.prototype.hasOwnProperty.call(value, 'increment')
+                ) {
+                  return [
+                    field,
+                    Number(existing[field] ?? 0) +
+                      Number((value as { increment?: number }).increment ?? 0),
+                  ];
+                }
+
+                return [field, value];
+              }),
+            ),
+          };
+          sceneIndexSummaryStore.set(args.where.key, next);
+          return next;
+        },
+    ),
+    upsert: jest.fn(
+      async (args: {
+        where: { key: string };
+        create: Record<string, unknown>;
+        update: Record<string, unknown>;
+      }) => {
+        const existing = sceneIndexSummaryStore.get(args.where.key);
+        const next = existing
+          ? {
+              ...existing,
+              ...args.update,
+            }
+          : {
+              key: args.where.key,
+              ...args.create,
+            };
+        sceneIndexSummaryStore.set(args.where.key, next);
+        return next;
+      },
+    ),
+  };
+
   return {
     prisma: {
       sceneIndex,
+      sceneIndexSummary,
       request,
       syncState,
       $transaction: jest.fn(async (operations: TransactionOperation[]) =>
@@ -299,6 +410,7 @@ function createPrismaMock(config: {
       ),
     } as unknown as PrismaService,
     sceneIndexStore,
+    sceneIndexSummaryStore,
   };
 }
 
@@ -306,7 +418,9 @@ describe('IndexingService', () => {
   const findOneMock = jest.fn();
   const getMovieSnapshotMock = jest.fn();
   const getQueueSnapshotMock = jest.fn();
+  const findMovieByStashIdMock = jest.fn();
   const findMovieByIdMock = jest.fn();
+  const findScenesByStashIdMock = jest.fn();
   const getLocalSceneIdentityPageMock = jest.fn();
   const getSceneMetadataByIdsMock = jest.fn();
   const runWithLeaseMock = jest.fn();
@@ -319,10 +433,12 @@ describe('IndexingService', () => {
   const whisparrAdapter = {
     getMovieSnapshot: getMovieSnapshotMock,
     getQueueSnapshot: getQueueSnapshotMock,
+    findMovieByStashId: findMovieByStashIdMock,
     findMovieById: findMovieByIdMock,
   } as unknown as WhisparrAdapter;
 
   const stashAdapter = {
+    findScenesByStashId: findScenesByStashIdMock,
     getLocalSceneIdentityPage: getLocalSceneIdentityPageMock,
   } as unknown as StashAdapter;
 
@@ -378,7 +494,9 @@ describe('IndexingService', () => {
     });
     getMovieSnapshotMock.mockResolvedValue([]);
     getQueueSnapshotMock.mockResolvedValue([]);
+    findMovieByStashIdMock.mockResolvedValue(null);
     findMovieByIdMock.mockResolvedValue(null);
+    findScenesByStashIdMock.mockResolvedValue([]);
     recordSuccessMock.mockResolvedValue(undefined);
     getLocalSceneIdentityPageMock.mockResolvedValue({
       total: 0,
@@ -641,6 +759,17 @@ describe('IndexingService', () => {
           lifecycleSortOrder: 3,
         }),
       ],
+      sceneIndexSummaryRow: {
+        key: 'GLOBAL',
+        indexedScenes: 1,
+        acquisitionTrackedScenes: 1,
+        requestedCount: 1,
+        downloadingCount: 0,
+        importPendingCount: 0,
+        failedCount: 0,
+        metadataPendingCount: 1,
+        metadataRetryableCount: 0,
+      },
     });
     const transactionMock = prisma.$transaction as jest.Mock;
     const executeTransaction = transactionMock.getMockImplementation();
@@ -746,7 +875,7 @@ describe('IndexingService', () => {
         {
           jobName: INDEXING_JOB_NAMES.STASH_AVAILABILITY,
           status: SyncJobStatus.SUCCEEDED,
-          lastSuccessAt: new Date(now - 16 * 60_000),
+          lastSuccessAt: new Date(now - 21 * 60_000),
         },
       ],
     });
@@ -761,6 +890,156 @@ describe('IndexingService', () => {
 
     await expect(service.canResolveUnknownScenesAsNotRequested()).resolves.toBe(
       false,
+    );
+  });
+
+  it('uses targeted provider lookups for immediate refresh without triggering broad snapshots', async () => {
+    const { prisma, sceneIndexStore } = createPrismaMock({
+      sceneIndexRows: [
+        buildSceneIndexRow({
+          stashId: 'scene-1',
+          requestStatus: RequestStatus.REQUESTED,
+          computedLifecycle: 'REQUESTED',
+          lifecycleSortOrder: 3,
+        }),
+      ],
+      requestRows: [
+        {
+          stashId: 'scene-1',
+          status: RequestStatus.REQUESTED,
+          updatedAt: new Date('2026-03-27T00:00:00.000Z'),
+        },
+      ],
+    });
+    findMovieByStashIdMock.mockResolvedValue({
+      movieId: 77,
+      stashId: 'scene-1',
+      hasFile: false,
+    });
+    findScenesByStashIdMock.mockResolvedValue([
+      {
+        id: 'local-1',
+      },
+    ]);
+
+    const service = new IndexingService(
+      prisma,
+      integrationsService,
+      whisparrAdapter,
+      stashAdapter,
+      stashdbAdapter,
+      syncStateService,
+    );
+
+    await service.requestImmediateRefresh(['scene-1'], 'request-submitted');
+
+    expect(findMovieByStashIdMock).toHaveBeenCalledWith(
+      'scene-1',
+      expect.objectContaining({
+        baseUrl: 'http://whisparr.local',
+      }),
+    );
+    expect(findScenesByStashIdMock).toHaveBeenCalledWith(
+      'scene-1',
+      expect.objectContaining({
+        baseUrl: 'http://stash.local',
+      }),
+    );
+    expect(getQueueSnapshotMock).not.toHaveBeenCalled();
+    expect(getMovieSnapshotMock).not.toHaveBeenCalled();
+    expect(getLocalSceneIdentityPageMock).not.toHaveBeenCalled();
+    expect(sceneIndexStore.get('scene-1')).toEqual(
+      expect.objectContaining({
+        whisparrMovieId: 77,
+        stashAvailable: true,
+      }),
+    );
+  });
+
+  it('exposes persisted sync metrics and freshness details in indexing status', async () => {
+    const now = Date.now();
+    const { prisma } = createPrismaMock({
+      syncStateRows: [
+        {
+          jobName: INDEXING_JOB_NAMES.REQUEST_ROWS,
+          status: SyncJobStatus.SUCCEEDED,
+          lastSuccessAt: new Date(now - 30_000),
+          lastDurationMs: 120,
+          lastProcessedCount: 3,
+          lastUpdatedCount: 3,
+          lastRunReason: 'request-sync',
+        },
+        {
+          jobName: INDEXING_JOB_NAMES.WHISPARR_MOVIES,
+          status: SyncJobStatus.SUCCEEDED,
+          lastSuccessAt: new Date(now - 2 * 60_000),
+          lastDurationMs: 1_500,
+          lastProcessedCount: 40,
+          lastUpdatedCount: 12,
+          lastRunReason: 'interval',
+        },
+        {
+          jobName: INDEXING_JOB_NAMES.STASH_AVAILABILITY,
+          status: SyncJobStatus.SUCCEEDED,
+          lastSuccessAt: new Date(now - 2 * 60_000),
+          lastDurationMs: 900,
+          lastProcessedCount: 50,
+          lastUpdatedCount: 8,
+          lastRunReason: 'interval',
+        },
+      ],
+      sceneIndexSummaryRow: {
+        key: 'GLOBAL',
+        indexedScenes: 120,
+        acquisitionTrackedScenes: 14,
+        requestedCount: 4,
+        downloadingCount: 5,
+        importPendingCount: 3,
+        failedCount: 2,
+        metadataPendingCount: 6,
+        metadataRetryableCount: 1,
+        lastIndexWriteAt: new Date('2026-03-27T01:00:00.000Z'),
+      },
+    });
+
+    const service = new IndexingService(
+      prisma,
+      integrationsService,
+      whisparrAdapter,
+      stashAdapter,
+      stashdbAdapter,
+      syncStateService,
+    );
+
+    await expect(service.getSyncStatus()).resolves.toEqual(
+      expect.objectContaining({
+        totals: expect.objectContaining({
+          indexedScenes: 120,
+          acquisitionTrackedScenes: 14,
+          metadataBacklogScenes: 7,
+          metadataHydration: {
+            pending: 6,
+            retryable: 1,
+          },
+        }),
+        freshness: expect.objectContaining({
+          requestRowsFresh: true,
+          whisparrMoviesFresh: true,
+          stashAvailabilityFresh: true,
+          canResolveUnknownScenesAsNotRequested: true,
+          acquisitionCountsSource: 'scene-index-summary',
+          lastIndexWriteAt: '2026-03-27T01:00:00.000Z',
+        }),
+        jobs: expect.arrayContaining([
+          expect.objectContaining({
+            jobName: INDEXING_JOB_NAMES.WHISPARR_MOVIES,
+            lastDurationMs: 1_500,
+            processedCount: 40,
+            updatedCount: 12,
+            lastRunReason: 'interval',
+          }),
+        ]),
+      }),
     );
   });
 
@@ -804,14 +1083,15 @@ describe('IndexingService', () => {
     );
   });
 
-  it('skips scheduled metadata backfill when fully hydrated and the 30-minute steady interval has not elapsed', async () => {
+  it('skips scheduled metadata backfill when metadata was hydrated successfully but remains sparse', async () => {
     const { prisma } = createPrismaMock({
       sceneIndexRows: [
         buildSceneIndexRow({
           stashId: 'scene-1',
-          title: 'Title scene-1',
-          imageUrl: 'http://image/scene-1',
-          studioName: 'Studio',
+          title: null,
+          imageUrl: null,
+          studioName: null,
+          metadataHydrationState: MetadataHydrationState.HYDRATED,
           metadataLastSyncedAt: new Date('2026-03-27T00:00:00.000Z'),
         }),
       ],

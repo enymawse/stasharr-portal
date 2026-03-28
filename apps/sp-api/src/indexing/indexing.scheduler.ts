@@ -21,7 +21,7 @@ export class IndexingScheduler implements OnApplicationBootstrap {
     );
   }
 
-  @Interval(5 * 60_000)
+  @Interval(15 * 60_000)
   handleWhisparrMovieSync(): void {
     this.runInBackground('whisparr-movies', () =>
       this.indexingService.syncWhisparrMovies('interval'),
@@ -42,10 +42,7 @@ export class IndexingScheduler implements OnApplicationBootstrap {
     );
   }
 
-  private runInBackground(
-    jobName: string,
-    task: () => Promise<unknown>,
-  ): void {
+  private runInBackground(jobName: string, task: () => Promise<unknown>): void {
     void task().catch((error: unknown) => {
       this.logger.error(
         `Background indexing job failed: ${jobName}`,

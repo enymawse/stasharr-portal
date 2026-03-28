@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import {
   IntegrationStatus,
   IntegrationType,
+  MetadataHydrationState,
   Prisma,
   RequestStatus,
   SceneIndex,
@@ -44,6 +45,20 @@ const ACQUISITION_LIFECYCLES: SceneLifecycle[] = [
   SceneLifecycle.FAILED,
 ];
 
+const SCENE_INDEX_SUMMARY_KEY = 'GLOBAL';
+
+export interface SceneIndexSummarySnapshot {
+  indexedScenes: number;
+  acquisitionTrackedScenes: number;
+  requestedCount: number;
+  downloadingCount: number;
+  importPendingCount: number;
+  failedCount: number;
+  metadataPendingCount: number;
+  metadataRetryableCount: number;
+  lastIndexWriteAt: Date | null;
+}
+
 interface SceneIndexPatch {
   stashId: string;
   requestStatus?: RequestStatus | null;
@@ -63,7 +78,9 @@ interface SceneIndexPatch {
   whisparrQueueState?: string | null;
   whisparrErrorMessage?: string | null;
   stashAvailable?: boolean | null;
+  metadataHydrationState?: MetadataHydrationState;
   metadataLastSyncedAt?: Date | null;
+  metadataRetryAfterAt?: Date | null;
   whisparrLastSyncedAt?: Date | null;
   stashLastSyncedAt?: Date | null;
   lastSyncedAt?: Date | null;
@@ -75,14 +92,34 @@ interface SyncRunSummary {
   cursor?: string | null;
 }
 
+interface SceneIndexSummaryDelta {
+  indexedScenes: number;
+  acquisitionTrackedScenes: number;
+  requestedCount: number;
+  downloadingCount: number;
+  importPendingCount: number;
+  failedCount: number;
+  metadataPendingCount: number;
+  metadataRetryableCount: number;
+  lastIndexWriteAt: Date | null;
+}
+
+type SceneIndexUpsertData = Prisma.SceneIndexUncheckedCreateInput & {
+  stashId: string;
+  computedLifecycle: SceneLifecycle;
+  lifecycleSortOrder: number;
+  metadataHydrationState: MetadataHydrationState;
+};
+
 @Injectable()
 export class IndexingService {
   private static readonly INDEX_STATUS_MAX_AGE_MS = 30 * 60_000;
   private static readonly REQUEST_ROWS_FRESHNESS_MAX_AGE_MS = 2 * 60_000;
-  private static readonly SNAPSHOT_FRESHNESS_MAX_AGE_MS = 15 * 60_000;
+  private static readonly SNAPSHOT_FRESHNESS_MAX_AGE_MS = 20 * 60_000;
   private static readonly METADATA_REFRESH_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
   private static readonly APPLY_PATCH_CHUNK_SIZE = 100;
   private static readonly WHISPARR_LOOKUP_BATCH_SIZE = 8;
+  private static readonly STASH_LOOKUP_BATCH_SIZE = 6;
   private static readonly STASH_IDENTITY_PAGE_SIZE = 250;
   private static readonly METADATA_BATCH_SIZE = 24;
   private static readonly METADATA_QUERY_BATCH_SIZE = 8;
@@ -114,8 +151,16 @@ export class IndexingService {
       {
         jobName: INDEXING_JOB_NAMES.BOOTSTRAP,
         leaseMs: IndexingService.BOOTSTRAP_LEASE_MS,
+        onSuccess: (result, context) => ({
+          processedCount: result.processedCount,
+          updatedCount: result.updatedCount,
+          durationMs: context.durationMs,
+          runReason: reason,
+        }),
       },
       async () => {
+        await this.ensureSceneIndexSummary();
+
         if (!(await this.shouldBootstrap())) {
           this.logger.debug(`Bootstrap skipped for reason=${reason}.`);
           return {
@@ -170,6 +215,12 @@ export class IndexingService {
       {
         jobName: INDEXING_JOB_NAMES.WHISPARR_QUEUE,
         leaseMs: IndexingService.QUEUE_LEASE_MS,
+        onSuccess: (result, context) => ({
+          processedCount: result.processedCount,
+          updatedCount: result.updatedCount,
+          durationMs: context.durationMs,
+          runReason: reason,
+        }),
       },
       async () => this.performWhisparrQueueSync(reason, skipRequestSync),
     );
@@ -183,6 +234,12 @@ export class IndexingService {
       {
         jobName: INDEXING_JOB_NAMES.WHISPARR_MOVIES,
         leaseMs: IndexingService.MOVIES_LEASE_MS,
+        onSuccess: (result, context) => ({
+          processedCount: result.processedCount,
+          updatedCount: result.updatedCount,
+          durationMs: context.durationMs,
+          runReason: reason,
+        }),
       },
       async () => this.performWhisparrMovieSync(reason, skipRequestSync),
     );
@@ -197,6 +254,12 @@ export class IndexingService {
       {
         jobName: INDEXING_JOB_NAMES.STASH_AVAILABILITY,
         leaseMs: IndexingService.STASH_LEASE_MS,
+        onSuccess: (result, context) => ({
+          processedCount: result.processedCount,
+          updatedCount: result.updatedCount,
+          durationMs: context.durationMs,
+          runReason: reason,
+        }),
       },
       async () =>
         this.performStashAvailabilitySync(reason, stashIds, forceFullPass),
@@ -219,7 +282,13 @@ export class IndexingService {
       {
         jobName: INDEXING_JOB_NAMES.METADATA_BACKFILL,
         leaseMs: IndexingService.METADATA_LEASE_MS,
-        onSuccessCursor: (result) => result.cursor,
+        onSuccess: (result, context) => ({
+          cursor: result.cursor,
+          processedCount: result.processedCount,
+          updatedCount: result.updatedCount,
+          durationMs: context.durationMs,
+          runReason: reason,
+        }),
       },
       async () => this.performMetadataBackfill(reason, forceBootstrapPass),
     );
@@ -292,7 +361,9 @@ export class IndexingService {
         studioImageUrl: input.studioImageUrl,
         releaseDate: input.releaseDate,
         duration: input.duration,
+        metadataHydrationState: MetadataHydrationState.HYDRATED,
         metadataLastSyncedAt: now,
+        metadataRetryAfterAt: null,
         whisparrMovieId: input.whisparrMovieId,
         whisparrHasFile: input.whisparrHasFile,
         whisparrLastSyncedAt:
@@ -311,9 +382,17 @@ export class IndexingService {
       return;
     }
 
+    await this.syncRequestRows(normalizedIds);
+
     const results = await Promise.allSettled([
-      this.syncWhisparrQueue(`${reason}:queue`),
-      this.syncStashAvailability(`${reason}:stash`, normalizedIds),
+      this.refreshWhisparrMoviesForStashIds(
+        normalizedIds,
+        `${reason}:whisparr-targeted`,
+      ),
+      this.refreshStashAvailabilityForStashIds(
+        normalizedIds,
+        `${reason}:stash-targeted`,
+      ),
     ]);
 
     for (const result of results) {
@@ -324,6 +403,18 @@ export class IndexingService {
           )}`,
         );
       }
+    }
+
+    const rows = await this.getSceneIndexRows(normalizedIds);
+    const pendingMetadataIds = normalizedIds.filter((stashId) =>
+      this.shouldHydrateMetadataNow(rows.get(stashId) ?? null),
+    );
+
+    if (pendingMetadataIds.length > 0) {
+      this.requestMetadataHydrationForStashIds(
+        pendingMetadataIds,
+        `${reason}:metadata-targeted`,
+      );
     }
   }
 
@@ -358,43 +449,75 @@ export class IndexingService {
     }
   }
 
+  async getSceneIndexSummary(): Promise<SceneIndexSummarySnapshot> {
+    let summary = await this.prisma.sceneIndexSummary.findUnique({
+      where: {
+        key: SCENE_INDEX_SUMMARY_KEY,
+      },
+    });
+    if (!summary) {
+      await this.rebuildSceneIndexSummary();
+      summary = await this.prisma.sceneIndexSummary.findUnique({
+        where: {
+          key: SCENE_INDEX_SUMMARY_KEY,
+        },
+      });
+    }
+
+    return {
+      indexedScenes: summary?.indexedScenes ?? 0,
+      acquisitionTrackedScenes: summary?.acquisitionTrackedScenes ?? 0,
+      requestedCount: summary?.requestedCount ?? 0,
+      downloadingCount: summary?.downloadingCount ?? 0,
+      importPendingCount: summary?.importPendingCount ?? 0,
+      failedCount: summary?.failedCount ?? 0,
+      metadataPendingCount: summary?.metadataPendingCount ?? 0,
+      metadataRetryableCount: summary?.metadataRetryableCount ?? 0,
+      lastIndexWriteAt: summary?.lastIndexWriteAt ?? null,
+    };
+  }
+
   async getSyncStatus() {
-    const [
-      jobs,
-      totalIndexedScenes,
-      acquisitionTrackedScenes,
-      missingMetadata,
-    ] = await this.prisma.$transaction([
+    const [jobs, summary] = await Promise.all([
       this.prisma.syncState.findMany({
         orderBy: {
           jobName: 'asc',
         },
       }),
-      this.prisma.sceneIndex.count(),
-      this.prisma.sceneIndex.count({
-        where: {
-          computedLifecycle: {
-            in: ACQUISITION_LIFECYCLES,
-          },
-        },
-      }),
-      this.prisma.sceneIndex.count({
-        where: {
-          OR: [
-            { title: null },
-            { imageUrl: null },
-            { studioName: null },
-            { metadataLastSyncedAt: null },
-          ],
-        },
-      }),
+      this.getSceneIndexSummary(),
     ]);
+    const jobByName = new Map(jobs.map((job) => [job.jobName, job]));
+    const metadataBacklogScenes =
+      summary.metadataPendingCount + summary.metadataRetryableCount;
 
     return {
       totals: {
-        indexedScenes: totalIndexedScenes,
-        acquisitionTrackedScenes,
-        missingMetadataScenes: missingMetadata,
+        indexedScenes: summary.indexedScenes,
+        acquisitionTrackedScenes: summary.acquisitionTrackedScenes,
+        metadataBacklogScenes,
+        metadataHydration: {
+          pending: summary.metadataPendingCount,
+          retryable: summary.metadataRetryableCount,
+        },
+      },
+      freshness: {
+        indexStatusMaxAgeMs: IndexingService.INDEX_STATUS_MAX_AGE_MS,
+        requestRowsFresh: this.isSuccessfulSyncFresh(
+          jobByName.get(INDEXING_JOB_NAMES.REQUEST_ROWS) ?? null,
+          IndexingService.REQUEST_ROWS_FRESHNESS_MAX_AGE_MS,
+        ),
+        whisparrMoviesFresh: this.isSuccessfulSyncFresh(
+          jobByName.get(INDEXING_JOB_NAMES.WHISPARR_MOVIES) ?? null,
+          IndexingService.SNAPSHOT_FRESHNESS_MAX_AGE_MS,
+        ),
+        stashAvailabilityFresh: this.isSuccessfulSyncFresh(
+          jobByName.get(INDEXING_JOB_NAMES.STASH_AVAILABILITY) ?? null,
+          IndexingService.SNAPSHOT_FRESHNESS_MAX_AGE_MS,
+        ),
+        canResolveUnknownScenesAsNotRequested:
+          await this.canResolveUnknownScenesAsNotRequested(),
+        lastIndexWriteAt: summary.lastIndexWriteAt?.toISOString() ?? null,
+        acquisitionCountsSource: 'scene-index-summary',
       },
       jobs: jobs.map((job) => ({
         jobName: job.jobName,
@@ -405,6 +528,10 @@ export class IndexingService {
         cursor: job.cursor,
         lastError: job.lastError,
         lastSuccessAt: job.lastSuccessAt?.toISOString() ?? null,
+        lastDurationMs: job.lastDurationMs ?? null,
+        processedCount: job.lastProcessedCount ?? null,
+        updatedCount: job.lastUpdatedCount ?? null,
+        lastRunReason: job.lastRunReason ?? null,
       })),
     };
   }
@@ -497,6 +624,180 @@ export class IndexingService {
           IndexingService.SNAPSHOT_FRESHNESS_MAX_AGE_MS,
         ))
     );
+  }
+
+  private async refreshWhisparrMoviesForStashIds(
+    stashIds: string[],
+    reason: string,
+  ): Promise<SyncRunSummary> {
+    const config = await this.getWhisparrConfig();
+    if (!config) {
+      return {
+        processedCount: 0,
+        updatedCount: 0,
+      };
+    }
+
+    const normalizedIds = this.normalizeStashIds(stashIds);
+    if (normalizedIds.length === 0) {
+      return {
+        processedCount: 0,
+        updatedCount: 0,
+      };
+    }
+
+    const now = new Date();
+    const patches: SceneIndexPatch[] = [];
+
+    for (
+      let i = 0;
+      i < normalizedIds.length;
+      i += IndexingService.WHISPARR_LOOKUP_BATCH_SIZE
+    ) {
+      const batch = normalizedIds.slice(
+        i,
+        i + IndexingService.WHISPARR_LOOKUP_BATCH_SIZE,
+      );
+      const results = await Promise.all(
+        batch.map(async (stashId) => {
+          try {
+            const movie = await this.whisparrAdapter.findMovieByStashId(
+              stashId,
+              config,
+            );
+            return {
+              stashId,
+              movie,
+            };
+          } catch (error) {
+            this.logger.warn(
+              `Targeted Whisparr lookup failed. reason=${reason} stashId=${stashId} error=${this.safeJson(
+                this.serializeError(error),
+              )}`,
+            );
+            return {
+              stashId,
+              movie: null,
+            };
+          }
+        }),
+      );
+
+      for (const result of results) {
+        if (!result.movie) {
+          continue;
+        }
+
+        patches.push({
+          stashId: result.stashId,
+          whisparrMovieId: result.movie.movieId,
+          whisparrHasFile: result.movie.hasFile,
+          whisparrQueuePosition: result.movie.hasFile ? null : undefined,
+          whisparrQueueStatus: result.movie.hasFile ? null : undefined,
+          whisparrQueueState: result.movie.hasFile ? null : undefined,
+          whisparrErrorMessage: result.movie.hasFile ? null : undefined,
+          whisparrLastSyncedAt: now,
+          lastSyncedAt: now,
+        });
+      }
+    }
+
+    await this.applySceneIndexPatches(patches);
+    this.logger.debug(
+      `Targeted Whisparr refresh completed: ${this.safeJson({
+        reason,
+        requestedIds: normalizedIds.length,
+        updated: patches.length,
+      })}`,
+    );
+
+    return {
+      processedCount: normalizedIds.length,
+      updatedCount: patches.length,
+    };
+  }
+
+  private async refreshStashAvailabilityForStashIds(
+    stashIds: string[],
+    reason: string,
+  ): Promise<SyncRunSummary> {
+    const config = await this.getStashConfig();
+    if (!config) {
+      return {
+        processedCount: 0,
+        updatedCount: 0,
+      };
+    }
+
+    const normalizedIds = this.normalizeStashIds(stashIds);
+    if (normalizedIds.length === 0) {
+      return {
+        processedCount: 0,
+        updatedCount: 0,
+      };
+    }
+
+    const now = new Date();
+    const patches: SceneIndexPatch[] = [];
+
+    for (
+      let i = 0;
+      i < normalizedIds.length;
+      i += IndexingService.STASH_LOOKUP_BATCH_SIZE
+    ) {
+      const batch = normalizedIds.slice(
+        i,
+        i + IndexingService.STASH_LOOKUP_BATCH_SIZE,
+      );
+      const results = await Promise.all(
+        batch.map(async (stashId) => {
+          try {
+            const matches = await this.stashAdapter.findScenesByStashId(
+              stashId,
+              config,
+            );
+            return {
+              stashId,
+              stashAvailable: matches.length > 0,
+            };
+          } catch (error) {
+            this.logger.warn(
+              `Targeted Stash availability lookup failed. reason=${reason} stashId=${stashId} error=${this.safeJson(
+                this.serializeError(error),
+              )}`,
+            );
+            return null;
+          }
+        }),
+      );
+
+      for (const result of results) {
+        if (!result) {
+          continue;
+        }
+
+        patches.push({
+          stashId: result.stashId,
+          stashAvailable: result.stashAvailable,
+          stashLastSyncedAt: now,
+          lastSyncedAt: now,
+        });
+      }
+    }
+
+    await this.applySceneIndexPatches(patches);
+    this.logger.debug(
+      `Targeted Stash refresh completed: ${this.safeJson({
+        reason,
+        requestedIds: normalizedIds.length,
+        updated: patches.length,
+      })}`,
+    );
+
+    return {
+      processedCount: normalizedIds.length,
+      updatedCount: patches.length,
+    };
   }
 
   private async shouldBootstrap(): Promise<boolean> {
@@ -927,6 +1228,16 @@ export class IndexingService {
               batch,
             )} error=${this.safeJson(this.serializeError(error))}`,
           );
+          const retryAfterAt = new Date(
+            now.getTime() + IndexingService.METADATA_RETRY_BACKOFF_MS,
+          );
+          for (const stashId of batch) {
+            patches.push({
+              stashId,
+              metadataHydrationState: MetadataHydrationState.FAILED_RETRYABLE,
+              metadataRetryAfterAt: retryAfterAt,
+            });
+          }
           continue;
         }
 
@@ -939,7 +1250,10 @@ export class IndexingService {
           if (!hydratedIds.has(stashId)) {
             patches.push({
               stashId,
+              metadataHydrationState: MetadataHydrationState.HYDRATED,
               metadataLastSyncedAt: now,
+              metadataRetryAfterAt: null,
+              lastSyncedAt: now,
             });
           }
         }
@@ -987,6 +1301,11 @@ export class IndexingService {
     if (isFullSync) {
       await this.syncStateService.recordSuccess(
         INDEXING_JOB_NAMES.REQUEST_ROWS,
+        {
+          processedCount: requestRows.length,
+          updatedCount: requestRows.length,
+          runReason: 'request-sync',
+        },
       );
     }
 
@@ -1004,6 +1323,8 @@ export class IndexingService {
       if (mergedPatches.length === 0) {
         return;
       }
+
+      await this.ensureSceneIndexSummary();
 
       const existingRows = await this.prisma.sceneIndex.findMany({
         where: {
@@ -1045,22 +1366,45 @@ export class IndexingService {
       attempt += 1
     ) {
       try {
-        await this.prisma.$transaction(
-          chunk.map((patch) => {
-            const data = this.buildSceneIndexUpsertData(
-              existingByStashId.get(patch.stashId) ?? null,
-              patch,
-              queueItemsByStashId?.get(patch.stashId),
-            );
-            return this.prisma.sceneIndex.upsert({
+        const nextRows = chunk.map((patch) =>
+          this.buildSceneIndexUpsertData(
+            existingByStashId.get(patch.stashId) ?? null,
+            patch,
+            queueItemsByStashId?.get(patch.stashId),
+          ),
+        );
+        const transactionOperations: Prisma.PrismaPromise<unknown>[] =
+          nextRows.map((data) =>
+            this.prisma.sceneIndex.upsert({
               where: {
-                stashId: patch.stashId,
+                stashId: data.stashId,
               },
               create: data,
               update: data,
-            });
-          }),
+            }),
+          );
+        const summaryDelta = this.buildSceneIndexSummaryDelta(
+          chunk,
+          nextRows,
+          existingByStashId,
         );
+
+        if (this.hasSummaryDelta(summaryDelta)) {
+          transactionOperations.push(
+            this.prisma.sceneIndexSummary.update({
+              where: {
+                key: SCENE_INDEX_SUMMARY_KEY,
+              },
+              data: this.buildSceneIndexSummaryDeltaUpdate(summaryDelta),
+            }),
+          );
+        }
+
+        await this.prisma.$transaction(transactionOperations);
+
+        for (const row of nextRows) {
+          existingByStashId.set(row.stashId, row as SceneIndex);
+        }
         return;
       } catch (error) {
         if (
@@ -1085,8 +1429,8 @@ export class IndexingService {
     existing: SceneIndex | null,
     patch: SceneIndexPatch,
     queueItems?: ResolverQueueItem[],
-  ): Prisma.SceneIndexUncheckedCreateInput {
-    const merged: Prisma.SceneIndexUncheckedCreateInput = {
+  ): SceneIndexUpsertData {
+    const merged: SceneIndexUpsertData = {
       stashId: patch.stashId,
       requestStatus: this.pickValue(
         patch.requestStatus,
@@ -1144,9 +1488,17 @@ export class IndexingService {
         patch.stashAvailable,
         existing?.stashAvailable ?? null,
       ),
+      metadataHydrationState: this.pickValue(
+        patch.metadataHydrationState,
+        existing?.metadataHydrationState ?? MetadataHydrationState.PENDING,
+      ),
       metadataLastSyncedAt: this.pickValue(
         patch.metadataLastSyncedAt,
         existing?.metadataLastSyncedAt ?? null,
+      ),
+      metadataRetryAfterAt: this.pickValue(
+        patch.metadataRetryAfterAt,
+        existing?.metadataRetryAfterAt ?? null,
       ),
       whisparrLastSyncedAt: this.pickValue(
         patch.whisparrLastSyncedAt,
@@ -1268,6 +1620,251 @@ export class IndexingService {
     }
 
     return Array.from(merged.values());
+  }
+
+  private buildSceneIndexSummaryDelta(
+    chunk: SceneIndexPatch[],
+    nextRows: SceneIndexUpsertData[],
+    existingByStashId: Map<string, SceneIndex>,
+  ): SceneIndexSummaryDelta {
+    const delta: SceneIndexSummaryDelta = {
+      indexedScenes: 0,
+      acquisitionTrackedScenes: 0,
+      requestedCount: 0,
+      downloadingCount: 0,
+      importPendingCount: 0,
+      failedCount: 0,
+      metadataPendingCount: 0,
+      metadataRetryableCount: 0,
+      lastIndexWriteAt: chunk.length > 0 ? new Date() : null,
+    };
+
+    nextRows.forEach((nextRow, index) => {
+      const patch = chunk[index];
+      const existing = existingByStashId.get(patch?.stashId ?? '') ?? null;
+
+      if (!existing) {
+        delta.indexedScenes += 1;
+      }
+
+      delta.acquisitionTrackedScenes +=
+        (this.isAcquisitionLifecycle(nextRow.computedLifecycle) ? 1 : 0) -
+        (this.isAcquisitionLifecycle(existing?.computedLifecycle ?? null)
+          ? 1
+          : 0);
+
+      delta.requestedCount += this.lifecycleCountDelta(
+        nextRow.computedLifecycle,
+        existing?.computedLifecycle ?? null,
+        SceneLifecycle.REQUESTED,
+      );
+      delta.downloadingCount += this.lifecycleCountDelta(
+        nextRow.computedLifecycle,
+        existing?.computedLifecycle ?? null,
+        SceneLifecycle.DOWNLOADING,
+      );
+      delta.importPendingCount += this.lifecycleCountDelta(
+        nextRow.computedLifecycle,
+        existing?.computedLifecycle ?? null,
+        SceneLifecycle.IMPORT_PENDING,
+      );
+      delta.failedCount += this.lifecycleCountDelta(
+        nextRow.computedLifecycle,
+        existing?.computedLifecycle ?? null,
+        SceneLifecycle.FAILED,
+      );
+
+      delta.metadataPendingCount += this.metadataStateCountDelta(
+        nextRow.metadataHydrationState,
+        existing?.metadataHydrationState ?? null,
+        MetadataHydrationState.PENDING,
+      );
+      delta.metadataRetryableCount += this.metadataStateCountDelta(
+        nextRow.metadataHydrationState,
+        existing?.metadataHydrationState ?? null,
+        MetadataHydrationState.FAILED_RETRYABLE,
+      );
+    });
+
+    return delta;
+  }
+
+  private buildSceneIndexSummaryDeltaUpdate(
+    delta: SceneIndexSummaryDelta,
+  ): Prisma.SceneIndexSummaryUpdateInput {
+    return {
+      indexedScenes: {
+        increment: delta.indexedScenes,
+      },
+      acquisitionTrackedScenes: {
+        increment: delta.acquisitionTrackedScenes,
+      },
+      requestedCount: {
+        increment: delta.requestedCount,
+      },
+      downloadingCount: {
+        increment: delta.downloadingCount,
+      },
+      importPendingCount: {
+        increment: delta.importPendingCount,
+      },
+      failedCount: {
+        increment: delta.failedCount,
+      },
+      metadataPendingCount: {
+        increment: delta.metadataPendingCount,
+      },
+      metadataRetryableCount: {
+        increment: delta.metadataRetryableCount,
+      },
+      lastIndexWriteAt: delta.lastIndexWriteAt,
+    };
+  }
+
+  private hasSummaryDelta(delta: SceneIndexSummaryDelta): boolean {
+    return (
+      delta.indexedScenes !== 0 ||
+      delta.acquisitionTrackedScenes !== 0 ||
+      delta.requestedCount !== 0 ||
+      delta.downloadingCount !== 0 ||
+      delta.importPendingCount !== 0 ||
+      delta.failedCount !== 0 ||
+      delta.metadataPendingCount !== 0 ||
+      delta.metadataRetryableCount !== 0 ||
+      delta.lastIndexWriteAt !== null
+    );
+  }
+
+  private lifecycleCountDelta(
+    nextLifecycle: SceneLifecycle,
+    previousLifecycle: SceneLifecycle | null,
+    targetLifecycle: SceneLifecycle,
+  ): number {
+    return (
+      (nextLifecycle === targetLifecycle ? 1 : 0) -
+      (previousLifecycle === targetLifecycle ? 1 : 0)
+    );
+  }
+
+  private metadataStateCountDelta(
+    nextState: MetadataHydrationState,
+    previousState: MetadataHydrationState | null,
+    targetState: MetadataHydrationState,
+  ): number {
+    return (
+      (nextState === targetState ? 1 : 0) -
+      (previousState === targetState ? 1 : 0)
+    );
+  }
+
+  private isAcquisitionLifecycle(
+    lifecycle: SceneLifecycle | null,
+  ): lifecycle is SceneLifecycle {
+    return lifecycle !== null && ACQUISITION_LIFECYCLES.includes(lifecycle);
+  }
+
+  private async ensureSceneIndexSummary(): Promise<void> {
+    const existingSummary = await this.prisma.sceneIndexSummary.findUnique({
+      where: {
+        key: SCENE_INDEX_SUMMARY_KEY,
+      },
+      select: {
+        key: true,
+      },
+    });
+
+    if (existingSummary) {
+      return;
+    }
+
+    await this.rebuildSceneIndexSummary();
+  }
+
+  private async rebuildSceneIndexSummary(): Promise<void> {
+    const [
+      indexedScenes,
+      requestedCount,
+      downloadingCount,
+      importPendingCount,
+      failedCount,
+      metadataPendingCount,
+      metadataRetryableCount,
+      newestRow,
+    ] = await this.prisma.$transaction([
+      this.prisma.sceneIndex.count(),
+      this.prisma.sceneIndex.count({
+        where: {
+          computedLifecycle: SceneLifecycle.REQUESTED,
+        },
+      }),
+      this.prisma.sceneIndex.count({
+        where: {
+          computedLifecycle: SceneLifecycle.DOWNLOADING,
+        },
+      }),
+      this.prisma.sceneIndex.count({
+        where: {
+          computedLifecycle: SceneLifecycle.IMPORT_PENDING,
+        },
+      }),
+      this.prisma.sceneIndex.count({
+        where: {
+          computedLifecycle: SceneLifecycle.FAILED,
+        },
+      }),
+      this.prisma.sceneIndex.count({
+        where: {
+          metadataHydrationState: MetadataHydrationState.PENDING,
+        },
+      }),
+      this.prisma.sceneIndex.count({
+        where: {
+          metadataHydrationState: MetadataHydrationState.FAILED_RETRYABLE,
+        },
+      }),
+      this.prisma.sceneIndex.findFirst({
+        select: {
+          lastSyncedAt: true,
+          updatedAt: true,
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+      }),
+    ]);
+
+    await this.prisma.sceneIndexSummary.upsert({
+      where: {
+        key: SCENE_INDEX_SUMMARY_KEY,
+      },
+      create: {
+        key: SCENE_INDEX_SUMMARY_KEY,
+        indexedScenes,
+        acquisitionTrackedScenes:
+          requestedCount + downloadingCount + importPendingCount + failedCount,
+        requestedCount,
+        downloadingCount,
+        importPendingCount,
+        failedCount,
+        metadataPendingCount,
+        metadataRetryableCount,
+        lastIndexWriteAt:
+          newestRow?.lastSyncedAt ?? newestRow?.updatedAt ?? null,
+      },
+      update: {
+        indexedScenes,
+        acquisitionTrackedScenes:
+          requestedCount + downloadingCount + importPendingCount + failedCount,
+        requestedCount,
+        downloadingCount,
+        importPendingCount,
+        failedCount,
+        metadataPendingCount,
+        metadataRetryableCount,
+        lastIndexWriteAt:
+          newestRow?.lastSyncedAt ?? newestRow?.updatedAt ?? null,
+      },
+    });
   }
 
   private async lookupWhisparrMoviesById(
@@ -1498,30 +2095,41 @@ export class IndexingService {
   }
 
   private async shouldRunScheduledMetadataBackfill(): Promise<boolean> {
-    const [eligibleMetadataCount, missingMetadataCount, syncState] =
-      await Promise.all([
-        this.prisma.sceneIndex.count({
-          where: this.buildMetadataBackfillWhere(false),
-        }),
-        this.prisma.sceneIndex.count({
-          where: this.buildMissingMetadataBacklogWhere(),
-        }),
-        this.prisma.syncState.findUnique({
-          where: {
-            jobName: INDEXING_JOB_NAMES.METADATA_BACKFILL,
-          },
-          select: {
-            lastSuccessAt: true,
-          },
-        }),
-      ]);
+    const [
+      pendingMetadataCount,
+      retryableMetadataCount,
+      staleMetadataCount,
+      syncState,
+    ] = await Promise.all([
+      this.prisma.sceneIndex.count({
+        where: {
+          metadataHydrationState: MetadataHydrationState.PENDING,
+        },
+      }),
+      this.prisma.sceneIndex.count({
+        where: this.buildMissingMetadataBacklogWhere(),
+      }),
+      this.prisma.sceneIndex.count({
+        where: this.buildStaleHydratedMetadataWhere(),
+      }),
+      this.prisma.syncState.findUnique({
+        where: {
+          jobName: INDEXING_JOB_NAMES.METADATA_BACKFILL,
+        },
+        select: {
+          lastSuccessAt: true,
+        },
+      }),
+    ]);
 
     const targetIntervalMs =
-      eligibleMetadataCount > 0
+      pendingMetadataCount > 0
         ? IndexingService.METADATA_ACCELERATED_INTERVAL_MS
-        : missingMetadataCount > 0
+        : retryableMetadataCount > 0
           ? IndexingService.METADATA_RETRY_BACKOFF_MS
-          : IndexingService.METADATA_STEADY_INTERVAL_MS;
+          : staleMetadataCount > 0
+            ? IndexingService.METADATA_STEADY_INTERVAL_MS
+            : IndexingService.METADATA_STEADY_INTERVAL_MS;
     const lastSuccessAt = syncState?.lastSuccessAt ?? null;
 
     if (!lastSuccessAt) {
@@ -1533,55 +2141,57 @@ export class IndexingService {
 
   private buildMissingMetadataBacklogWhere(): Prisma.SceneIndexWhereInput {
     return {
-      OR: [
-        { title: null },
-        { imageUrl: null },
-        { studioName: null },
-        { metadataLastSyncedAt: null },
-      ],
+      metadataHydrationState: MetadataHydrationState.FAILED_RETRYABLE,
     };
   }
 
   private buildMetadataBackfillWhere(
     forceBootstrapPass: boolean,
   ): Prisma.SceneIndexWhereInput {
-    const missingMetadataWhere = this.buildMissingMetadataBacklogWhere();
     if (forceBootstrapPass) {
-      return missingMetadataWhere;
+      return {
+        metadataHydrationState: {
+          in: [
+            MetadataHydrationState.PENDING,
+            MetadataHydrationState.FAILED_RETRYABLE,
+          ],
+        },
+      };
     }
-
-    const staleBefore = new Date(
-      Date.now() - IndexingService.METADATA_REFRESH_MAX_AGE_MS,
-    );
-    const retryBefore = new Date(
-      Date.now() - IndexingService.METADATA_RETRY_BACKOFF_MS,
-    );
 
     return {
       OR: [
         {
-          AND: [
-            {
-              OR: [{ title: null }, { imageUrl: null }, { studioName: null }],
-            },
-            {
-              OR: [
-                { metadataLastSyncedAt: null },
-                {
-                  metadataLastSyncedAt: {
-                    lte: retryBefore,
-                  },
-                },
-              ],
-            },
-          ],
+          metadataHydrationState: MetadataHydrationState.PENDING,
+        },
+        this.buildRetryableMetadataWhere(),
+        this.buildStaleHydratedMetadataWhere(),
+      ],
+    };
+  }
+
+  private buildRetryableMetadataWhere(): Prisma.SceneIndexWhereInput {
+    return {
+      metadataHydrationState: MetadataHydrationState.FAILED_RETRYABLE,
+      OR: [
+        {
+          metadataRetryAfterAt: null,
         },
         {
-          metadataLastSyncedAt: {
-            lte: staleBefore,
+          metadataRetryAfterAt: {
+            lte: new Date(),
           },
         },
       ],
+    };
+  }
+
+  private buildStaleHydratedMetadataWhere(): Prisma.SceneIndexWhereInput {
+    return {
+      metadataHydrationState: MetadataHydrationState.HYDRATED,
+      metadataLastSyncedAt: {
+        lte: new Date(Date.now() - IndexingService.METADATA_REFRESH_MAX_AGE_MS),
+      },
     };
   }
 
@@ -1599,9 +2209,33 @@ export class IndexingService {
       studioImageUrl: scene.studioImageUrl,
       releaseDate: scene.releaseDate,
       duration: scene.duration,
+      metadataHydrationState: MetadataHydrationState.HYDRATED,
       metadataLastSyncedAt: now,
+      metadataRetryAfterAt: null,
       lastSyncedAt: now,
     };
+  }
+
+  private shouldHydrateMetadataNow(row: SceneIndex | null): boolean {
+    if (!row) {
+      return true;
+    }
+
+    if (row.metadataHydrationState === MetadataHydrationState.PENDING) {
+      return true;
+    }
+
+    if (
+      row.metadataHydrationState !== MetadataHydrationState.FAILED_RETRYABLE
+    ) {
+      return false;
+    }
+
+    if (!row.metadataRetryAfterAt) {
+      return true;
+    }
+
+    return row.metadataRetryAfterAt.getTime() <= Date.now();
   }
 
   private pickValue<T>(incoming: T | undefined, existing: T): T {

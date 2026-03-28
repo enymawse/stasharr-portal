@@ -15,32 +15,34 @@ model Request {
 }
 
 model SceneIndex {
-  stashId               String         @id
-  requestStatus         RequestStatus?
-  requestUpdatedAt      DateTime?
-  title                 String?
-  description           String?
-  imageUrl              String?
-  studioId              String?
-  studioName            String?
-  studioImageUrl        String?
-  releaseDate           String?
-  duration              Int?
-  whisparrMovieId       Int?
-  whisparrHasFile       Boolean?
-  whisparrQueuePosition Int?
-  whisparrQueueStatus   String?
-  whisparrQueueState    String?
-  whisparrErrorMessage  String?
-  stashAvailable        Boolean?
-  computedLifecycle     SceneLifecycle @default(NOT_REQUESTED)
-  lifecycleSortOrder    Int            @default(999)
-  metadataLastSyncedAt  DateTime?
-  whisparrLastSyncedAt  DateTime?
-  stashLastSyncedAt     DateTime?
-  lastSyncedAt          DateTime?
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
+  stashId                String                 @id
+  requestStatus          RequestStatus?
+  requestUpdatedAt       DateTime?
+  title                  String?
+  description            String?
+  imageUrl               String?
+  studioId               String?
+  studioName             String?
+  studioImageUrl         String?
+  releaseDate            String?
+  duration               Int?
+  whisparrMovieId        Int?
+  whisparrHasFile        Boolean?
+  whisparrQueuePosition  Int?
+  whisparrQueueStatus    String?
+  whisparrQueueState     String?
+  whisparrErrorMessage   String?
+  stashAvailable         Boolean?
+  computedLifecycle      SceneLifecycle         @default(NOT_REQUESTED)
+  lifecycleSortOrder     Int                    @default(999)
+  metadataHydrationState MetadataHydrationState @default(PENDING)
+  metadataLastSyncedAt   DateTime?
+  metadataRetryAfterAt   DateTime?
+  whisparrLastSyncedAt   DateTime?
+  stashLastSyncedAt      DateTime?
+  lastSyncedAt           DateTime?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
 
   @@index([computedLifecycle, lifecycleSortOrder, whisparrQueuePosition, requestUpdatedAt])
   @@index([requestUpdatedAt])
@@ -52,16 +54,35 @@ model SceneIndex {
 }
 
 model SyncState {
-  jobName       String        @id
-  status        SyncJobStatus @default(IDLE)
-  startedAt     DateTime?
-  finishedAt    DateTime?
-  leaseUntil    DateTime?
-  cursor        String?
-  lastError     String?
-  lastSuccessAt DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  jobName            String        @id
+  status             SyncJobStatus @default(IDLE)
+  startedAt          DateTime?
+  finishedAt         DateTime?
+  leaseUntil         DateTime?
+  cursor             String?
+  lastError          String?
+  lastSuccessAt      DateTime?
+  lastDurationMs     Int?
+  lastProcessedCount Int?
+  lastUpdatedCount   Int?
+  lastRunReason      String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+}
+
+model SceneIndexSummary {
+  key                      String    @id
+  indexedScenes            Int       @default(0)
+  acquisitionTrackedScenes Int       @default(0)
+  requestedCount           Int       @default(0)
+  downloadingCount         Int       @default(0)
+  importPendingCount       Int       @default(0)
+  failedCount              Int       @default(0)
+  metadataPendingCount     Int       @default(0)
+  metadataRetryableCount   Int       @default(0)
+  lastIndexWriteAt         DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 }
 
 model HomeRail {
@@ -104,6 +125,12 @@ enum SyncJobStatus {
   FAILED
 }
 
+enum MetadataHydrationState {
+  PENDING
+  HYDRATED
+  FAILED_RETRYABLE
+}
+
 enum HomeRailKey {
   FAVORITE_STUDIOS
   FAVORITE_PERFORMERS
@@ -138,21 +165,21 @@ enum IntegrationStatus {
 }
 
 model IntegrationConfig {
-  id               String            @id @default(cuid())
-  type             IntegrationType   @unique
-  enabled          Boolean           @default(true)
-  status           IntegrationStatus @default(NOT_CONFIGURED)
+  id      String            @id @default(cuid())
+  type    IntegrationType   @unique
+  enabled Boolean           @default(true)
+  status  IntegrationStatus @default(NOT_CONFIGURED)
 
-  name             String?
-  baseUrl          String?
-  apiKey           String?
+  name    String?
+  baseUrl String?
+  apiKey  String?
 
-  config           Json?
+  config Json?
 
   lastHealthyAt    DateTime?
   lastErrorAt      DateTime?
   lastErrorMessage String?
 
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
