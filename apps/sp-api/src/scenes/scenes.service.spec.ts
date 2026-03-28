@@ -196,10 +196,10 @@ describe('ScenesService', () => {
   });
 
   it('defaults to DATE sort for scenes feed and returns statuses', async () => {
-    await expect(service.getScenesFeed(1, 25)).resolves.toEqual({
+    await expect(service.getScenesFeed()).resolves.toEqual({
       total: 1,
       page: 1,
-      perPage: 25,
+      perPage: 24,
       hasMore: false,
       items: [
         {
@@ -225,7 +225,7 @@ describe('ScenesService', () => {
       baseUrl: stashdbIntegration.baseUrl,
       apiKey: stashdbIntegration.apiKey,
       page: 1,
-      perPage: 25,
+      perPage: 24,
       sort: 'DATE',
       direction: 'DESC',
       favorites: undefined,

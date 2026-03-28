@@ -99,10 +99,10 @@ describe('StudiosService', () => {
   });
 
   it('uses default query behavior for studios feed', async () => {
-    await expect(service.getStudiosFeed(1, 50)).resolves.toEqual({
+    await expect(service.getStudiosFeed()).resolves.toEqual({
       total: 1,
       page: 1,
-      perPage: 50,
+      perPage: 24,
       hasMore: false,
       items: [
         {
@@ -120,7 +120,7 @@ describe('StudiosService', () => {
       baseUrl: stashdbIntegration.baseUrl,
       apiKey: stashdbIntegration.apiKey,
       page: 1,
-      perPage: 50,
+      perPage: 24,
       name: undefined,
       sort: 'NAME',
       direction: 'ASC',

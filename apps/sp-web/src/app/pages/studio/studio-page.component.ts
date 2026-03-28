@@ -67,7 +67,7 @@ interface MultiSelectOption {
   styleUrl: './studio-page.component.scss',
 })
 export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
-  private static readonly SCENES_PAGE_SIZE = 25;
+  private static readonly SCENES_PAGE_SIZE = 24;
   private static readonly SEARCH_DEBOUNCE_MS = 250;
   private static readonly DEFAULT_SCENE_SORT: SceneFeedSort = 'DATE';
   private static readonly DEFAULT_SCENE_DIRECTION: SortDirection = 'DESC';

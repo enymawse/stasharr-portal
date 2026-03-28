@@ -74,7 +74,7 @@ interface SelectedStudioChip {
   styleUrl: './scenes-page.component.scss',
 })
 export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
-  private static readonly PAGE_SIZE = 50;
+  private static readonly PAGE_SIZE = 24;
   private static readonly SEARCH_DEBOUNCE_MS = 250;
   private static readonly DEFAULT_SORT: SceneFeedSort = 'DATE';
   private static readonly DEFAULT_DIRECTION: SortDirection = 'DESC';

@@ -51,7 +51,7 @@ type GenderOption = PerformerGender | 'NONE';
   styleUrl: './performers-page.component.scss',
 })
 export class PerformersPageComponent implements OnInit, AfterViewInit, OnDestroy {
-  private static readonly PAGE_SIZE = 50;
+  private static readonly PAGE_SIZE = 24;
   private static readonly NAME_FILTER_DEBOUNCE_MS = 300;
   private static readonly DEFAULT_SORT: PerformerSort = 'NAME';
   private static readonly DEFAULT_DIRECTION: SortDirection = 'ASC';

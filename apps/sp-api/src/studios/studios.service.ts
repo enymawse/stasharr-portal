@@ -15,7 +15,7 @@ import { StudioSort } from './dto/studios-query.dto';
 @Injectable()
 export class StudiosService {
   private static readonly DEFAULT_PAGE = 1;
-  private static readonly DEFAULT_PER_PAGE = 50;
+  private static readonly DEFAULT_PER_PAGE = 24;
   private static readonly DEFAULT_SORT: StudioSort = 'NAME';
   private static readonly DEFAULT_DIRECTION: StashdbSortDirection = 'ASC';
 

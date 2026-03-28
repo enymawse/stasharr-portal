@@ -37,7 +37,7 @@ import {
 @Injectable()
 export class ScenesService {
   private static readonly DEFAULT_PAGE = 1;
-  private static readonly DEFAULT_PER_PAGE = 25;
+  private static readonly DEFAULT_PER_PAGE = 24;
   private static readonly LIFECYCLE_SCAN_PAGE_SIZE = 50;
 
   constructor(

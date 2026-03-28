@@ -32,7 +32,7 @@ function buildResponse(
   return {
     total: items.length,
     page: 1,
-    perPage: 50,
+    perPage: 24,
     hasMore: false,
     countsByLifecycle: {
       REQUESTED: items.filter((item) => item.status.state === 'REQUESTED').length,
@@ -128,7 +128,7 @@ describe('AcquisitionPageComponent', () => {
     const { fixture, acquisitionService } = await renderPage();
     const text = fixture.nativeElement.textContent;
 
-    expect(acquisitionService.getScenesFeed).toHaveBeenCalledWith(1, 50, 'ANY');
+    expect(acquisitionService.getScenesFeed).toHaveBeenCalledWith(1, 24, 'ANY');
     expect(text).toContain('Acquisition');
     expect(text).toContain('Resolve or retry this download in Whisparr.');
     expect(fixture.nativeElement.querySelector('.request-cta')).toBeNull();
@@ -154,7 +154,7 @@ describe('AcquisitionPageComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(acquisitionService.getScenesFeed).toHaveBeenLastCalledWith(1, 50, 'FAILED');
+    expect(acquisitionService.getScenesFeed).toHaveBeenLastCalledWith(1, 24, 'FAILED');
     expect(fixture.nativeElement.textContent).toContain('Failed Scene');
     expect(fixture.nativeElement.textContent).not.toContain('Downloading Scene');
   });

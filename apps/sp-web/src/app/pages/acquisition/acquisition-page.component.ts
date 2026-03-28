@@ -27,7 +27,7 @@ import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene
   styleUrl: './acquisition-page.component.scss',
 })
 export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestroy {
-  private static readonly PAGE_SIZE = 50;
+  private static readonly PAGE_SIZE = 24;
   private static readonly EMPTY_COUNTS: AcquisitionCountsByLifecycle = {
     REQUESTED: 0,
     DOWNLOADING: 0,

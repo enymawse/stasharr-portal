@@ -28,8 +28,8 @@ import {
 @Injectable()
 export class PerformersService {
   private static readonly DEFAULT_PAGE = 1;
-  private static readonly DEFAULT_PER_PAGE = 50;
-  private static readonly DEFAULT_SCENES_PER_PAGE = 25;
+  private static readonly DEFAULT_PER_PAGE = 24;
+  private static readonly DEFAULT_SCENES_PER_PAGE = 24;
   private static readonly DEFAULT_PERFORMERS_SORT_DIRECTION: PerformerSortDirection = 'ASC';
   private static readonly DEFAULT_SCENES_SORT_DIRECTION: PerformerScenesSortDirection = 'DESC';
 

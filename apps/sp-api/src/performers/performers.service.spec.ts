@@ -126,10 +126,10 @@ describe('PerformersService', () => {
   });
 
   it('uses default query behavior for performers feed', async () => {
-    await expect(service.getPerformersFeed(1, 50)).resolves.toEqual({
+    await expect(service.getPerformersFeed()).resolves.toEqual({
       total: 1,
       page: 1,
-      perPage: 50,
+      perPage: 24,
       hasMore: false,
       items: [
         {
@@ -148,7 +148,7 @@ describe('PerformersService', () => {
       baseUrl: stashdbIntegration.baseUrl,
       apiKey: stashdbIntegration.apiKey,
       page: 1,
-      perPage: 50,
+      perPage: 24,
       name: undefined,
       gender: undefined,
       sort: 'NAME',
@@ -207,10 +207,10 @@ describe('PerformersService', () => {
   });
 
   it('returns performer-scoped scenes with DATE default sort', async () => {
-    await expect(service.getPerformerScenes('p-1', 1, 25)).resolves.toEqual({
+    await expect(service.getPerformerScenes('p-1')).resolves.toEqual({
       total: 1,
       page: 1,
-      perPage: 25,
+      perPage: 24,
       hasMore: false,
       items: [
         {
@@ -236,7 +236,7 @@ describe('PerformersService', () => {
       apiKey: stashdbIntegration.apiKey,
       performerId: 'p-1',
       page: 1,
-      perPage: 25,
+      perPage: 24,
       sort: 'DATE',
       direction: 'DESC',
       studioIds: [],

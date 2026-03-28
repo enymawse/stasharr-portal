@@ -34,7 +34,7 @@ import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene
   styleUrl: './discover-page.component.scss',
 })
 export class DiscoverPageComponent implements OnInit, AfterViewInit, OnDestroy {
-  private static readonly PAGE_SIZE = 50;
+  private static readonly PAGE_SIZE = 24;
 
   private readonly discoverService = inject(DiscoverService);
   private readonly router = inject(Router);

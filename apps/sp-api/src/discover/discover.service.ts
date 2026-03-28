@@ -14,7 +14,7 @@ import { DiscoverResponseDto } from './dto/discover-item.dto';
 @Injectable()
 export class DiscoverService {
   private static readonly DEFAULT_PAGE = 1;
-  private static readonly DEFAULT_PER_PAGE = 25;
+  private static readonly DEFAULT_PER_PAGE = 24;
 
   constructor(
     private readonly integrationsService: IntegrationsService,

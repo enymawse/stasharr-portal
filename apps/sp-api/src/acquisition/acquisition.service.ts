@@ -29,7 +29,7 @@ import {
 @Injectable()
 export class AcquisitionService {
   private static readonly DEFAULT_PAGE = 1;
-  private static readonly DEFAULT_PER_PAGE = 25;
+  private static readonly DEFAULT_PER_PAGE = 24;
   private static readonly ACQUISITION_LIFECYCLES: SceneLifecycle[] = [
     SceneLifecycle.REQUESTED,
     SceneLifecycle.DOWNLOADING,
