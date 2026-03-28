@@ -4,6 +4,7 @@ import {
   IntegrationType,
   RequestStatus,
 } from '@prisma/client';
+import { IndexingService } from '../indexing/indexing.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
@@ -19,6 +20,13 @@ describe('RequestsService', () => {
   const createMovieMock = jest.fn();
   const getSceneByIdMock = jest.fn();
   const upsertRequestMock = jest.fn();
+  const seedRequestedSceneMock = jest.fn();
+  const requestImmediateRefreshMock = jest.fn();
+
+  const indexingService = {
+    seedRequestedScene: seedRequestedSceneMock,
+    requestImmediateRefresh: requestImmediateRefreshMock,
+  } as unknown as IndexingService;
 
   const integrationsService = {
     findOne: findOneMock,
@@ -62,6 +70,7 @@ describe('RequestsService', () => {
     jest.clearAllMocks();
 
     service = new RequestsService(
+      indexingService,
       integrationsService,
       whisparrAdapter,
       stashdbAdapter,
@@ -97,6 +106,14 @@ describe('RequestsService', () => {
         sourceUrls: [],
       }),
     );
+    upsertRequestMock.mockImplementation(({ where }: { where: { stashId: string } }) =>
+      Promise.resolve({
+        stashId: where.stashId,
+        status: RequestStatus.REQUESTED,
+        updatedAt: new Date('2026-03-27T00:00:00.000Z'),
+      }),
+    );
+    requestImmediateRefreshMock.mockResolvedValue(undefined);
   });
 
   it('returns normalized request options with defaults', async () => {
@@ -175,6 +192,18 @@ describe('RequestsService', () => {
       create: { stashId: 'scene-1', status: RequestStatus.REQUESTED },
       update: { status: RequestStatus.REQUESTED },
     });
+    expect(seedRequestedSceneMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stashId: 'scene-1',
+        whisparrMovieId: 444,
+        whisparrHasFile: false,
+        requestStatus: RequestStatus.REQUESTED,
+      }),
+    );
+    expect(requestImmediateRefreshMock).toHaveBeenCalledWith(
+      ['scene-1'],
+      'request-submitted',
+    );
     expect(result).toEqual({
       accepted: true,
       alreadyExists: false,
@@ -200,6 +229,17 @@ describe('RequestsService', () => {
 
     expect(createMovieMock).not.toHaveBeenCalled();
     expect(upsertRequestMock).toHaveBeenCalledTimes(1);
+    expect(seedRequestedSceneMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stashId: 'scene-1',
+        whisparrMovieId: 999,
+        whisparrHasFile: false,
+      }),
+    );
+    expect(requestImmediateRefreshMock).toHaveBeenCalledWith(
+      ['scene-1'],
+      'request-existing-movie',
+    );
     expect(result).toEqual({
       accepted: true,
       alreadyExists: true,

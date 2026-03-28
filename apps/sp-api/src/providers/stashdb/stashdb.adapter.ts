@@ -217,6 +217,18 @@ export interface StashdbScene {
   duration: number | null;
 }
 
+export interface StashdbSceneMetadata {
+  id: string;
+  title: string;
+  details: string | null;
+  imageUrl: string | null;
+  studioId: string | null;
+  studioName: string | null;
+  studioImageUrl: string | null;
+  releaseDate: string | null;
+  duration: number | null;
+}
+
 export interface StashdbTrendingScenesResult {
   total: number;
   scenes: StashdbScene[];
@@ -269,22 +281,40 @@ export interface StashdbSceneUrl {
   type: string | null;
 }
 
-export interface StashdbSceneDetails {
-  id: string;
-  title: string;
-  details: string | null;
-  imageUrl: string | null;
+export interface StashdbSceneDetails extends StashdbSceneMetadata {
   images: StashdbSceneImage[];
-  studioId: string | null;
   studioIsFavorite: boolean;
-  studioName: string | null;
-  studioImageUrl: string | null;
-  releaseDate: string | null;
-  duration: number | null;
   tags: StashdbSceneTag[];
   performers: StashdbScenePerformer[];
   sourceUrls: StashdbSceneUrl[];
 }
+
+type StashdbSceneMetadataSource = {
+  id?: unknown;
+  title?: unknown;
+  details?: unknown;
+  date?: unknown;
+  release_date?: unknown;
+  production_date?: unknown;
+  duration?: unknown;
+  images?: Array<{
+    id?: unknown;
+    url?: unknown;
+    width?: unknown;
+    height?: unknown;
+  }>;
+  studio?: {
+    id?: unknown;
+    name?: unknown;
+    is_favorite?: unknown;
+    images?: Array<{
+      id?: unknown;
+      url?: unknown;
+      width?: unknown;
+      height?: unknown;
+    }>;
+  } | null;
+};
 
 interface StashdbGraphqlResponse {
   data?: {
@@ -1374,6 +1404,13 @@ export class StashdbAdapter {
       );
     }
 
+    const metadata = this.normalizeSceneMetadata(scene);
+    if (!metadata) {
+      throw new BadGatewayException(
+        'StashDB scene response is missing required fields.',
+      );
+    }
+
     const images = (scene.images ?? [])
       .map((image): StashdbSceneImage | null => {
         if (typeof image.url !== 'string') {
@@ -1393,11 +1430,6 @@ export class StashdbAdapter {
         };
       })
       .filter((image): image is StashdbSceneImage => image !== null);
-
-    const primaryImage = this.selectPrimaryImage(images);
-    const studioImageUrl = this.selectPrimaryImage(
-      this.normalizeImages(scene.studio?.images),
-    )?.url;
 
     const tags = (scene.tags ?? [])
       .map((tag): StashdbSceneTag | null => {
@@ -1474,43 +1506,93 @@ export class StashdbAdapter {
       })
       .filter((sourceUrl): sourceUrl is StashdbSceneUrl => sourceUrl !== null);
 
-    const releaseDate =
-      (typeof scene.release_date === 'string' && scene.release_date.length > 0
-        ? scene.release_date
-        : null) ??
-      (typeof scene.production_date === 'string' &&
-      scene.production_date.length > 0
-        ? scene.production_date
-        : null) ??
-      (typeof scene.date === 'string' && scene.date.length > 0
-        ? scene.date
-        : null);
-
     return {
-      id: scene.id,
-      title: scene.title,
-      details:
-        typeof scene.details === 'string' && scene.details.trim().length > 0
-          ? scene.details
-          : null,
-      imageUrl: primaryImage?.url ?? null,
+      ...metadata,
       images,
-      studioId:
-        typeof scene.studio?.id === 'string' && scene.studio.id.length > 0
-          ? scene.studio.id
-          : null,
       studioIsFavorite: scene.studio?.is_favorite === true,
-      studioName:
-        typeof scene.studio?.name === 'string' && scene.studio.name.length > 0
-          ? scene.studio.name
-          : null,
-      studioImageUrl: studioImageUrl ?? null,
-      releaseDate,
-      duration: typeof scene.duration === 'number' ? scene.duration : null,
       tags,
       performers,
       sourceUrls,
     };
+  }
+
+  async getSceneMetadataByIds(
+    sceneIds: string[],
+    config: StashdbAdapterBaseConfig,
+  ): Promise<StashdbSceneMetadata[]> {
+    const normalizedIds = [...new Set(sceneIds.map((sceneId) => sceneId.trim()).filter(Boolean))];
+    if (normalizedIds.length === 0) {
+      return [];
+    }
+
+    const variableDeclarations = normalizedIds
+      .map((_, index) => `$id${index}: ID!`)
+      .join(', ');
+    const queryFields = normalizedIds
+      .map(
+        (_, index) => `
+          scene_${index}: findScene(id: $id${index}) {
+            id
+            title
+            details
+            date
+            release_date
+            production_date
+            duration
+            images {
+              id
+              url
+              width
+              height
+            }
+            studio {
+              id
+              name
+              images {
+                id
+                url
+                width
+                height
+              }
+            }
+          }
+        `,
+      )
+      .join('\n');
+    const variables = Object.fromEntries(
+      normalizedIds.map((sceneId, index) => [`id${index}`, sceneId]),
+    );
+    const query = `
+      query FindSceneMetadataBatch(${variableDeclarations}) {
+        ${queryFields}
+      }
+    `;
+
+    const payload = await this.executeQueryRaw(config, query, variables);
+    if (
+      payload.errors &&
+      payload.errors.length > 0 &&
+      (!payload.data || Object.keys(payload.data).length === 0)
+    ) {
+      const firstError = payload.errors[0]?.message;
+      const message =
+        typeof firstError === 'string' && firstError.length > 0
+          ? firstError
+          : 'StashDB GraphQL request failed.';
+      throw new BadGatewayException(message);
+    }
+
+    const data = payload.data as Record<string, unknown> | undefined;
+    return normalizedIds
+      .map((_, index) =>
+        this.normalizeSceneMetadata(
+          (data?.[`scene_${index}`] as StashdbSceneMetadataSource | null | undefined) ??
+            null,
+        ),
+      )
+      .filter(
+        (scene): scene is StashdbSceneMetadata => scene !== null,
+      );
   }
 
   private selectPrimaryImage(
@@ -1697,6 +1779,54 @@ export class StashdbAdapter {
         };
       })
       .filter((url): url is StashdbStudioUrl => url !== null);
+  }
+
+  private normalizeSceneMetadata(
+    scene: StashdbSceneMetadataSource | null | undefined,
+  ): StashdbSceneMetadata | null {
+    if (!scene || typeof scene.id !== 'string' || typeof scene.title !== 'string') {
+      return null;
+    }
+
+    const sceneImageUrl = this.selectPrimaryImage(
+      this.normalizeImages(scene.images),
+    )?.url;
+    const studioImageUrl = this.selectPrimaryImage(
+      this.normalizeImages(scene.studio?.images),
+    )?.url;
+    const releaseDate =
+      (typeof scene.release_date === 'string' && scene.release_date.length > 0
+        ? scene.release_date
+        : null) ??
+      (typeof scene.production_date === 'string' &&
+      scene.production_date.length > 0
+        ? scene.production_date
+        : null) ??
+      (typeof scene.date === 'string' && scene.date.length > 0
+        ? scene.date
+        : null);
+
+    return {
+      id: scene.id,
+      title: scene.title,
+      details:
+        typeof scene.details === 'string' && scene.details.trim().length > 0
+          ? scene.details
+          : null,
+      imageUrl: sceneImageUrl ?? null,
+      studioId:
+        typeof scene.studio?.id === 'string' && scene.studio.id.length > 0
+          ? scene.studio.id
+          : null,
+      studioName:
+        typeof scene.studio?.name === 'string' &&
+        scene.studio.name.length > 0
+          ? scene.studio.name
+          : null,
+      studioImageUrl: studioImageUrl ?? null,
+      releaseDate,
+      duration: typeof scene.duration === 'number' ? scene.duration : null,
+    };
   }
 
   private normalizeStudioParent(

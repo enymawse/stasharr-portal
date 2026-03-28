@@ -176,6 +176,101 @@ describe('StashdbAdapter', () => {
     expect(requestBody.query).toContain('images');
   });
 
+  it('batches lightweight scene metadata lookups with GraphQL aliases', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            scene_0: {
+              id: 'scene-1',
+              title: 'Scene 1',
+              details: 'Details 1',
+              date: '2026-03-01',
+              release_date: '2026-03-02',
+              production_date: '2026-03-03',
+              duration: 640,
+              images: [
+                {
+                  id: 'img-1',
+                  url: 'https://scene-1-large.jpg',
+                  width: 1920,
+                  height: 1080,
+                },
+              ],
+              studio: {
+                id: 'studio-1',
+                name: 'Studio One',
+                images: [
+                  {
+                    id: 'studio-1-img',
+                    url: 'https://studio-1-large.jpg',
+                    width: 512,
+                    height: 512,
+                  },
+                ],
+              },
+            },
+            scene_1: {
+              id: 'scene-2',
+              title: 'Scene 2',
+              details: null,
+              date: null,
+              release_date: null,
+              production_date: '2026-04-01',
+              duration: 720,
+              images: [],
+              studio: null,
+            },
+          },
+        }),
+    } as Response);
+
+    const result = await adapter.getSceneMetadataByIds(
+      ['scene-1', 'scene-2'],
+      { baseUrl: 'http://stashdb.local/graphql' },
+    );
+
+    expect(result).toEqual([
+      {
+        id: 'scene-1',
+        title: 'Scene 1',
+        details: 'Details 1',
+        imageUrl: 'https://scene-1-large.jpg',
+        studioId: 'studio-1',
+        studioName: 'Studio One',
+        studioImageUrl: 'https://studio-1-large.jpg',
+        releaseDate: '2026-03-02',
+        duration: 640,
+      },
+      {
+        id: 'scene-2',
+        title: 'Scene 2',
+        details: null,
+        imageUrl: null,
+        studioId: null,
+        studioName: null,
+        studioImageUrl: null,
+        releaseDate: '2026-04-01',
+        duration: 720,
+      },
+    ]);
+
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
+    ) as { query: string; variables: Record<string, string> };
+
+    expect(requestBody.query).toContain('scene_0: findScene(id: $id0)');
+    expect(requestBody.query).toContain('scene_1: findScene(id: $id1)');
+    expect(requestBody.query).not.toContain('performers');
+    expect(requestBody.query).not.toContain('tags');
+    expect(requestBody.query).not.toContain('urls');
+    expect(requestBody.variables).toEqual({
+      id0: 'scene-1',
+      id1: 'scene-2',
+    });
+  });
+
   it('requests date-sorted scenes for the scenes feed', async () => {
     fetchMock.mockResolvedValue({
       ok: true,

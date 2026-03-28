@@ -14,6 +14,56 @@ model Request {
   updatedAt DateTime      @updatedAt
 }
 
+model SceneIndex {
+  stashId               String         @id
+  requestStatus         RequestStatus?
+  requestUpdatedAt      DateTime?
+  title                 String?
+  description           String?
+  imageUrl              String?
+  studioId              String?
+  studioName            String?
+  studioImageUrl        String?
+  releaseDate           String?
+  duration              Int?
+  whisparrMovieId       Int?
+  whisparrHasFile       Boolean?
+  whisparrQueuePosition Int?
+  whisparrQueueStatus   String?
+  whisparrQueueState    String?
+  whisparrErrorMessage  String?
+  stashAvailable        Boolean?
+  computedLifecycle     SceneLifecycle @default(NOT_REQUESTED)
+  lifecycleSortOrder    Int            @default(999)
+  metadataLastSyncedAt  DateTime?
+  whisparrLastSyncedAt  DateTime?
+  stashLastSyncedAt     DateTime?
+  lastSyncedAt          DateTime?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([computedLifecycle, lifecycleSortOrder, whisparrQueuePosition, requestUpdatedAt])
+  @@index([requestUpdatedAt])
+  @@index([whisparrMovieId])
+  @@index([metadataLastSyncedAt])
+  @@index([whisparrLastSyncedAt])
+  @@index([stashLastSyncedAt])
+  @@index([lastSyncedAt])
+}
+
+model SyncState {
+  jobName       String        @id
+  status        SyncJobStatus @default(IDLE)
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  leaseUntil    DateTime?
+  cursor        String?
+  lastError     String?
+  lastSuccessAt DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
 model HomeRail {
   id          String              @id @default(cuid())
   key         HomeRailKey?        @unique
@@ -35,6 +85,22 @@ enum RequestStatus {
   REQUESTED
   PROCESSING
   AVAILABLE
+  FAILED
+}
+
+enum SceneLifecycle {
+  NOT_REQUESTED
+  REQUESTED
+  DOWNLOADING
+  IMPORT_PENDING
+  AVAILABLE
+  FAILED
+}
+
+enum SyncJobStatus {
+  IDLE
+  RUNNING
+  SUCCEEDED
   FAILED
 }
 

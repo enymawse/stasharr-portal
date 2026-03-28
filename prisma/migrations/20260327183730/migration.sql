@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "SceneIndex_computedLifecycle_lifecycleSortOrder_whisparrQ_idx" RENAME TO "SceneIndex_computedLifecycle_lifecycleSortOrder_whisparrQue_idx";

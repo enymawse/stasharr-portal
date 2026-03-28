@@ -7,8 +7,10 @@ import {
 import {
   IntegrationStatus,
   IntegrationType,
+  Request,
   RequestStatus,
 } from '@prisma/client';
+import { IndexingService } from '../indexing/indexing.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
@@ -20,6 +22,7 @@ import { SubmitSceneRequestResponseDto } from './dto/submit-scene-request-respon
 @Injectable()
 export class RequestsService {
   constructor(
+    private readonly indexingService: IndexingService,
     private readonly integrationsService: IntegrationsService,
     private readonly whisparrAdapter: WhisparrAdapter,
     private readonly stashdbAdapter: StashdbAdapter,
@@ -110,7 +113,26 @@ export class RequestsService {
       whisparrConfig,
     );
     if (existingMovie) {
-      await this.upsertLocalRequestRow(normalizedStashId);
+      const request = await this.upsertLocalRequestRow(normalizedStashId);
+      await this.indexingService.seedRequestedScene({
+        stashId: normalizedStashId,
+        requestStatus: request.status,
+        requestUpdatedAt: request.updatedAt,
+        title: scene.title,
+        description: scene.details,
+        imageUrl: scene.imageUrl,
+        studioId: scene.studioId,
+        studioName: scene.studioName,
+        studioImageUrl: scene.studioImageUrl,
+        releaseDate: scene.releaseDate,
+        duration: scene.duration,
+        whisparrMovieId: existingMovie.movieId,
+        whisparrHasFile: existingMovie.hasFile,
+      });
+      void this.indexingService.requestImmediateRefresh(
+        [normalizedStashId],
+        'request-existing-movie',
+      );
       return {
         accepted: true,
         alreadyExists: true,
@@ -185,7 +207,26 @@ export class RequestsService {
       whisparrConfig,
     );
 
-    await this.upsertLocalRequestRow(normalizedStashId);
+    const request = await this.upsertLocalRequestRow(normalizedStashId);
+    await this.indexingService.seedRequestedScene({
+      stashId: normalizedStashId,
+      requestStatus: request.status,
+      requestUpdatedAt: request.updatedAt,
+      title: scene.title,
+      description: scene.details,
+      imageUrl: scene.imageUrl,
+      studioId: scene.studioId,
+      studioName: scene.studioName,
+      studioImageUrl: scene.studioImageUrl,
+      releaseDate: scene.releaseDate,
+      duration: scene.duration,
+      whisparrMovieId: createdMovie.movieId ?? undefined,
+      whisparrHasFile: false,
+    });
+    void this.indexingService.requestImmediateRefresh(
+      [normalizedStashId],
+      'request-submitted',
+    );
 
     return {
       accepted: true,
@@ -195,8 +236,8 @@ export class RequestsService {
     };
   }
 
-  private async upsertLocalRequestRow(stashId: string): Promise<void> {
-    await this.prisma.request.upsert({
+  private async upsertLocalRequestRow(stashId: string): Promise<Request> {
+    return this.prisma.request.upsert({
       where: { stashId },
       create: {
         stashId,

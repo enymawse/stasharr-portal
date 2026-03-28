@@ -3,6 +3,7 @@ import {
   IntegrationType,
   RequestStatus,
 } from '@prisma/client';
+import { IndexingService } from '../indexing/indexing.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
@@ -23,6 +24,13 @@ describe('SceneStatusService', () => {
   const findMovieByStashIdMock = jest.fn();
   const getQueueSnapshotMock = jest.fn();
   const findScenesByStashIdMock = jest.fn();
+  const getFreshSceneIndexRowsMock = jest.fn();
+  const toSceneStatusMock = jest.fn();
+
+  const indexingService = {
+    getFreshSceneIndexRows: getFreshSceneIndexRowsMock,
+    toSceneStatus: toSceneStatusMock,
+  } as unknown as IndexingService;
 
   const integrationsService = {
     findOne: findOneMock,
@@ -56,6 +64,7 @@ describe('SceneStatusService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = new SceneStatusService(
+      indexingService,
       prisma,
       integrationsService,
       stashAdapter,
@@ -78,6 +87,10 @@ describe('SceneStatusService', () => {
     findScenesByStashIdMock.mockResolvedValue([]);
     findMovieByStashIdMock.mockResolvedValue(null);
     getQueueSnapshotMock.mockResolvedValue([]);
+    getFreshSceneIndexRowsMock.mockResolvedValue(new Map());
+    toSceneStatusMock.mockImplementation((row: { computedLifecycle: string }) => ({
+      state: row.computedLifecycle,
+    }));
   });
 
   describe('resolveForScene', () => {
@@ -94,6 +107,27 @@ describe('SceneStatusService', () => {
       await expect(service.resolveForScene('scene-1')).resolves.toEqual({
         state: 'NOT_REQUESTED',
       });
+    });
+
+    it('returns a fresh indexed lifecycle without provider lookups', async () => {
+      getFreshSceneIndexRowsMock.mockResolvedValue(
+        new Map([
+          [
+            'scene-1',
+            {
+              stashId: 'scene-1',
+              computedLifecycle: 'DOWNLOADING',
+            },
+          ],
+        ]),
+      );
+
+      await expect(service.resolveForScene('scene-1')).resolves.toEqual({
+        state: 'DOWNLOADING',
+      });
+      expect(findScenesByStashIdMock).not.toHaveBeenCalled();
+      expect(findMovieByStashIdMock).not.toHaveBeenCalled();
+      expect(getQueueSnapshotMock).not.toHaveBeenCalled();
     });
 
     it('returns REQUESTED when a fallback Request row exists without Whisparr evidence yet', async () => {
@@ -289,6 +323,33 @@ describe('SceneStatusService', () => {
       expect(result.get('scene-3')).toEqual({ state: 'IMPORT_PENDING' });
       expect(result.get('scene-4')).toEqual({ state: 'AVAILABLE' });
       expect(result.get('scene-5')).toEqual({ state: 'FAILED' });
+    });
+
+    it('reuses indexed statuses before falling back to remote resolution', async () => {
+      getFreshSceneIndexRowsMock.mockResolvedValue(
+        new Map([
+          [
+            'scene-1',
+            {
+              stashId: 'scene-1',
+              computedLifecycle: 'AVAILABLE',
+            },
+          ],
+        ]),
+      );
+      requestDelegate.findMany.mockResolvedValue([
+        { stashId: 'scene-2', status: RequestStatus.REQUESTED },
+      ]);
+
+      const result = await service.resolveForScenes(['scene-1', 'scene-2']);
+
+      expect(result).toEqual(
+        new Map([
+          ['scene-1', { state: 'AVAILABLE' }],
+          ['scene-2', { state: 'REQUESTED' }],
+        ]),
+      );
+      expect(findScenesByStashIdMock).toHaveBeenCalledTimes(1);
     });
 
     it('uses queue status as the batch classifier for stalled/problem downloads', async () => {

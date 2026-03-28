@@ -1,45 +1,70 @@
-import { BadRequestException } from '@nestjs/common';
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
+import { IndexingService } from '../indexing/indexing.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
-import { SceneStatusService } from '../scene-status/scene-status.service';
 import { AcquisitionService } from './acquisition.service';
+
+function buildIndexedRow(overrides: Record<string, unknown> = {}) {
+  return {
+    stashId: 'scene-1',
+    requestStatus: null,
+    requestUpdatedAt: new Date('2026-03-10T00:00:00.000Z'),
+    title: 'Title scene-1',
+    description: 'Description scene-1',
+    imageUrl: 'http://image/scene-1',
+    studioId: 'studio-1',
+    studioName: 'Studio',
+    studioImageUrl: 'http://studio/image',
+    releaseDate: '2026-03-01',
+    duration: 720,
+    whisparrMovieId: 44,
+    whisparrHasFile: false,
+    whisparrQueuePosition: 0,
+    whisparrQueueStatus: 'downloading',
+    whisparrQueueState: 'downloading',
+    whisparrErrorMessage: null,
+    stashAvailable: false,
+    computedLifecycle: 'DOWNLOADING',
+    lifecycleSortOrder: 1,
+    metadataLastSyncedAt: new Date('2026-03-10T00:00:00.000Z'),
+    whisparrLastSyncedAt: new Date('2026-03-10T00:00:00.000Z'),
+    stashLastSyncedAt: new Date('2026-03-10T00:00:00.000Z'),
+    lastSyncedAt: new Date('2026-03-10T00:00:00.000Z'),
+    createdAt: new Date('2026-03-10T00:00:00.000Z'),
+    updatedAt: new Date('2026-03-10T00:00:00.000Z'),
+    ...overrides,
+  };
+}
 
 describe('AcquisitionService', () => {
   const findOneMock = jest.fn();
-  const getQueueSnapshotMock = jest.fn();
-  const getMovieSnapshotMock = jest.fn();
   const buildSceneViewUrlMock = jest.fn();
-  const getSceneByIdMock = jest.fn();
-  const getScenesBySortMock = jest.fn();
-  const resolveForScenesWithEvidenceMock = jest.fn();
-  const requestFindManyMock = jest.fn();
+  const requestMetadataHydrationForStashIdsMock = jest.fn();
+  const toSceneStatusMock = jest.fn();
+  const sceneIndexFindManyMock = jest.fn();
+  const sceneIndexCountMock = jest.fn();
+  const transactionMock = jest.fn();
+
+  const indexingService = {
+    requestMetadataHydrationForStashIds: requestMetadataHydrationForStashIdsMock,
+    toSceneStatus: toSceneStatusMock,
+  } as unknown as IndexingService;
 
   const integrationsService = {
     findOne: findOneMock,
   } as unknown as IntegrationsService;
 
   const whisparrAdapter = {
-    getQueueSnapshot: getQueueSnapshotMock,
-    getMovieSnapshot: getMovieSnapshotMock,
     buildSceneViewUrl: buildSceneViewUrlMock,
   } as unknown as WhisparrAdapter;
 
-  const stashdbAdapter = {
-    getSceneById: getSceneByIdMock,
-    getScenesBySort: getScenesBySortMock,
-  } as unknown as StashdbAdapter;
-
-  const sceneStatusService = {
-    resolveForScenesWithEvidence: resolveForScenesWithEvidenceMock,
-  } as unknown as SceneStatusService;
-
   const prismaService = {
-    request: {
-      findMany: requestFindManyMock,
+    sceneIndex: {
+      findMany: sceneIndexFindManyMock,
+      count: sceneIndexCountMock,
     },
+    $transaction: transactionMock,
   } as unknown as PrismaService;
 
   const configuredWhisparrIntegration = {
@@ -49,114 +74,86 @@ describe('AcquisitionService', () => {
     apiKey: 'wh-key',
   };
 
-  const configuredStashdbIntegration = {
-    enabled: true,
-    status: IntegrationStatus.CONFIGURED,
-    baseUrl: 'http://stashdb.local',
-    apiKey: 'stashdb-key',
-  };
-
   let service: AcquisitionService;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
     service = new AcquisitionService(
+      indexingService,
       integrationsService,
       whisparrAdapter,
-      stashdbAdapter,
-      sceneStatusService,
       prismaService,
     );
 
+    buildSceneViewUrlMock.mockImplementation(
+      (baseUrl: string, movieId: number) => `${baseUrl}/movie/${movieId}`,
+    );
+    toSceneStatusMock.mockImplementation((row: { computedLifecycle: string }) => ({
+      state: row.computedLifecycle,
+    }));
+    transactionMock.mockImplementation((operations: Array<Promise<unknown>>) =>
+      Promise.all(operations),
+    );
     findOneMock.mockImplementation((type: IntegrationType) => {
       if (type === IntegrationType.WHISPARR) {
         return configuredWhisparrIntegration;
       }
 
-      if (type === IntegrationType.STASHDB) {
-        return configuredStashdbIntegration;
-      }
-
-      throw new Error('Unexpected integration type');
+      throw new Error(`Unexpected integration type: ${type}`);
     });
 
-    buildSceneViewUrlMock.mockImplementation(
-      (baseUrl: string, movieId: number) => `${baseUrl}/movie/${movieId}`,
+    sceneIndexCountMock.mockImplementation(
+      (args?: { where?: { computedLifecycle?: unknown } }) => {
+        const lifecycle = args?.where?.computedLifecycle;
+        if (!lifecycle) {
+          return Promise.resolve(4);
+        }
+
+        if (typeof lifecycle === 'string') {
+          return Promise.resolve(
+            lifecycle === 'REQUESTED' ||
+              lifecycle === 'DOWNLOADING' ||
+              lifecycle === 'IMPORT_PENDING' ||
+              lifecycle === 'FAILED'
+              ? 1
+              : 0,
+          );
+        }
+
+        if (
+          lifecycle &&
+          typeof lifecycle === 'object' &&
+          Array.isArray((lifecycle as { in?: unknown[] }).in)
+        ) {
+          return Promise.resolve(4);
+        }
+
+        return Promise.resolve(0);
+      },
     );
-    getSceneByIdMock.mockImplementation((stashId: string) =>
-      Promise.resolve({
-        id: stashId,
-        title: `Title ${stashId}`,
-        details: `Description ${stashId}`,
-        imageUrl: `http://image/${stashId}`,
-        images: [],
-        studioId: 'studio-1',
-        studioName: 'Studio',
-        studioImageUrl: 'http://studio/image',
-        releaseDate: '2026-03-01',
-        duration: 720,
-        tags: [],
-        performers: [],
-        sourceUrls: [],
+
+    sceneIndexFindManyMock.mockResolvedValue([
+      buildIndexedRow({
+        stashId: 'scene-failed',
+        title: 'Title scene-failed',
+        computedLifecycle: 'FAILED',
+        lifecycleSortOrder: 0,
+        whisparrMovieId: 40,
+        whisparrQueueStatus: 'failed',
+        whisparrQueueState: 'warning',
       }),
-    );
+      buildIndexedRow({
+        stashId: 'scene-downloading',
+        title: 'Title scene-downloading',
+        computedLifecycle: 'DOWNLOADING',
+        lifecycleSortOrder: 1,
+        whisparrMovieId: 20,
+      }),
+    ]);
   });
 
-  function configureMixedLifecycleState(): void {
-    requestFindManyMock.mockResolvedValue([
-      {
-        stashId: 'scene-requested',
-        createdAt: new Date('2026-03-01T00:00:00.000Z'),
-        updatedAt: new Date('2026-03-05T00:00:00.000Z'),
-      },
-      {
-        stashId: 'scene-available',
-        createdAt: new Date('2026-03-02T00:00:00.000Z'),
-        updatedAt: new Date('2026-03-04T00:00:00.000Z'),
-      },
-    ]);
-
-    getQueueSnapshotMock.mockResolvedValue([
-      {
-        movieId: 20,
-        status: 'downloading',
-        trackedDownloadState: 'downloading',
-        trackedDownloadStatus: 'ok',
-        errorMessage: null,
-      },
-      {
-        movieId: 40,
-        status: 'failed',
-        trackedDownloadState: 'warning',
-        trackedDownloadStatus: 'warning',
-        errorMessage: 'download failed',
-      },
-    ]);
-
-    getMovieSnapshotMock.mockResolvedValue([
-      { movieId: 20, stashId: 'scene-downloading', hasFile: false },
-      { movieId: 30, stashId: 'scene-import', hasFile: true },
-      { movieId: 40, stashId: 'scene-failed', hasFile: false },
-      { movieId: 50, stashId: 'scene-available', hasFile: true },
-      { movieId: 60, stashId: 'scene-not-requested', hasFile: false },
-    ]);
-
-    resolveForScenesWithEvidenceMock.mockResolvedValue(
-      new Map([
-        ['scene-downloading', { state: 'DOWNLOADING' }],
-        ['scene-failed', { state: 'FAILED' }],
-        ['scene-requested', { state: 'REQUESTED' }],
-        ['scene-available', { state: 'AVAILABLE' }],
-        ['scene-import', { state: 'IMPORT_PENDING' }],
-        ['scene-not-requested', { state: 'NOT_REQUESTED' }],
-      ]),
-    );
-  }
-
-  it('builds the acquisition feed from local lifecycle evidence and excludes terminal states', async () => {
-    configureMixedLifecycleState();
-
+  it('builds the acquisition feed from the local scene index', async () => {
     const result = await service.getScenesFeed(1, 2);
 
     expect(result.total).toBe(4);
@@ -174,79 +171,101 @@ describe('AcquisitionService', () => {
     expect(result.items[0]?.whisparrViewUrl).toBe(
       'http://whisparr.local/movie/40',
     );
-    expect(resolveForScenesWithEvidenceMock).toHaveBeenCalledWith(
-      [
-        'scene-downloading',
-        'scene-failed',
-        'scene-requested',
-        'scene-available',
-        'scene-import',
-        'scene-not-requested',
-      ],
+    expect(sceneIndexFindManyMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        queueItems: expect.any(Array),
-        movieByStashId: expect.any(Map),
+        where: {
+          computedLifecycle: {
+            in: ['REQUESTED', 'DOWNLOADING', 'IMPORT_PENDING', 'FAILED'],
+          },
+        },
+        skip: 0,
+        take: 2,
       }),
     );
-    expect(getSceneByIdMock.mock.calls.map(([stashId]) => stashId)).toEqual([
-      'scene-failed',
-      'scene-downloading',
-    ]);
-    expect(getScenesBySortMock).not.toHaveBeenCalled();
+    expect(requestMetadataHydrationForStashIdsMock).not.toHaveBeenCalled();
   });
 
   it.each([
-    ['REQUESTED', 'scene-requested'],
-    ['DOWNLOADING', 'scene-downloading'],
-    ['IMPORT_PENDING', 'scene-import'],
-    ['FAILED', 'scene-failed'],
+    ['REQUESTED', 1],
+    ['DOWNLOADING', 1],
+    ['IMPORT_PENDING', 1],
+    ['FAILED', 1],
   ] as const)(
-    'filters acquisition feed to %s scenes',
-    async (lifecycle, expectedSceneId) => {
-      configureMixedLifecycleState();
+    'filters acquisition feed to %s scenes in the database query',
+    async (lifecycle, expectedTotal) => {
+      sceneIndexFindManyMock.mockResolvedValue([
+        buildIndexedRow({
+          stashId: `scene-${lifecycle.toLowerCase()}`,
+          computedLifecycle: lifecycle,
+        }),
+      ]);
+      sceneIndexCountMock.mockImplementation(
+        (args?: { where?: { computedLifecycle?: unknown } }) => {
+          const filter = args?.where?.computedLifecycle;
+          if (filter === lifecycle) {
+            return Promise.resolve(expectedTotal);
+          }
+
+          if (
+            filter &&
+            typeof filter === 'object' &&
+            Array.isArray((filter as { in?: unknown[] }).in)
+          ) {
+            return Promise.resolve(4);
+          }
+
+          return Promise.resolve(1);
+        },
+      );
 
       const result = await service.getScenesFeed(1, 25, lifecycle);
 
-      expect(result.total).toBe(1);
-      expect(result.hasMore).toBe(false);
-      expect(result.items.map((item) => item.id)).toEqual([expectedSceneId]);
+      expect(result.total).toBe(expectedTotal);
+      expect(sceneIndexFindManyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            computedLifecycle: lifecycle,
+          },
+        }),
+      );
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]?.status).toEqual({ state: lifecycle });
     },
   );
 
-  it('shows a newly requested scene from the local request table even before queue activity exists', async () => {
-    requestFindManyMock.mockResolvedValue([
-      {
-        stashId: 'scene-new',
-        createdAt: new Date('2026-03-12T00:00:00.000Z'),
-        updatedAt: new Date('2026-03-12T00:00:00.000Z'),
-      },
+  it('schedules metadata hydration only for the requested page window', async () => {
+    sceneIndexFindManyMock.mockResolvedValue([
+      buildIndexedRow({
+        stashId: 'scene-missing-metadata',
+        title: null,
+        metadataLastSyncedAt: null,
+        computedLifecycle: 'REQUESTED',
+        whisparrMovieId: 99,
+      }),
     ]);
-    getQueueSnapshotMock.mockResolvedValue([]);
-    getMovieSnapshotMock.mockResolvedValue([]);
-    resolveForScenesWithEvidenceMock.mockResolvedValue(
-      new Map([['scene-new', { state: 'REQUESTED' }]]),
+    sceneIndexCountMock.mockImplementation(
+      (args?: { where?: { computedLifecycle?: unknown } }) => {
+        const filter = args?.where?.computedLifecycle;
+        if (filter === 'REQUESTED') {
+          return Promise.resolve(1);
+        }
+        if (
+          filter &&
+          typeof filter === 'object' &&
+          Array.isArray((filter as { in?: unknown[] }).in)
+        ) {
+          return Promise.resolve(1);
+        }
+        return Promise.resolve(0);
+      },
     );
 
     const result = await service.getScenesFeed(1, 25, 'REQUESTED');
 
-    expect(result.total).toBe(1);
-    expect(result.items.map((item) => item.id)).toEqual(['scene-new']);
-    expect(result.items[0]?.whisparrViewUrl).toBeNull();
-  });
-
-  it('throws when STASHDB integration has no baseUrl', async () => {
-    findOneMock.mockImplementation((type: IntegrationType) => {
-      if (type === IntegrationType.STASHDB) {
-        return {
-          ...configuredStashdbIntegration,
-          baseUrl: '   ',
-        };
-      }
-      return configuredWhisparrIntegration;
-    });
-
-    await expect(service.getScenesFeed()).rejects.toBeInstanceOf(
-      BadRequestException,
+    expect(requestMetadataHydrationForStashIdsMock).toHaveBeenCalledWith(
+      ['scene-missing-metadata'],
+      'acquisition-page',
     );
+    expect(result.items[0]?.title).toBe('scene-missing-metadata');
   });
 });

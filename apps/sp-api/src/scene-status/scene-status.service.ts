@@ -4,6 +4,7 @@ import {
   IntegrationType,
   RequestStatus,
 } from '@prisma/client';
+import { IndexingService } from '../indexing/indexing.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
@@ -38,6 +39,7 @@ export class SceneStatusService {
   >();
 
   constructor(
+    private readonly indexingService: IndexingService,
     private readonly prisma: PrismaService,
     private readonly integrationsService: IntegrationsService,
     private readonly stashAdapter: StashAdapter,
@@ -49,6 +51,14 @@ export class SceneStatusService {
     if (!normalized) {
       this.logger.debug('resolveForScene received empty stashId.');
       return SceneStatusService.NOT_REQUESTED;
+    }
+
+    const indexedRows = await this.indexingService.getFreshSceneIndexRows([
+      normalized,
+    ]);
+    const indexedRow = indexedRows.get(normalized);
+    if (indexedRow) {
+      return this.indexingService.toSceneStatus(indexedRow);
     }
 
     const [fallbackRequestStatus, stashConfig, whisparrConfig] =
@@ -164,17 +174,27 @@ export class SceneStatusService {
       return new Map();
     }
 
+    const indexedRows = await this.indexingService.getFreshSceneIndexRows(
+      normalizedIds,
+    );
+    if (indexedRows.size === normalizedIds.length) {
+      return this.mergeResolvedStatuses(normalizedIds, indexedRows, new Map());
+    }
+
+    const unresolvedIds = normalizedIds.filter(
+      (stashId) => !indexedRows.has(stashId),
+    );
     const [fallbackStatuses, stashConfig, whisparrConfig] = await Promise.all([
-      this.resolveFallbackStatusesForScenes(normalizedIds),
+      this.resolveFallbackStatusesForScenes(unresolvedIds),
       this.getStashConfig(),
       this.getWhisparrConfig(),
     ]);
     const stashAvailability = await this.resolveStashAvailabilityForScenes(
-      normalizedIds,
+      unresolvedIds,
       stashConfig,
     );
     const resolvedStatuses = this.resolveFallbackSceneStatuses(
-      normalizedIds,
+      unresolvedIds,
       fallbackStatuses,
       stashAvailability,
     );
@@ -182,9 +202,10 @@ export class SceneStatusService {
       `resolveForScenes fallback map prepared: ${this.safeJson({
         inputCount: stashIds.length,
         normalizedCount: normalizedIds.length,
-        normalizedIds,
+        unresolvedIds,
         fallbackStatuses: Array.from(fallbackStatuses.entries()),
         stashAvailability: Array.from(stashAvailability.entries()),
+        indexedRows: Array.from(indexedRows.keys()),
       })}`,
     );
 
@@ -192,14 +213,22 @@ export class SceneStatusService {
       this.logger.debug(
         'Whisparr config unavailable for batch resolution; returning fallback map.',
       );
-      return resolvedStatuses;
+      return this.mergeResolvedStatuses(
+        normalizedIds,
+        indexedRows,
+        resolvedStatuses,
+      );
     }
 
-    const unresolvedIds = normalizedIds.filter(
+    const unresolvedRemoteIds = unresolvedIds.filter(
       (stashId) => stashAvailability.get(stashId) !== true,
     );
-    if (unresolvedIds.length === 0) {
-      return resolvedStatuses;
+    if (unresolvedRemoteIds.length === 0) {
+      return this.mergeResolvedStatuses(
+        normalizedIds,
+        indexedRows,
+        resolvedStatuses,
+      );
     }
 
     let queueItems = evidence?.queueItems;
@@ -219,16 +248,23 @@ export class SceneStatusService {
             this.serializeError(error),
           )}`,
         );
-        return resolvedStatuses;
+        return this.mergeResolvedStatuses(
+          normalizedIds,
+          indexedRows,
+          resolvedStatuses,
+        );
       }
     }
 
     const movieByStashId =
       evidence?.movieByStashId ??
-      (await this.lookupWhisparrMoviesForScenes(unresolvedIds, whisparrConfig));
+      (await this.lookupWhisparrMoviesForScenes(
+        unresolvedRemoteIds,
+        whisparrConfig,
+      ));
     const resolvedQueueItems = queueItems ?? [];
 
-    for (const stashId of unresolvedIds) {
+    for (const stashId of unresolvedRemoteIds) {
       resolvedStatuses.set(
         stashId,
         resolveSceneStatus({
@@ -247,7 +283,30 @@ export class SceneStatusService {
       )}`,
     );
 
-    return resolvedStatuses;
+    return this.mergeResolvedStatuses(normalizedIds, indexedRows, resolvedStatuses);
+  }
+
+  private mergeResolvedStatuses(
+    orderedIds: string[],
+    indexedRows: Map<string, { computedLifecycle: SceneStatusDto['state'] }>,
+    resolvedStatuses: Map<string, SceneStatusDto>,
+  ): Map<string, SceneStatusDto> {
+    const merged = new Map<string, SceneStatusDto>();
+
+    for (const stashId of orderedIds) {
+      const indexedRow = indexedRows.get(stashId);
+      if (indexedRow) {
+        merged.set(stashId, this.indexingService.toSceneStatus(indexedRow));
+        continue;
+      }
+
+      const resolved = resolvedStatuses.get(stashId);
+      if (resolved) {
+        merged.set(stashId, resolved);
+      }
+    }
+
+    return merged;
   }
 
   private async lookupWhisparrMoviesForScenes(
