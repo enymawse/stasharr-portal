@@ -124,6 +124,9 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly selectedDirection = signal<LibrarySortDirection>(
     LibraryPageComponent.DEFAULT_DIRECTION,
   );
+  protected readonly favoritePerformersOnly = signal(false);
+  protected readonly favoriteStudiosOnly = signal(false);
+  protected readonly favoriteTagsOnly = signal(false);
   protected readonly selectedTagMode = signal<LibraryTagMatchMode>(
     LibraryPageComponent.DEFAULT_TAG_MODE,
   );
@@ -253,6 +256,9 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.queryTerm().trim().length > 0 ||
       this.selectedSort() !== LibraryPageComponent.DEFAULT_SORT ||
       this.selectedDirection() !== LibraryPageComponent.DEFAULT_DIRECTION ||
+      this.favoritePerformersOnly() ||
+      this.favoriteStudiosOnly() ||
+      this.favoriteTagsOnly() ||
       this.selectedTagMode() !== LibraryPageComponent.DEFAULT_TAG_MODE ||
       this.selectedTags().length > 0 ||
       this.selectedStudios().length > 0
@@ -267,6 +273,9 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.queryTerm.set('');
     this.selectedSort.set(LibraryPageComponent.DEFAULT_SORT);
     this.selectedDirection.set(LibraryPageComponent.DEFAULT_DIRECTION);
+    this.favoritePerformersOnly.set(false);
+    this.favoriteStudiosOnly.set(false);
+    this.favoriteTagsOnly.set(false);
     this.selectedTagMode.set(LibraryPageComponent.DEFAULT_TAG_MODE);
     this.selectedTags.set([]);
     this.selectedTagIdsModel.set([]);
@@ -292,7 +301,7 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected libraryResultsNote(): string {
-    return 'This page is served from the local library projection in the app database, not from StashDB discovery.';
+    return 'This page is served from the local library projection in the app database and includes local-only favorite overlays.';
   }
 
   protected emptyStateMessage(): string {
@@ -319,6 +328,36 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected onStudioFilterPanelHide(): void {
     this.onStudioFilterChanged('');
+  }
+
+  protected onFavoritePerformersOnlyChanged(nextValue: boolean): void {
+    if (this.favoritePerformersOnly() === nextValue) {
+      return;
+    }
+
+    this.favoritePerformersOnly.set(nextValue);
+    this.syncUrlWithCurrentFilters(false);
+    this.resetFeedAndReload();
+  }
+
+  protected onFavoriteStudiosOnlyChanged(nextValue: boolean): void {
+    if (this.favoriteStudiosOnly() === nextValue) {
+      return;
+    }
+
+    this.favoriteStudiosOnly.set(nextValue);
+    this.syncUrlWithCurrentFilters(false);
+    this.resetFeedAndReload();
+  }
+
+  protected onFavoriteTagsOnlyChanged(nextValue: boolean): void {
+    if (this.favoriteTagsOnly() === nextValue) {
+      return;
+    }
+
+    this.favoriteTagsOnly.set(nextValue);
+    this.syncUrlWithCurrentFilters(false);
+    this.resetFeedAndReload();
   }
 
   protected studioSelectEmptyMessage(): string {
@@ -451,6 +490,9 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
         tagIds: this.selectedTagIds(),
         tagMode: this.selectedTagMode(),
         studioIds: this.selectedStudioIds(),
+        favoritePerformersOnly: this.favoritePerformersOnly(),
+        favoriteStudiosOnly: this.favoriteStudiosOnly(),
+        favoriteTagsOnly: this.favoriteTagsOnly(),
       })
       .pipe(
         finalize(() => {
@@ -566,6 +608,9 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     query: string;
     sort: LibrarySceneSort;
     direction: LibrarySortDirection;
+    favoritePerformersOnly: boolean;
+    favoriteStudiosOnly: boolean;
+    favoriteTagsOnly: boolean;
     mode: LibraryTagMatchMode;
     tagIds: string[];
     tagNamesById: Map<string, string>;
@@ -586,11 +631,16 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
       directionParam === 'ASC' || directionParam === 'DESC'
         ? directionParam
         : LibraryPageComponent.DEFAULT_DIRECTION;
+    const favoritePerformersOnly = ['1', 'true'].includes(
+      queryParamMap.get('favoritePerformersOnly') ?? '',
+    );
+    const favoriteStudiosOnly = ['1', 'true'].includes(
+      queryParamMap.get('favoriteStudiosOnly') ?? '',
+    );
+    const favoriteTagsOnly = ['1', 'true'].includes(queryParamMap.get('favoriteTagsOnly') ?? '');
     const modeParam = queryParamMap.get('mode');
     const mode: LibraryTagMatchMode =
-      modeParam === 'OR' || modeParam === 'AND'
-        ? modeParam
-        : LibraryPageComponent.DEFAULT_TAG_MODE;
+      modeParam === 'OR' || modeParam === 'AND' ? modeParam : LibraryPageComponent.DEFAULT_TAG_MODE;
 
     const rawTagIds = (queryParamMap.get('tags') ?? '')
       .split(',')
@@ -626,6 +676,9 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
       query,
       sort,
       direction,
+      favoritePerformersOnly,
+      favoriteStudiosOnly,
+      favoriteTagsOnly,
       mode,
       tagIds: this.dedupeStrings(rawTagIds),
       tagNamesById,
@@ -638,6 +691,9 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     query: string;
     sort: LibrarySceneSort;
     direction: LibrarySortDirection;
+    favoritePerformersOnly: boolean;
+    favoriteStudiosOnly: boolean;
+    favoriteTagsOnly: boolean;
     mode: LibraryTagMatchMode;
     tagIds: string[];
     tagNamesById: Map<string, string>;
@@ -652,6 +708,9 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
       this.queryTerm() !== state.query ||
       this.selectedSort() !== state.sort ||
       this.selectedDirection() !== state.direction ||
+      this.favoritePerformersOnly() !== state.favoritePerformersOnly ||
+      this.favoriteStudiosOnly() !== state.favoriteStudiosOnly ||
+      this.favoriteTagsOnly() !== state.favoriteTagsOnly ||
       this.selectedTagMode() !== state.mode ||
       tagsChanged ||
       studiosChanged;
@@ -663,6 +722,9 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.queryTerm.set(state.query);
     this.selectedSort.set(state.sort);
     this.selectedDirection.set(state.direction);
+    this.favoritePerformersOnly.set(state.favoritePerformersOnly);
+    this.favoriteStudiosOnly.set(state.favoriteStudiosOnly);
+    this.favoriteTagsOnly.set(state.favoriteTagsOnly);
     this.selectedTagMode.set(state.mode);
     this.selectedTagIdsModel.set(state.tagIds);
 
@@ -702,6 +764,9 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
         this.selectedDirection() === LibraryPageComponent.DEFAULT_DIRECTION
           ? null
           : this.selectedDirection(),
+      favoritePerformersOnly: this.favoritePerformersOnly() ? '1' : null,
+      favoriteStudiosOnly: this.favoriteStudiosOnly() ? '1' : null,
+      favoriteTagsOnly: this.favoriteTagsOnly() ? '1' : null,
       mode:
         this.selectedTagMode() === LibraryPageComponent.DEFAULT_TAG_MODE
           ? null
@@ -727,6 +792,9 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
       (current.get('query') ?? null) === next.query &&
       (current.get('sort') ?? null) === next.sort &&
       (current.get('dir') ?? null) === next.dir &&
+      (current.get('favoritePerformersOnly') ?? null) === next.favoritePerformersOnly &&
+      (current.get('favoriteStudiosOnly') ?? null) === next.favoriteStudiosOnly &&
+      (current.get('favoriteTagsOnly') ?? null) === next.favoriteTagsOnly &&
       (current.get('mode') ?? null) === next.mode &&
       (current.get('tags') ?? null) === next.tags &&
       (current.get('tagNames') ?? null) === next.tagNames &&

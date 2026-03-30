@@ -18,7 +18,7 @@ export class ScenesFeedItemDto {
 }
 
 export class ScenesFeedResponseDto {
-  total!: number | null;
+  total!: number;
   page!: number;
   perPage!: number;
   hasMore!: boolean;

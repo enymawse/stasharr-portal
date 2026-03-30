@@ -80,7 +80,11 @@ describe('LibraryService', () => {
     expect(librarySceneIndexFindManyMock).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {},
-        orderBy: [{ releaseDate: 'desc' }, { title: 'asc' }, { stashSceneId: 'asc' }],
+        orderBy: [
+          { releaseDate: 'desc' },
+          { title: 'asc' },
+          { stashSceneId: 'asc' },
+        ],
         skip: 0,
         take: 2,
       }),
@@ -125,6 +129,30 @@ describe('LibraryService', () => {
         orderBy: [{ title: 'asc' }, { stashSceneId: 'asc' }],
         skip: 10,
         take: 10,
+      }),
+    );
+  });
+
+  it('applies local favorite overlay filters from the library surface', async () => {
+    await service.getScenesFeed(
+      1,
+      24,
+      'UPDATED_AT',
+      'DESC',
+      undefined,
+      [],
+      'OR',
+      [],
+      true,
+      true,
+      false,
+    );
+
+    expect(librarySceneIndexFindManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [{ hasFavoritePerformer: true }, { favoriteStudio: true }],
+        },
       }),
     );
   });

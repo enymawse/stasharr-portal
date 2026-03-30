@@ -110,6 +110,9 @@ describe('LibraryPageComponent', () => {
       tagIds: [],
       tagMode: 'OR',
       studioIds: [],
+      favoritePerformersOnly: false,
+      favoriteStudiosOnly: false,
+      favoriteTagsOnly: false,
     });
     expect(navigateSpy).not.toHaveBeenCalled();
     expect(resetButton?.disabled).toBe(true);
@@ -145,6 +148,9 @@ describe('LibraryPageComponent', () => {
       tagIds: [],
       tagMode: 'OR',
       studioIds: [],
+      favoritePerformersOnly: false,
+      favoriteStudiosOnly: false,
+      favoriteTagsOnly: false,
     });
     expect(navigateSpy).toHaveBeenCalledWith([], {
       relativeTo: expect.anything(),
@@ -152,6 +158,9 @@ describe('LibraryPageComponent', () => {
         query: null,
         sort: null,
         dir: null,
+        favoritePerformersOnly: null,
+        favoriteStudiosOnly: null,
+        favoriteTagsOnly: null,
         mode: null,
         tags: null,
         tagNames: null,
@@ -160,6 +169,26 @@ describe('LibraryPageComponent', () => {
       },
       queryParamsHandling: 'merge',
       replaceUrl: false,
+    });
+  });
+
+  it('loads local favorite overlay filters from the library route', async () => {
+    const { libraryService } = await renderPage({
+      favoritePerformersOnly: '1',
+      favoriteStudiosOnly: '1',
+      favoriteTagsOnly: '1',
+    });
+
+    expect(libraryService.getScenesFeed).toHaveBeenCalledWith(1, 24, {
+      query: undefined,
+      sort: 'RELEASE_DATE',
+      direction: 'DESC',
+      tagIds: [],
+      tagMode: 'OR',
+      studioIds: [],
+      favoritePerformersOnly: true,
+      favoriteStudiosOnly: true,
+      favoriteTagsOnly: true,
     });
   });
 });

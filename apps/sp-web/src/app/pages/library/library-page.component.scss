@@ -86,7 +86,8 @@ header p {
     minmax(0, 1.25fr)
     minmax(0, 1.1fr)
     minmax(0, 1.35fr)
-    minmax(0, 1fr);
+    minmax(0, 1fr)
+    minmax(0, 1.1fr);
   gap: 0.6rem;
   align-items: start;
 }
@@ -150,6 +151,37 @@ header p {
   gap: 0.35rem;
   align-items: center;
   min-width: 0;
+}
+
+.local-favorites-field {
+  align-content: start;
+}
+
+.local-favorites-toggles {
+  display: grid;
+  gap: 0.2rem;
+  min-height: 2.5rem;
+}
+
+.toggle-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.5rem;
+  padding: 0 0.15rem;
+}
+
+.toggle-inline input {
+  inline-size: 1rem;
+  block-size: 1rem;
+}
+
+.toggle-inline span {
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .tag-input-row {

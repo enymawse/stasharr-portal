@@ -57,7 +57,10 @@ import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene
 type HomeRailView = HomeRailConfig & {
   items: HomeRailItem[];
   error: string | null;
-  seeAllQueryParams: Record<string, string> | null;
+  seeAllLink: {
+    path: '/library' | '/scenes';
+    queryParams: Record<string, string>;
+  } | null;
   summary: HomeRailViewSummary;
 };
 
@@ -273,7 +276,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
         ...rail,
         items: this.railItemsById()[rail.id] ?? [],
         error: this.railErrorsById()[rail.id] ?? null,
-        seeAllQueryParams: this.canSeeAll(rail) ? this.buildSeeAllQueryParams(rail.config) : null,
+        seeAllLink: this.buildSeeAllLink(rail),
         summary: this.summarizeRail(rail),
       }));
   }
@@ -899,10 +902,6 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return rail.config.studioIds.length;
   }
 
-  protected canSeeAll(rail: HomeRailConfig): boolean {
-    return rail.source === 'STASHDB';
-  }
-
   protected isInternalSceneRoute(item: HomeRailItem): boolean {
     return item.source === 'STASHDB';
   }
@@ -992,23 +991,77 @@ export class HomePageComponent implements OnInit, OnDestroy {
       );
   }
 
-  private buildSeeAllQueryParams(config: HomeRailConfig['config']): Record<string, string> {
+  private buildSeeAllLink(rail: HomeRailConfig): {
+    path: '/library' | '/scenes';
+    queryParams: Record<string, string>;
+  } | null {
+    if (rail.source === 'STASHDB') {
+      return {
+        path: '/scenes',
+        queryParams: this.buildDiscoverySeeAllQueryParams(rail.config),
+      };
+    }
+
+    if (rail.source === 'STASH') {
+      return {
+        path: '/library',
+        queryParams: this.buildLibrarySeeAllQueryParams(rail.config),
+      };
+    }
+
+    return null;
+  }
+
+  private buildDiscoverySeeAllQueryParams(
+    config: HomeStashdbSceneRailConfig,
+  ): Record<string, string> {
     const params: Record<string, string> = {
       sort: config.sort,
       dir: config.direction,
     };
 
-    if ('favorites' in config && config.favorites) {
+    if (config.favorites) {
       params['fav'] = config.favorites;
     }
-    if ('tagIds' in config && config.tagIds.length > 0) {
+    if (config.tagIds.length > 0) {
       params['tags'] = config.tagIds.join(',');
       params['tagNames'] = config.tagNames.join(',');
       params['mode'] = config.tagMode ?? 'OR';
     }
-    if ('studioIds' in config && config.studioIds.length > 0) {
+    if (config.studioIds.length > 0) {
       params['studios'] = config.studioIds.join(',');
       params['studioNames'] = config.studioNames.join(',');
+    }
+
+    return params;
+  }
+
+  private buildLibrarySeeAllQueryParams(config: HomeStashSceneRailConfig): Record<string, string> {
+    const params: Record<string, string> = {
+      sort: config.sort,
+      dir: config.direction,
+    };
+
+    if (config.titleQuery) {
+      params['query'] = config.titleQuery;
+    }
+    if (config.tagIds.length > 0) {
+      params['tags'] = config.tagIds.join(',');
+      params['tagNames'] = config.tagNames.join(',');
+      params['mode'] = config.tagMode ?? 'OR';
+    }
+    if (config.studioIds.length > 0) {
+      params['studios'] = config.studioIds.join(',');
+      params['studioNames'] = config.studioNames.join(',');
+    }
+    if (config.favoritePerformersOnly) {
+      params['favoritePerformersOnly'] = '1';
+    }
+    if (config.favoriteStudiosOnly) {
+      params['favoriteStudiosOnly'] = '1';
+    }
+    if (config.favoriteTagsOnly) {
+      params['favoriteTagsOnly'] = '1';
     }
 
     return params;

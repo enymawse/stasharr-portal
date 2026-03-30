@@ -1,5 +1,11 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsIn, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { DiscoverQueryDto } from '../../discover/dto/discover-query.dto';
 
 export const LIBRARY_SCENE_SORT_VALUES = [
@@ -63,4 +69,19 @@ export class LibraryScenesQueryDto extends DiscoverQueryDto {
   @IsArray()
   @IsString({ each: true })
   studioIds?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  favoritePerformersOnly?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  favoriteStudiosOnly?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  favoriteTagsOnly?: boolean;
 }

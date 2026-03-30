@@ -111,6 +111,7 @@ describe('ScenesPageComponent', () => {
     const resetButton = fixture.nativeElement.querySelector(
       '.reset-filters-button',
     ) as HTMLButtonElement | null;
+    const pageText = fixture.nativeElement.textContent ?? '';
 
     expect(discoverService.getScenesFeed).toHaveBeenCalledWith(
       1,
@@ -121,13 +122,12 @@ describe('ScenesPageComponent', () => {
       'OR',
       undefined,
       [],
-      'ANY',
-      false,
-      false,
-      false,
     );
     expect(navigateSpy).not.toHaveBeenCalled();
     expect(resetButton?.disabled).toBe(true);
+    expect(pageText).not.toContain('Already In Library');
+    expect(pageText).not.toContain('Missing From Library');
+    expect(pageText).not.toContain('Favorite Tags');
   });
 
   it('clears active filters back to the default trending discovery state', async () => {
@@ -135,10 +135,6 @@ describe('ScenesPageComponent', () => {
       sort: 'DATE',
       dir: 'ASC',
       fav: 'ALL',
-      availability: 'IN_LIBRARY',
-      stashFavPerformers: '1',
-      stashFavStudios: '1',
-      stashFavTags: '1',
       mode: 'AND',
       tags: 'tag-1,tag-2',
       tagNames: 'Tag One,Tag Two',
@@ -166,10 +162,6 @@ describe('ScenesPageComponent', () => {
       'OR',
       undefined,
       [],
-      'ANY',
-      false,
-      false,
-      false,
     );
     expect(navigateSpy).toHaveBeenCalledWith([], {
       relativeTo: expect.anything(),
@@ -190,6 +182,46 @@ describe('ScenesPageComponent', () => {
       },
       queryParamsHandling: 'merge',
       replaceUrl: false,
+    });
+  });
+
+  it('strips legacy library overlay params from the discovery route', async () => {
+    const { discoverService, navigateSpy } = await renderPage({
+      availability: 'IN_LIBRARY',
+      stashFavPerformers: '1',
+      stashFavStudios: '1',
+      stashFavTags: '1',
+    });
+
+    expect(discoverService.getScenesFeed).toHaveBeenCalledWith(
+      1,
+      24,
+      'TRENDING',
+      'DESC',
+      [],
+      'OR',
+      undefined,
+      [],
+    );
+    expect(navigateSpy).toHaveBeenCalledWith([], {
+      relativeTo: expect.anything(),
+      queryParams: {
+        sort: null,
+        dir: null,
+        fav: null,
+        availability: null,
+        lifecycle: null,
+        stashFavPerformers: null,
+        stashFavStudios: null,
+        stashFavTags: null,
+        mode: null,
+        tags: null,
+        tagNames: null,
+        studios: null,
+        studioNames: null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   });
 });

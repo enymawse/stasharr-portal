@@ -38,14 +38,12 @@ export interface DiscoverResponse {
   items: DiscoverItem[];
 }
 
-export type SceneLibraryAvailability = 'ANY' | 'IN_LIBRARY' | 'MISSING_FROM_LIBRARY';
-
 export interface SceneExplorerItem extends DiscoverItem {
   requestable: boolean;
 }
 
 export interface ScenesFeedResponse {
-  total: number | null;
+  total: number;
   page: number;
   perPage: number;
   hasMore: boolean;

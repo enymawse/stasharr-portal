@@ -23,6 +23,9 @@ export class LibraryController {
       query.tagIds,
       query.tagMode,
       query.studioIds,
+      query.favoritePerformersOnly,
+      query.favoriteStudiosOnly,
+      query.favoriteTagsOnly,
     );
   }
 

@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { LibraryScenesFeedDto, LibrarySceneFeedItemDto } from './dto/library-scenes-feed.dto';
+import {
+  LibraryScenesFeedDto,
+  LibrarySceneFeedItemDto,
+} from './dto/library-scenes-feed.dto';
 import {
   LibrarySceneSort,
   LibrarySortDirection,
@@ -26,6 +29,9 @@ export class LibraryService {
     tagIds: string[] = [],
     tagMode: LibraryTagMatchMode = 'OR',
     studioIds: string[] = [],
+    favoritePerformersOnly = false,
+    favoriteStudiosOnly = false,
+    favoriteTagsOnly = false,
   ): Promise<LibraryScenesFeedDto> {
     const normalizedQuery = query?.trim() ?? '';
     const normalizedTagIds = this.normalizeIds(tagIds);
@@ -35,6 +41,9 @@ export class LibraryService {
       normalizedTagIds,
       tagMode,
       normalizedStudioIds,
+      favoritePerformersOnly,
+      favoriteStudiosOnly,
+      favoriteTagsOnly,
     );
     const orderBy = this.buildOrderBy(sort, direction);
     const [rows, total] = await Promise.all([
@@ -94,6 +103,9 @@ export class LibraryService {
     tagIds: string[],
     tagMode: LibraryTagMatchMode,
     studioIds: string[],
+    favoritePerformersOnly: boolean,
+    favoriteStudiosOnly: boolean,
+    favoriteTagsOnly: boolean,
   ): Prisma.LibrarySceneIndexWhereInput {
     const andClauses: Prisma.LibrarySceneIndexWhereInput[] = [];
 
@@ -143,6 +155,18 @@ export class LibraryService {
       });
     }
 
+    if (favoritePerformersOnly) {
+      andClauses.push({ hasFavoritePerformer: true });
+    }
+
+    if (favoriteStudiosOnly) {
+      andClauses.push({ favoriteStudio: true });
+    }
+
+    if (favoriteTagsOnly) {
+      andClauses.push({ hasFavoriteTag: true });
+    }
+
     return andClauses.length > 0 ? { AND: andClauses } : {};
   }
 
@@ -156,17 +180,31 @@ export class LibraryService {
       case 'TITLE':
         return [{ title: order }, { stashSceneId: 'asc' }];
       case 'RELEASE_DATE':
-        return [{ releaseDate: order }, { title: 'asc' }, { stashSceneId: 'asc' }];
+        return [
+          { releaseDate: order },
+          { title: 'asc' },
+          { stashSceneId: 'asc' },
+        ];
       case 'CREATED_AT':
-        return [{ localCreatedAt: order }, { title: 'asc' }, { stashSceneId: 'asc' }];
+        return [
+          { localCreatedAt: order },
+          { title: 'asc' },
+          { stashSceneId: 'asc' },
+        ];
       case 'UPDATED_AT':
       default:
-        return [{ localUpdatedAt: order }, { title: 'asc' }, { stashSceneId: 'asc' }];
+        return [
+          { localUpdatedAt: order },
+          { title: 'asc' },
+          { stashSceneId: 'asc' },
+        ];
     }
   }
 
   private toSceneFeedItem(
-    row: Awaited<ReturnType<PrismaService['librarySceneIndex']['findMany']>>[number],
+    row: Awaited<
+      ReturnType<PrismaService['librarySceneIndex']['findMany']>
+    >[number],
   ): LibrarySceneFeedItemDto {
     const screenshotUrl = row.imageUrl
       ? `/api/media/stash/scenes/${encodeURIComponent(row.stashSceneId)}/screenshot`
@@ -197,9 +235,7 @@ export class LibraryService {
   private normalizeIds(values: string[]): string[] {
     return Array.from(
       new Set(
-        values
-          .map((value) => value.trim())
-          .filter((value) => value.length > 0),
+        values.map((value) => value.trim()).filter((value) => value.length > 0),
       ),
     );
   }

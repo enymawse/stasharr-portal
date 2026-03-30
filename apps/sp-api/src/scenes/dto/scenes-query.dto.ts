@@ -1,11 +1,5 @@
 import { Transform } from 'class-transformer';
-import {
-  IsArray,
-  IsBoolean,
-  IsIn,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsArray, IsIn, IsOptional, IsString } from 'class-validator';
 import { DiscoverQueryDto } from '../../discover/dto/discover-query.dto';
 
 export const SCENE_FEED_SORT_VALUES = [
@@ -29,14 +23,6 @@ export const SCENE_FAVORITES_FILTER_VALUES = [
 ] as const;
 export type SceneFavoritesFilter =
   (typeof SCENE_FAVORITES_FILTER_VALUES)[number];
-
-export const SCENE_LIBRARY_AVAILABILITY_VALUES = [
-  'ANY',
-  'IN_LIBRARY',
-  'MISSING_FROM_LIBRARY',
-] as const;
-export type SceneLibraryAvailability =
-  (typeof SCENE_LIBRARY_AVAILABILITY_VALUES)[number];
 
 export class ScenesQueryDto extends DiscoverQueryDto {
   @IsOptional()
@@ -90,23 +76,4 @@ export class ScenesQueryDto extends DiscoverQueryDto {
   @IsOptional()
   @IsIn(SCENE_FAVORITES_FILTER_VALUES)
   favorites?: SceneFavoritesFilter;
-
-  @IsOptional()
-  @IsIn(SCENE_LIBRARY_AVAILABILITY_VALUES)
-  libraryAvailability?: SceneLibraryAvailability;
-
-  @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true' || value === '1')
-  @IsBoolean()
-  stashFavoritePerformersOnly?: boolean;
-
-  @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true' || value === '1')
-  @IsBoolean()
-  stashFavoriteStudiosOnly?: boolean;
-
-  @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true' || value === '1')
-  @IsBoolean()
-  stashFavoriteTagsOnly?: boolean;
 }

@@ -1,5 +1,4 @@
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
-import { HybridScenesService } from '../hybrid-scenes/hybrid-scenes.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import {
@@ -9,22 +8,6 @@ import {
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
 import { SceneStatusService } from '../scene-status/scene-status.service';
 import { ScenesService } from './scenes.service';
-
-function buildFeedScene(id: string, title = id) {
-  return {
-    id,
-    title,
-    details: null,
-    imageUrl: null,
-    studioId: null,
-    studioName: null,
-    studioImageUrl: null,
-    date: null,
-    releaseDate: null,
-    productionDate: null,
-    duration: null,
-  };
-}
 
 describe('ScenesService', () => {
   const integrationsService = {
@@ -90,18 +73,15 @@ describe('ScenesService', () => {
   };
 
   let service: ScenesService;
-  let hybridScenesService: HybridScenesService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    hybridScenesService = new HybridScenesService(stashAdapter, stashdbAdapter);
     service = new ScenesService(
       integrationsService,
       stashdbAdapter,
       sceneStatusService,
       stashAdapter,
       whisparrAdapter,
-      hybridScenesService,
     );
 
     integrationsService.findOne = jest
@@ -291,176 +271,15 @@ describe('ScenesService', () => {
     });
   });
 
-  it('uses hybrid matching for IN_LIBRARY scenes and disables request CTA', async () => {
-    stashdbAdapter.getScenesBySort = jest.fn().mockResolvedValue({
-      total: 1,
-      scenes: [
-        {
-          id: 'stashdb-scene-1',
-          title: 'Scene',
-          details: 'Description',
-          imageUrl: 'http://cdn.local/image.jpg',
-          studioId: 'studio-1',
-          studioName: 'Studio',
-          studioImageUrl: 'http://studio-image',
-          date: '2026-01-01',
-          releaseDate: '2026-01-02',
-          productionDate: '2026-01-03',
-          duration: 300,
-        },
-      ],
-    });
-    stashAdapter.findScenesByStashId = jest.fn().mockResolvedValue([
-      {
-        id: 'local-1',
-        width: 1920,
-        height: 1080,
-        viewUrl: 'http://stash.local/scenes/local-1',
-        label: '1080p',
-      },
-    ]);
-
-    await expect(
-      service.getScenesFeed(
-        1,
-        25,
-        'DATE',
-        'DESC',
-        [],
-        'OR',
-        undefined,
-        [],
-        'IN_LIBRARY',
-      ),
-    ).resolves.toEqual({
-      total: null,
-      page: 1,
-      perPage: 25,
-      hasMore: false,
-      items: [
-        expect.objectContaining({
-          id: 'stashdb-scene-1',
-          source: 'STASHDB',
-          status: { state: 'AVAILABLE' },
-          requestable: false,
-        }),
-      ],
-    });
-
-    expect(sceneStatusService.resolveForScenes).not.toHaveBeenCalled();
-    expect(stashAdapter.findScenesByStashId).toHaveBeenCalledWith(
-      'stashdb-scene-1',
-      {
-        baseUrl: stashIntegration.baseUrl,
-        apiKey: stashIntegration.apiKey,
-      },
-      {
-        favoritePerformersOnly: false,
-        favoriteStudiosOnly: false,
-        favoriteTagsOnly: false,
-      },
-    );
-  });
-
-  it('activates hybrid mode when stash local favorite overlays are enabled', async () => {
-    stashdbAdapter.getScenesBySort = jest.fn().mockResolvedValue({
-      total: 1,
-      scenes: [
-        {
-          id: 'stashdb-scene-1',
-          title: 'Scene',
-          details: 'Description',
-          imageUrl: 'http://cdn.local/image.jpg',
-          studioId: 'studio-1',
-          studioName: 'Studio',
-          studioImageUrl: 'http://studio-image',
-          date: '2026-01-01',
-          releaseDate: '2026-01-02',
-          productionDate: '2026-01-03',
-          duration: 300,
-        },
-      ],
-    });
-    stashAdapter.findScenesByStashId = jest.fn().mockResolvedValue([
-      {
-        id: 'local-1',
-        width: 1920,
-        height: 1080,
-        viewUrl: 'http://stash.local/scenes/local-1',
-        label: '1080p',
-      },
-    ]);
-
-    await service.getScenesFeed(
-      1,
-      25,
-      'DATE',
-      'DESC',
-      [],
-      'OR',
-      undefined,
-      [],
-      'ANY',
-      true,
-      false,
-      true,
-    );
-
-    expect(stashAdapter.findScenesByStashId).toHaveBeenCalledWith(
-      'stashdb-scene-1',
-      {
-        baseUrl: stashIntegration.baseUrl,
-        apiKey: stashIntegration.apiKey,
-      },
-      {
-        favoritePerformersOnly: true,
-        favoriteStudiosOnly: false,
-        favoriteTagsOnly: true,
-      },
-    );
-    expect(sceneStatusService.resolveForScenes).not.toHaveBeenCalled();
-  });
-
-  it('marks hybrid missing-library scenes as requestable when status is actionable', async () => {
-    stashdbAdapter.getScenesBySort = jest.fn().mockResolvedValue({
-      total: 2,
-      scenes: [
-        {
-          id: 'stashdb-scene-1',
-          title: 'Scene',
-          details: 'Description',
-          imageUrl: 'http://cdn.local/image.jpg',
-          studioId: 'studio-1',
-          studioName: 'Studio',
-          studioImageUrl: 'http://studio-image',
-          date: '2026-01-01',
-          releaseDate: '2026-01-02',
-          productionDate: '2026-01-03',
-          duration: 300,
-        },
-      ],
-    });
-    stashAdapter.findScenesByStashId = jest.fn().mockResolvedValue([]);
+  it('marks NOT_REQUESTED discovery scenes as requestable from status resolution', async () => {
     sceneStatusService.resolveForScenes = jest
       .fn()
       .mockResolvedValue(
         new Map([['stashdb-scene-1', { state: 'NOT_REQUESTED' }]]),
       );
 
-    await expect(
-      service.getScenesFeed(
-        1,
-        25,
-        'DATE',
-        'DESC',
-        [],
-        'OR',
-        undefined,
-        [],
-        'MISSING_FROM_LIBRARY',
-      ),
-    ).resolves.toEqual({
-      total: null,
+    await expect(service.getScenesFeed(1, 25, 'DATE')).resolves.toEqual({
+      total: 1,
       page: 1,
       perPage: 25,
       hasMore: false,
@@ -472,57 +291,8 @@ describe('ScenesService', () => {
         }),
       ],
     });
-  });
 
-  it('keeps failed hybrid missing-library scenes visible but not requestable', async () => {
-    stashdbAdapter.getScenesBySort = jest.fn().mockResolvedValue({
-      total: 1,
-      scenes: [
-        {
-          id: 'stashdb-scene-1',
-          title: 'Scene',
-          details: 'Description',
-          imageUrl: 'http://cdn.local/image.jpg',
-          studioId: 'studio-1',
-          studioName: 'Studio',
-          studioImageUrl: 'http://studio-image',
-          date: '2026-01-01',
-          releaseDate: '2026-01-02',
-          productionDate: '2026-01-03',
-          duration: 300,
-        },
-      ],
-    });
-    stashAdapter.findScenesByStashId = jest.fn().mockResolvedValue([]);
-    sceneStatusService.resolveForScenes = jest
-      .fn()
-      .mockResolvedValue(new Map([['stashdb-scene-1', { state: 'FAILED' }]]));
-
-    await expect(
-      service.getScenesFeed(
-        1,
-        25,
-        'DATE',
-        'DESC',
-        [],
-        'OR',
-        undefined,
-        [],
-        'MISSING_FROM_LIBRARY',
-      ),
-    ).resolves.toEqual({
-      total: null,
-      page: 1,
-      perPage: 25,
-      hasMore: false,
-      items: [
-        expect.objectContaining({
-          id: 'stashdb-scene-1',
-          status: { state: 'FAILED' },
-          requestable: false,
-        }),
-      ],
-    });
+    expect(stashAdapter.findScenesByStashId).not.toHaveBeenCalled();
   });
 
   it('forwards STUDIO favorites filter to stashdb adapter', async () => {

@@ -26,6 +26,9 @@ export class LibraryService {
       tagIds?: string[];
       tagMode?: LibraryTagMatchMode;
       studioIds?: string[];
+      favoritePerformersOnly?: boolean;
+      favoriteStudiosOnly?: boolean;
+      favoriteTagsOnly?: boolean;
     },
   ): Observable<LibraryScenesFeedResponse> {
     let params = new HttpParams().set('page', page.toString()).set('perPage', perPage.toString());
@@ -47,6 +50,15 @@ export class LibraryService {
     }
     if (filters?.studioIds && filters.studioIds.length > 0) {
       params = params.set('studioIds', filters.studioIds.join(','));
+    }
+    if (filters?.favoritePerformersOnly) {
+      params = params.set('favoritePerformersOnly', 'true');
+    }
+    if (filters?.favoriteStudiosOnly) {
+      params = params.set('favoriteStudiosOnly', 'true');
+    }
+    if (filters?.favoriteTagsOnly) {
+      params = params.set('favoriteTagsOnly', 'true');
     }
 
     return this.http.get<LibraryScenesFeedResponse>('/api/library/scenes', { params });

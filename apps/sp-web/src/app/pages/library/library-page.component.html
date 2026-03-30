@@ -1,7 +1,10 @@
 <main>
   <header>
     <h1>Library</h1>
-    <p>Browse scenes already present in your local Stash library.</p>
+    <p>
+      Browse scenes already indexed from your local Stash library and refine with local-only
+      filters.
+    </p>
     @if (!loading() && !error()) {
       <p class="state">{{ libraryTotalLabel() }}</p>
     }
@@ -124,6 +127,36 @@
           >
             <i [class]="sortDirectionIconClass()" aria-hidden="true"></i>
           </button>
+        </div>
+      </div>
+
+      <div class="control-field local-favorites-field">
+        <span>Local Favorites</span>
+        <div class="local-favorites-toggles">
+          <label class="toggle-inline">
+            <input
+              type="checkbox"
+              [ngModel]="favoritePerformersOnly()"
+              (ngModelChange)="onFavoritePerformersOnlyChanged($event)"
+            />
+            <span>Performers</span>
+          </label>
+          <label class="toggle-inline">
+            <input
+              type="checkbox"
+              [ngModel]="favoriteStudiosOnly()"
+              (ngModelChange)="onFavoriteStudiosOnlyChanged($event)"
+            />
+            <span>Studios</span>
+          </label>
+          <label class="toggle-inline">
+            <input
+              type="checkbox"
+              [ngModel]="favoriteTagsOnly()"
+              (ngModelChange)="onFavoriteTagsOnlyChanged($event)"
+            />
+            <span>Tags</span>
+          </label>
         </div>
       </div>
     </div>

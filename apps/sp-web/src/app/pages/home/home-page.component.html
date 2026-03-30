@@ -5,9 +5,8 @@
         <p class="eyebrow">Home</p>
         <h1>Your rails, now driven by saved scene filters.</h1>
         <p class="lede">
-          Keep the built-in favorites rails, mix in your local library, add custom StashDB
-          scene rails, and shape Home into a personal browsing screen instead of a fixed
-          landing page.
+          Keep the built-in favorites rails, mix in your local library, add custom StashDB scene
+          rails, and shape Home into a personal browsing screen instead of a fixed landing page.
         </p>
         <div class="hero-actions">
           <button type="button" class="hero-link secondary" (click)="openEditor()">
@@ -74,9 +73,9 @@
         </div>
 
         <p class="editor-note">
-          Built-in rails stay fixed to their saved favorites or library query. Custom rails
-          save their filter definition immediately when you create or edit them.
-          Enable/disable and ordering changes are staged until you save this editor.
+          Built-in rails stay fixed to their saved favorites or library query. Custom rails save
+          their filter definition immediately when you create or edit them. Enable/disable and
+          ordering changes are staged until you save this editor.
         </p>
 
         @if (saveError(); as saveError) {
@@ -218,11 +217,7 @@
                   (click)="saveRailForm()"
                 >
                   {{
-                    railFormSaving()
-                      ? 'Saving...'
-                      : editingRailId()
-                        ? 'Update Rail'
-                        : 'Create Rail'
+                    railFormSaving() ? 'Saving...' : editingRailId() ? 'Update Rail' : 'Create Rail'
                   }}
                 </button>
               </div>
@@ -457,9 +452,7 @@
                     [appendTo]="'body'"
                     panelStyleClass="home-rail-tag-panel"
                     [placeholder]="
-                      form.source === 'STASH'
-                        ? 'Select local-library tags'
-                        : 'Select matching tags'
+                      form.source === 'STASH' ? 'Select local-library tags' : 'Select matching tags'
                     "
                     scrollHeight="16rem"
                   />
@@ -476,9 +469,7 @@
                     [filter]="true"
                     [filterValue]="studioSearchTerm()"
                     [filterPlaceHolder]="
-                      form.source === 'STASH'
-                        ? 'Search local studios'
-                        : 'Search studio networks'
+                      form.source === 'STASH' ? 'Search local studios' : 'Search studio networks'
                     "
                     [loading]="studioSearchLoading()"
                     [options]="studioSelectOptions()"
@@ -514,9 +505,7 @@
                         [ngModel]="form.favoritePerformersOnly"
                         (ngModelChange)="updateRailForm('favoritePerformersOnly', $event)"
                       />
-                      <span>{{
-                        form.favoritePerformersOnly ? 'Enabled' : 'Disabled'
-                      }}</span>
+                      <span>{{ form.favoritePerformersOnly ? 'Enabled' : 'Disabled' }}</span>
                     </label>
                   </label>
 
@@ -546,9 +535,8 @@
                 </div>
 
                 <p class="editor-note source-note">
-                  Stash rails use your local library filters only. This slice supports title
-                  search, local tags, local studios, and favorite performer, studio, or tag
-                  toggles.
+                  Stash rails use your local library filters only. This slice supports title search,
+                  local tags, local studios, and favorite performer, studio, or tag toggles.
                 </p>
               } @else if (form.source === 'HYBRID') {
                 <p class="editor-note source-note source-subsection">Stash Local Favorites</p>
@@ -561,9 +549,7 @@
                         [ngModel]="form.stashFavoritePerformersOnly"
                         (ngModelChange)="updateRailForm('stashFavoritePerformersOnly', $event)"
                       />
-                      <span>{{
-                        form.stashFavoritePerformersOnly ? 'Enabled' : 'Disabled'
-                      }}</span>
+                      <span>{{ form.stashFavoritePerformersOnly ? 'Enabled' : 'Disabled' }}</span>
                     </label>
                   </label>
 
@@ -575,9 +561,7 @@
                         [ngModel]="form.stashFavoriteStudiosOnly"
                         (ngModelChange)="updateRailForm('stashFavoriteStudiosOnly', $event)"
                       />
-                      <span>{{
-                        form.stashFavoriteStudiosOnly ? 'Enabled' : 'Disabled'
-                      }}</span>
+                      <span>{{ form.stashFavoriteStudiosOnly ? 'Enabled' : 'Disabled' }}</span>
                     </label>
                   </label>
 
@@ -589,17 +573,15 @@
                         [ngModel]="form.stashFavoriteTagsOnly"
                         (ngModelChange)="updateRailForm('stashFavoriteTagsOnly', $event)"
                       />
-                      <span>{{
-                        form.stashFavoriteTagsOnly ? 'Enabled' : 'Disabled'
-                      }}</span>
+                      <span>{{ form.stashFavoriteTagsOnly ? 'Enabled' : 'Disabled' }}</span>
                     </label>
                   </label>
                 </div>
 
                 <p class="editor-note source-note">
-                  Hybrid rails discover scenes from StashDB, then filter them by whether they
-                  exist in your local Stash library. StashDB favorites drive discovery; Stash
-                  local favorites are applied as a separate overlay after library matching.
+                  Hybrid rails discover scenes from StashDB, then filter them by whether they exist
+                  in your local Stash library. StashDB favorites drive discovery; Stash local
+                  favorites are applied as a separate overlay after library matching.
                 </p>
               }
             }
@@ -612,8 +594,8 @@
       <section class="home-state empty-state">
         <h2>No Home rails are enabled</h2>
         <p>
-          Turn at least one rail back on or create a custom rail to restore your
-          personalized landing page.
+          Turn at least one rail back on or create a custom rail to restore your personalized
+          landing page.
         </p>
         <div class="empty-links">
           <button type="button" class="hero-link" (click)="openEditor()">Edit Rails</button>
@@ -623,14 +605,13 @@
       <section class="home-state empty-state">
         <h2>No enabled rails are matching scenes yet</h2>
         <p>
-          Try favoriting more performers or studios, or add a custom rail with broader
-          tags, studios, or favorites filters.
+          Try favoriting more performers or studios, or add a custom rail with broader tags,
+          studios, or favorites filters.
         </p>
         <div class="empty-links">
-          <button type="button" class="hero-link" (click)="openEditor()">
-            Customize Home
-          </button>
+          <button type="button" class="hero-link" (click)="openEditor()">Customize Home</button>
           <a class="hero-link secondary" [routerLink]="['/scenes']">Browse Scenes</a>
+          <a class="hero-link secondary" [routerLink]="['/library']">Browse Library</a>
         </div>
       </section>
     } @else {
@@ -669,11 +650,11 @@
 
                 <div class="rail-actions">
                   @if (rail.items.length > 0) {
-                    @if (rail.seeAllQueryParams) {
+                    @if (rail.seeAllLink; as seeAllLink) {
                       <a
                         class="see-all-link"
-                        [routerLink]="['/scenes']"
-                        [queryParams]="rail.seeAllQueryParams"
+                        [routerLink]="[seeAllLink.path]"
+                        [queryParams]="seeAllLink.queryParams"
                       >
                         See all
                       </a>
@@ -734,7 +715,10 @@
 
                           <div class="media-top">
                             @if (item.studioImageUrl) {
-                              <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                              <div
+                                class="studio-badge logo-plaque"
+                                [title]="item.studio ?? 'Studio'"
+                              >
                                 <img
                                   [src]="item.studioImageUrl"
                                   [alt]="item.studio ?? 'Studio logo'"
@@ -761,7 +745,9 @@
                             <div class="media-meta-row">
                               <p class="media-date">
                                 @if (item.releaseDate) {
-                                  <time [attr.datetime]="item.releaseDate">{{ item.releaseDate }}</time>
+                                  <time [attr.datetime]="item.releaseDate">{{
+                                    item.releaseDate
+                                  }}</time>
                                 } @else {
                                   <span class="media-date-placeholder">No date</span>
                                 }
