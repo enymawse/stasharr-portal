@@ -27,8 +27,7 @@ export type StashdbSceneFeedSort =
   | 'UPDATED_AT';
 export type StashdbSortDirection = 'ASC' | 'DESC';
 
-export interface StashdbAdapterSceneFeedConfig
-  extends StashdbAdapterTrendingConfig {
+export interface StashdbAdapterSceneFeedConfig extends StashdbAdapterTrendingConfig {
   sort: StashdbSceneFeedSort;
   direction?: StashdbSortDirection;
   favorites?: StashdbSceneFeedFavorites;
@@ -577,7 +576,9 @@ export class StashdbAdapter {
     return this.getSceneFeed(config, config.sort, config.direction ?? 'DESC');
   }
 
-  async searchTags(config: StashdbTagSearchConfig): Promise<StashdbTagOption[]> {
+  async searchTags(
+    config: StashdbTagSearchConfig,
+  ): Promise<StashdbTagOption[]> {
     const query = `
       query QueryTags($name: String!) {
         queryTags(input: { direction: ASC, sort: NAME, name: $name }) {
@@ -591,7 +592,9 @@ export class StashdbAdapter {
       }
     `;
 
-    const payload = await this.executeQuery(config, query, { name: config.query });
+    const payload = await this.executeQuery(config, query, {
+      name: config.query,
+    });
     const rawTags = payload.data?.queryTags?.tags ?? [];
 
     return rawTags
@@ -601,14 +604,17 @@ export class StashdbAdapter {
         }
 
         const aliases = Array.isArray(tag.aliases)
-          ? tag.aliases.filter((alias): alias is string => typeof alias === 'string')
+          ? tag.aliases.filter(
+              (alias): alias is string => typeof alias === 'string',
+            )
           : [];
 
         return {
           id: tag.id,
           name: tag.name,
           description:
-            typeof tag.description === 'string' && tag.description.trim().length > 0
+            typeof tag.description === 'string' &&
+            tag.description.trim().length > 0
               ? tag.description
               : null,
           aliases,
@@ -703,7 +709,8 @@ export class StashdbAdapter {
         };
       })
       .filter(
-        (performer): performer is StashdbPerformerFeedItem => performer !== null,
+        (performer): performer is StashdbPerformerFeedItem =>
+          performer !== null,
       );
 
     return {
@@ -718,11 +725,7 @@ export class StashdbAdapter {
     const normalizedName = config.name?.trim() ?? '';
     const sort = config.sort ?? 'NAME';
     const direction = config.direction;
-    const inputParts = [
-      'per_page: $perPage',
-      'page: $page',
-      `sort: ${sort}`,
-    ];
+    const inputParts = ['per_page: $perPage', 'page: $page', `sort: ${sort}`];
 
     if (direction) {
       inputParts.push(`direction: ${direction}`);
@@ -787,7 +790,10 @@ export class StashdbAdapter {
 
         const childStudios = (studio.child_studios ?? [])
           .map((child): { id: string; name: string } | null => {
-            if (typeof child.id !== 'string' || typeof child.name !== 'string') {
+            if (
+              typeof child.id !== 'string' ||
+              typeof child.name !== 'string'
+            ) {
               return null;
             }
 
@@ -805,7 +811,8 @@ export class StashdbAdapter {
           name: studio.name,
           isFavorite: studio.is_favorite === true,
           imageUrl:
-            this.selectPrimaryImage(this.normalizeImages(studio.images))?.url ?? null,
+            this.selectPrimaryImage(this.normalizeImages(studio.images))?.url ??
+            null,
           parentStudio:
             typeof studio.parent?.id === 'string' &&
             typeof studio.parent?.name === 'string'
@@ -877,7 +884,10 @@ export class StashdbAdapter {
       );
     }
 
-    if (typeof performer.id !== 'string' || typeof performer.name !== 'string') {
+    if (
+      typeof performer.id !== 'string' ||
+      typeof performer.name !== 'string'
+    ) {
       throw new BadGatewayException(
         'StashDB performer response is missing required fields.',
       );
@@ -905,10 +915,12 @@ export class StashdbAdapter {
       hairColor: this.normalizeOptionalString(performer.hair_color),
       height: this.normalizeOptionalString(performer.height),
       cupSize: this.normalizeOptionalString(performer.cup_size),
-      bandSize: typeof performer.band_size === 'number' ? performer.band_size : null,
+      bandSize:
+        typeof performer.band_size === 'number' ? performer.band_size : null,
       waistSize:
         typeof performer.waist_size === 'number' ? performer.waist_size : null,
-      hipSize: typeof performer.hip_size === 'number' ? performer.hip_size : null,
+      hipSize:
+        typeof performer.hip_size === 'number' ? performer.hip_size : null,
       breastType: this.normalizeOptionalString(performer.breast_type),
       careerStartYear:
         typeof performer.career_start_year === 'number'
@@ -1051,12 +1063,11 @@ export class StashdbAdapter {
             createdAt: this.normalizeOptionalString(child.created),
             updatedAt: this.normalizeOptionalString(child.updated),
             imageUrl:
-              this.selectPrimaryImage(this.normalizeImages(child.images))?.url ?? null,
+              this.selectPrimaryImage(this.normalizeImages(child.images))
+                ?.url ?? null,
           };
         })
-        .filter(
-          (child): child is StashdbStudioChildSummary => child !== null,
-        ),
+        .filter((child): child is StashdbStudioChildSummary => child !== null),
     };
   }
 
@@ -1090,7 +1101,10 @@ export class StashdbAdapter {
 
         const childStudios = (studio.child_studios ?? [])
           .map((child): { id: string; name: string } | null => {
-            if (typeof child.id !== 'string' || typeof child.name !== 'string') {
+            if (
+              typeof child.id !== 'string' ||
+              typeof child.name !== 'string'
+            ) {
               return null;
             }
 
@@ -1125,7 +1139,11 @@ export class StashdbAdapter {
     const studioIds = [...new Set(normalizedStudioIds)];
     const tagIds = [...new Set(normalizedTagIds)];
 
-    const variableDeclarations = ['$page: Int!', '$perPage: Int!', '$performerId: [ID!]!'];
+    const variableDeclarations = [
+      '$page: Int!',
+      '$perPage: Int!',
+      '$performerId: [ID!]!',
+    ];
     const inputParts = [
       `sort: ${config.sort}`,
       `direction: ${config.direction ?? 'DESC'}`,
@@ -1200,7 +1218,9 @@ export class StashdbAdapter {
       typeof payload.data?.queryScenes?.count === 'number'
         ? payload.data.queryScenes.count
         : 0;
-    const scenes = this.normalizeSceneFeedItems(payload.data?.queryScenes?.scenes ?? []);
+    const scenes = this.normalizeSceneFeedItems(
+      payload.data?.queryScenes?.scenes ?? [],
+    );
 
     return { total, scenes };
   }
@@ -1216,7 +1236,9 @@ export class StashdbAdapter {
       }
     `;
 
-    const payload = await this.executeQueryRaw(config, query, { id: performerId });
+    const payload = await this.executeQueryRaw(config, query, {
+      id: performerId,
+    });
     return this.normalizeFavoriteMutationResult(
       payload,
       'favoritePerformer',
@@ -1262,8 +1284,7 @@ export class StashdbAdapter {
       'studioIds' in config && config.studioIds
         ? [...new Set(config.studioIds.map((id) => id.trim()).filter(Boolean))]
         : [];
-    const tagModifier =
-      tagFilter?.mode === 'AND' ? 'INCLUDES_ALL' : 'INCLUDES';
+    const tagModifier = tagFilter?.mode === 'AND' ? 'INCLUDES_ALL' : 'INCLUDES';
     const tagVariableDeclaration = tagFilter ? ', $tagIds: [ID!]!' : '';
     const studioVariableDeclaration =
       studioIds.length > 0 ? ', $studioIds: [ID!]!' : '';
@@ -1326,7 +1347,9 @@ export class StashdbAdapter {
       typeof payload.data?.queryScenes?.count === 'number'
         ? payload.data.queryScenes.count
         : 0;
-    const scenes = this.normalizeSceneFeedItems(payload.data?.queryScenes?.scenes ?? []);
+    const scenes = this.normalizeSceneFeedItems(
+      payload.data?.queryScenes?.scenes ?? [],
+    );
 
     return { total, scenes };
   }
@@ -1520,7 +1543,9 @@ export class StashdbAdapter {
     sceneIds: string[],
     config: StashdbAdapterBaseConfig,
   ): Promise<StashdbSceneMetadata[]> {
-    const normalizedIds = [...new Set(sceneIds.map((sceneId) => sceneId.trim()).filter(Boolean))];
+    const normalizedIds = [
+      ...new Set(sceneIds.map((sceneId) => sceneId.trim()).filter(Boolean)),
+    ];
     if (normalizedIds.length === 0) {
       return [];
     }
@@ -1586,13 +1611,13 @@ export class StashdbAdapter {
     return normalizedIds
       .map((_, index) =>
         this.normalizeSceneMetadata(
-          (data?.[`scene_${index}`] as StashdbSceneMetadataSource | null | undefined) ??
-            null,
+          (data?.[`scene_${index}`] as
+            | StashdbSceneMetadataSource
+            | null
+            | undefined) ?? null,
         ),
       )
-      .filter(
-        (scene): scene is StashdbSceneMetadata => scene !== null,
-      );
+      .filter((scene): scene is StashdbSceneMetadata => scene !== null);
   }
 
   private selectPrimaryImage(
@@ -1703,8 +1728,7 @@ export class StashdbAdapter {
               : null,
           imageUrl: sceneImageUrl ?? null,
           studioId:
-            typeof scene.studio?.id === 'string' &&
-            scene.studio.id.length > 0
+            typeof scene.studio?.id === 'string' && scene.studio.id.length > 0
               ? scene.studio.id
               : null,
           studioName:
@@ -1784,7 +1808,11 @@ export class StashdbAdapter {
   private normalizeSceneMetadata(
     scene: StashdbSceneMetadataSource | null | undefined,
   ): StashdbSceneMetadata | null {
-    if (!scene || typeof scene.id !== 'string' || typeof scene.title !== 'string') {
+    if (
+      !scene ||
+      typeof scene.id !== 'string' ||
+      typeof scene.title !== 'string'
+    ) {
       return null;
     }
 
@@ -1819,8 +1847,7 @@ export class StashdbAdapter {
           ? scene.studio.id
           : null,
       studioName:
-        typeof scene.studio?.name === 'string' &&
-        scene.studio.name.length > 0
+        typeof scene.studio?.name === 'string' && scene.studio.name.length > 0
           ? scene.studio.name
           : null,
       studioImageUrl: studioImageUrl ?? null,
@@ -1853,7 +1880,10 @@ export class StashdbAdapter {
       return null;
     }
 
-    if (typeof rawParent.id !== 'string' || typeof rawParent.name !== 'string') {
+    if (
+      typeof rawParent.id !== 'string' ||
+      typeof rawParent.name !== 'string'
+    ) {
       return null;
     }
 
@@ -1882,7 +1912,11 @@ export class StashdbAdapter {
     if (
       requestedFavorite &&
       payload.errors?.some((error) =>
-        this.isDuplicateFavoriteError(error, mutationField, duplicateConstraint),
+        this.isDuplicateFavoriteError(
+          error,
+          mutationField,
+          duplicateConstraint,
+        ),
       )
     ) {
       return {
@@ -1900,7 +1934,9 @@ export class StashdbAdapter {
       throw new BadGatewayException(message);
     }
 
-    throw new BadGatewayException('StashDB favorite mutation returned an invalid response.');
+    throw new BadGatewayException(
+      'StashDB favorite mutation returned an invalid response.',
+    );
   }
 
   private isDuplicateFavoriteError(
@@ -1909,11 +1945,11 @@ export class StashdbAdapter {
     duplicateConstraint: string,
   ): boolean {
     const message =
-      typeof error.message === 'string'
-        ? error.message.toLowerCase()
-        : '';
+      typeof error.message === 'string' ? error.message.toLowerCase() : '';
     const path = Array.isArray(error.path)
-      ? error.path.filter((segment): segment is string => typeof segment === 'string')
+      ? error.path.filter(
+          (segment): segment is string => typeof segment === 'string',
+        )
       : [];
 
     return (

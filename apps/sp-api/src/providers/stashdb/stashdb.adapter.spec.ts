@@ -226,10 +226,9 @@ describe('StashdbAdapter', () => {
         }),
     } as Response);
 
-    const result = await adapter.getSceneMetadataByIds(
-      ['scene-1', 'scene-2'],
-      { baseUrl: 'http://stashdb.local/graphql' },
-    );
+    const result = await adapter.getSceneMetadataByIds(['scene-1', 'scene-2'], {
+      baseUrl: 'http://stashdb.local/graphql',
+    });
 
     expect(result).toEqual([
       {
@@ -805,8 +804,18 @@ describe('StashdbAdapter', () => {
               created: '2024-01-01',
               updated: '2025-01-01',
               images: [
-                { id: 'img-1', url: 'https://small.jpg', width: 320, height: 240 },
-                { id: 'img-2', url: 'https://large.jpg', width: 1024, height: 768 },
+                {
+                  id: 'img-1',
+                  url: 'https://small.jpg',
+                  width: 320,
+                  height: 240,
+                },
+                {
+                  id: 'img-2',
+                  url: 'https://large.jpg',
+                  width: 1024,
+                  height: 768,
+                },
               ],
             },
           },
@@ -814,7 +823,9 @@ describe('StashdbAdapter', () => {
     } as Response);
 
     await expect(
-      adapter.getPerformerById('p-1', { baseUrl: 'http://stashdb.local/graphql' }),
+      adapter.getPerformerById('p-1', {
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
     ).resolves.toMatchObject({
       id: 'p-1',
       name: 'Performer One',
@@ -1125,7 +1136,10 @@ describe('StashdbAdapter', () => {
 
     const requestBody = JSON.parse(
       (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
-    ) as { query: string; variables: { page: number; perPage: number; name?: string } };
+    ) as {
+      query: string;
+      variables: { page: number; perPage: number; name?: string };
+    };
 
     expect(requestBody.query).toContain('queryStudios');
     expect(requestBody.query).toContain('sort: UPDATED_AT');
@@ -1168,10 +1182,16 @@ describe('StashdbAdapter', () => {
       (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
     ) as { query: string; variables: Record<string, unknown> };
 
-    expect(requestBody.query).toContain('performers: { value: $performerId, modifier: INCLUDES }');
+    expect(requestBody.query).toContain(
+      'performers: { value: $performerId, modifier: INCLUDES }',
+    );
     expect(requestBody.query).toContain('direction: DESC');
-    expect(requestBody.query).toContain('studios: { value: $studioIds, modifier: INCLUDES }');
-    expect(requestBody.query).toContain('tags: { value: $tagIds, modifier: INCLUDES }');
+    expect(requestBody.query).toContain(
+      'studios: { value: $studioIds, modifier: INCLUDES }',
+    );
+    expect(requestBody.query).toContain(
+      'tags: { value: $tagIds, modifier: INCLUDES }',
+    );
     expect(requestBody.query).toContain('favorites: STUDIO');
     expect(requestBody.variables.performerId).toEqual(['p-1']);
     expect(requestBody.variables.studioIds).toEqual(['studio-1']);

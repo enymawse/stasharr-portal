@@ -17,7 +17,6 @@ import {
   SceneTagMatchMode,
   SceneTagOption,
   SceneDetails,
-  SceneLifecycleFilter,
   SceneLibraryAvailability,
   SceneRequestOptions,
   ScenesFeedResponse,
@@ -47,7 +46,6 @@ export class DiscoverService {
     favorites?: SceneFavoritesFilter,
     studioIds?: string[],
     libraryAvailability?: SceneLibraryAvailability,
-    lifecycle?: SceneLifecycleFilter,
     stashFavoritePerformersOnly?: boolean,
     stashFavoriteStudiosOnly?: boolean,
     stashFavoriteTagsOnly?: boolean,
@@ -74,9 +72,6 @@ export class DiscoverService {
     }
     if (libraryAvailability) {
       params = params.set('libraryAvailability', libraryAvailability);
-    }
-    if (lifecycle && lifecycle !== 'ANY') {
-      params = params.set('lifecycle', lifecycle);
     }
     if (stashFavoritePerformersOnly) {
       params = params.set('stashFavoritePerformersOnly', '1');

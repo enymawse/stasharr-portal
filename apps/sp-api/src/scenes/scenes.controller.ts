@@ -25,7 +25,6 @@ export class ScenesController {
       query.favorites,
       query.studioIds,
       query.libraryAvailability,
-      query.lifecycle,
       query.stashFavoritePerformersOnly,
       query.stashFavoriteStudiosOnly,
       query.stashFavoriteTagsOnly,

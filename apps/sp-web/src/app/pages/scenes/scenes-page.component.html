@@ -8,151 +8,128 @@
   </header>
 
   <section class="controls-shell" aria-label="Scenes controls">
-    <div class="controls-row">
-      <div class="control-group">
-        <div class="control-group-head">
-          <span class="control-group-title">StashDB Discovery</span>
-        </div>
+    <div class="controls-header">
+      <span class="controls-title">StashDB Discovery</span>
+    </div>
 
-        <label class="control-field">
-          <span>Studio Filter</span>
-          <div class="studio-picker-shell">
+    <div class="controls-row">
+      <label class="control-field">
+        <span>Studio Filter</span>
+        <div class="studio-picker-shell">
+          <p-multiselect
+            inputId="scenes-studios"
+            [ngModel]="studioSelectedIdsModel()"
+            (ngModelChange)="onStudioSelectionChanged($event)"
+            (onFilter)="onStudioFilterChanged($event.filter)"
+            (onPanelHide)="onStudioFilterPanelHide()"
+            [filter]="true"
+            [filterValue]="studioSearchTerm()"
+            filterPlaceHolder="Search studio networks"
+            [loading]="studioSearchLoading()"
+            [fluid]="true"
+            [options]="studioSelectOptions()"
+            [group]="true"
+            optionGroupLabel="label"
+            optionGroupChildren="items"
+            optionLabel="label"
+            optionValue="value"
+            [showToggleAll]="false"
+            display="chip"
+            [emptyMessage]="studioSelectEmptyMessage()"
+            [emptyFilterMessage]="studioSelectEmptyMessage()"
+            [resetFilterOnHide]="true"
+            [appendTo]="'body'"
+            panelStyleClass="scenes-filter-studio-panel"
+            placeholder="Choose studio networks or child studios"
+            scrollHeight="16rem"
+          />
+        </div>
+      </label>
+
+      <label class="control-field">
+        <span>Tag Filter</span>
+        <div class="tag-picker-shell">
+          <div class="tag-input-row">
             <p-multiselect
-              inputId="scenes-studios"
-              [ngModel]="studioSelectedIdsModel()"
-              (ngModelChange)="onStudioSelectionChanged($event)"
-              (onFilter)="onStudioFilterChanged($event.filter)"
-              (onPanelHide)="onStudioFilterPanelHide()"
+              inputId="scenes-tags"
+              [ngModel]="selectedTagIdsModel()"
+              (ngModelChange)="onTagSelectionChanged($event)"
+              (onFilter)="onTagFilterChanged($event.filter)"
+              (onPanelHide)="onTagFilterPanelHide()"
               [filter]="true"
-              [filterValue]="studioSearchTerm()"
-              filterPlaceHolder="Search studio networks"
-              [loading]="studioSearchLoading()"
-              [fluid]="true"
-              [options]="studioSelectOptions()"
-              [group]="true"
-              optionGroupLabel="label"
-              optionGroupChildren="items"
+              [filterValue]="tagSearchTerm()"
+              filterPlaceHolder="Search tags"
+              [loading]="tagSearchLoading()"
+              [options]="tagSelectOptions()"
               optionLabel="label"
               optionValue="value"
               [showToggleAll]="false"
               display="chip"
-              [emptyMessage]="studioSelectEmptyMessage()"
-              [emptyFilterMessage]="studioSelectEmptyMessage()"
+              [emptyMessage]="tagSelectEmptyMessage()"
+              [emptyFilterMessage]="tagSelectEmptyMessage()"
               [resetFilterOnHide]="true"
               [appendTo]="'body'"
-              panelStyleClass="scenes-filter-studio-panel"
-              placeholder="Choose studio networks or child studios"
+              panelStyleClass="scenes-filter-tag-panel"
+              placeholder="Select matching tags"
               scrollHeight="16rem"
             />
-          </div>
-        </label>
-
-        <label class="control-field">
-          <span>Tag Filter</span>
-          <div class="tag-picker-shell">
-            <div class="tag-input-row">
-              <p-multiselect
-                inputId="scenes-tags"
-                [ngModel]="selectedTagIdsModel()"
-                (ngModelChange)="onTagSelectionChanged($event)"
-                (onFilter)="onTagFilterChanged($event.filter)"
-                (onPanelHide)="onTagFilterPanelHide()"
-                [filter]="true"
-                [filterValue]="tagSearchTerm()"
-                filterPlaceHolder="Search tags"
-                [loading]="tagSearchLoading()"
-                [options]="tagSelectOptions()"
-                optionLabel="label"
-                optionValue="value"
-                [showToggleAll]="false"
-                display="chip"
-                [emptyMessage]="tagSelectEmptyMessage()"
-                [emptyFilterMessage]="tagSelectEmptyMessage()"
-                [resetFilterOnHide]="true"
-                [appendTo]="'body'"
-                panelStyleClass="scenes-filter-tag-panel"
-                placeholder="Select matching tags"
-                scrollHeight="16rem"
-              />
-              <p-select
-                class="tag-mode-select"
-                inputId="scenes-tag-mode"
-                [ngModel]="selectedTagMode()"
-                (ngModelChange)="onTagMatchModeChanged($event)"
-                [options]="tagMatchOptions"
-                optionLabel="label"
-                optionValue="value"
-                [appendTo]="'body'"
-                panelStyleClass="scenes-filter-select-panel"
-              />
-            </div>
-          </div>
-        </label>
-
-        <div class="control-field">
-          <span>Sort By</span>
-          <div class="sort-with-direction">
             <p-select
-              inputId="scenes-sort"
-              [ngModel]="selectedSort()"
-              (ngModelChange)="onSortChanged($event)"
-              [options]="sortOptions"
+              class="tag-mode-select"
+              inputId="scenes-tag-mode"
+              [ngModel]="selectedTagMode()"
+              (ngModelChange)="onTagMatchModeChanged($event)"
+              [options]="tagMatchOptions"
               optionLabel="label"
               optionValue="value"
               [appendTo]="'body'"
               panelStyleClass="scenes-filter-select-panel"
             />
-            <button
-              type="button"
-              class="sort-direction-toggle"
-              [attr.aria-label]="sortDirectionToggleLabel()"
-              [attr.title]="sortDirectionToggleLabel()"
-              (click)="toggleSortDirection()"
-            >
-              <i [class]="sortDirectionIconClass()" aria-hidden="true"></i>
-            </button>
           </div>
         </div>
+      </label>
 
-        <label class="control-field">
-          <span>StashDB Favorites</span>
+      <div class="control-field">
+        <span>Sort By</span>
+        <div class="sort-with-direction">
           <p-select
-            inputId="scenes-favorites"
-            [ngModel]="selectedFavorites()"
-            (ngModelChange)="onFavoritesChanged($event)"
-            [options]="favoritesOptions"
+            inputId="scenes-sort"
+            [ngModel]="selectedSort()"
+            (ngModelChange)="onSortChanged($event)"
+            [options]="sortOptions"
             optionLabel="label"
             optionValue="value"
             [appendTo]="'body'"
             panelStyleClass="scenes-filter-select-panel"
           />
-        </label>
-      </div>
-
-      <div class="control-group">
-        <div class="control-group-head">
-          <span class="control-group-title">Acquisition Lifecycle</span>
+          <button
+            type="button"
+            class="sort-direction-toggle"
+            [attr.aria-label]="sortDirectionToggleLabel()"
+            [attr.title]="sortDirectionToggleLabel()"
+            (click)="toggleSortDirection()"
+          >
+            <i [class]="sortDirectionIconClass()" aria-hidden="true"></i>
+          </button>
         </div>
-
-        <label class="control-field">
-          <span>Lifecycle Status</span>
-          <p-select
-            inputId="scenes-lifecycle"
-            [ngModel]="selectedLifecycle()"
-            (ngModelChange)="onLifecycleChanged($event)"
-            [options]="lifecycleOptions"
-            optionLabel="label"
-            optionValue="value"
-            [appendTo]="'body'"
-            panelStyleClass="scenes-filter-select-panel"
-          />
-        </label>
       </div>
+
+      <label class="control-field">
+        <span>StashDB Favorites</span>
+        <p-select
+          inputId="scenes-favorites"
+          [ngModel]="selectedFavorites()"
+          (ngModelChange)="onFavoritesChanged($event)"
+          [options]="favoritesOptions"
+          optionLabel="label"
+          optionValue="value"
+          [appendTo]="'body'"
+          panelStyleClass="scenes-filter-select-panel"
+        />
+      </label>
     </div>
 
     <p class="controls-note">
-      Discovery filters come from StashDB. Lifecycle status comes from the Whisparr → Stash
-      acquisition pipeline.
+      {{ scenesResultsNote() }}
     </p>
   </section>
 
