@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import {
+  type CatalogProviderKey,
+  resolveCatalogProviderKey,
+} from '../providers/catalog/catalog-provider.util';
+import {
   StashAdapter,
   type StashAdapterBaseConfig,
 } from '../providers/stash/stash.adapter';
@@ -77,6 +81,9 @@ export class HybridScenesService {
     const normalizedTagIds = this.dedupeStrings(config.tagIds ?? []);
     const normalizedStudioIds = this.dedupeStrings(config.studioIds ?? []);
     const availabilityCache = new Map<string, boolean>();
+    const activeCatalogProviderKey = resolveCatalogProviderKey(
+      stashdbConfig.baseUrl,
+    );
     const matched: StashdbScene[] = [];
     let inspected = 0;
     let currentCandidatePage = 1;
@@ -106,7 +113,10 @@ export class HybridScenesService {
       });
 
       totalCandidates = candidatePage.total;
-      const pageScenes = candidatePage.scenes.slice(0, maxInspected - inspected);
+      const pageScenes = candidatePage.scenes.slice(
+        0,
+        maxInspected - inspected,
+      );
       if (pageScenes.length === 0) {
         reachedEndOfCandidates = true;
         break;
@@ -121,6 +131,7 @@ export class HybridScenesService {
             stashConfig,
             config,
             availabilityCache,
+            activeCatalogProviderKey,
           );
           return { scene, inLibrary };
         },
@@ -148,7 +159,9 @@ export class HybridScenesService {
     const scenes = matched.slice(startIndex, endIndexExclusive);
     const hasMore =
       matched.length > endIndexExclusive ||
-      (!reachedEndOfCandidates && scenes.length > 0 && inspected < totalCandidates);
+      (!reachedEndOfCandidates &&
+        scenes.length > 0 &&
+        inspected < totalCandidates);
 
     return {
       scenes,
@@ -174,11 +187,13 @@ export class HybridScenesService {
       : 'MISSING_FROM_LIBRARY';
   }
 
-  private usesStashLocalFavoriteOverlays(config: HybridSceneFeedConfig): boolean {
+  private usesStashLocalFavoriteOverlays(
+    config: HybridSceneFeedConfig,
+  ): boolean {
     return Boolean(
       config.stashFavoritePerformersOnly ||
-        config.stashFavoriteStudiosOnly ||
-        config.stashFavoriteTagsOnly,
+      config.stashFavoriteStudiosOnly ||
+      config.stashFavoriteTagsOnly,
     );
   }
 
@@ -187,17 +202,28 @@ export class HybridScenesService {
     stashConfig: StashAdapterBaseConfig,
     config: HybridSceneFeedConfig,
     cache: Map<string, boolean>,
+    activeCatalogProviderKey: CatalogProviderKey | null,
   ): Promise<boolean> {
     const cached = cache.get(stashId);
     if (cached !== undefined) {
       return cached;
     }
 
-    const matches = await this.stashAdapter.findScenesByStashId(stashId, stashConfig, {
-      favoritePerformersOnly: config.stashFavoritePerformersOnly,
-      favoriteStudiosOnly: config.stashFavoriteStudiosOnly,
-      favoriteTagsOnly: config.stashFavoriteTagsOnly,
-    });
+    if (!activeCatalogProviderKey) {
+      cache.set(stashId, false);
+      return false;
+    }
+
+    const matches = await this.stashAdapter.findScenesByStashId(
+      stashId,
+      stashConfig,
+      {
+        providerKey: activeCatalogProviderKey,
+        favoritePerformersOnly: config.stashFavoritePerformersOnly,
+        favoriteStudiosOnly: config.stashFavoriteStudiosOnly,
+        favoriteTagsOnly: config.stashFavoriteTagsOnly,
+      },
+    );
     const inLibrary = matches.length > 0;
     cache.set(stashId, inLibrary);
     return inLibrary;
@@ -211,13 +237,19 @@ export class HybridScenesService {
     const results = new Array<TOutput>(items.length);
     let nextIndex = 0;
 
-    const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-      while (nextIndex < items.length) {
-        const currentIndex = nextIndex;
-        nextIndex += 1;
-        results[currentIndex] = await mapper(items[currentIndex] as TInput, currentIndex);
-      }
-    });
+    const workers = Array.from(
+      { length: Math.min(concurrency, items.length) },
+      async () => {
+        while (nextIndex < items.length) {
+          const currentIndex = nextIndex;
+          nextIndex += 1;
+          results[currentIndex] = await mapper(
+            items[currentIndex] as TInput,
+            currentIndex,
+          );
+        }
+      },
+    );
 
     await Promise.all(workers);
     return results;

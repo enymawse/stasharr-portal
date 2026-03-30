@@ -1,4 +1,10 @@
 import { BadGatewayException, Injectable } from '@nestjs/common';
+import {
+  type CatalogProviderKey,
+  findCatalogExternalIdForProvider,
+  hasCatalogSceneRef,
+  normalizeCatalogSceneRefs,
+} from '../catalog/catalog-provider.util';
 
 export interface StashAdapterBaseConfig {
   baseUrl: string;
@@ -72,7 +78,7 @@ export interface StashLocalSceneIdentityPage {
 export interface StashLocalLibrarySceneItem {
   id: string;
   linkedStashId: string | null;
-  linkedStashIds: string[];
+  linkedCatalogRefs: string[];
   title: string;
   description: string | null;
   imageUrl: string | null;
@@ -102,6 +108,7 @@ export interface StashLocalLibraryScenePage {
 }
 
 export interface StashSceneMatchOverlayConfig {
+  providerKey?: CatalogProviderKey | null;
   favoritePerformersOnly?: boolean;
   favoriteStudiosOnly?: boolean;
   favoriteTagsOnly?: boolean;
@@ -264,6 +271,10 @@ export class StashAdapter {
               height
               width
             }
+            stash_ids {
+              endpoint
+              stash_id
+            }
           }
         }
       }
@@ -276,21 +287,14 @@ export class StashAdapter {
     const scenes = payload.data?.findScenes?.scenes ?? [];
 
     return scenes
-      .map((scene): StashSceneMatch | null => {
-        if (typeof scene.id !== 'string' || scene.id.trim().length === 0) {
-          return null;
-        }
-
-        const { width, height } = this.pickBestResolution(scene.files ?? []);
-
-        return {
-          id: scene.id,
-          width,
-          height,
-          viewUrl: this.resolveSceneViewUrl(config.baseUrl, scene.id),
-          label: this.buildSceneLabel(scene.id, height),
-        };
-      })
+      .map((scene) =>
+        this.toSceneMatch(
+          scene,
+          config.baseUrl,
+          normalizedStashId,
+          overlays?.providerKey ?? null,
+        ),
+      )
       .filter((scene): scene is StashSceneMatch => scene !== null)
       .sort((a, b) => {
         const aHeight = a.height ?? 0;
@@ -415,6 +419,7 @@ export class StashAdapter {
   async getLocalLibraryScenePage(
     config: StashAdapterBaseConfig,
     pageConfig: StashLocalLibraryScenePageConfig,
+    activeCatalogProviderKey?: CatalogProviderKey | null,
   ): Promise<StashLocalLibraryScenePage> {
     const page = this.normalizePositiveInteger(pageConfig.page, 1);
     const perPage = this.normalizePositiveInteger(pageConfig.perPage, 100);
@@ -482,7 +487,13 @@ export class StashAdapter {
       perPage,
       hasMore: page * perPage < total,
       items: scenes
-        .map((scene) => this.toLocalLibrarySceneItem(scene, config.baseUrl))
+        .map((scene) =>
+          this.toLocalLibrarySceneItem(
+            scene,
+            config.baseUrl,
+            activeCatalogProviderKey ?? null,
+          ),
+        )
         .filter((scene): scene is StashLocalLibrarySceneItem => scene !== null),
     };
   }
@@ -800,6 +811,7 @@ export class StashAdapter {
   private toLocalLibrarySceneItem(
     scene: StashLocalSceneRecord,
     baseUrl: string,
+    activeCatalogProviderKey: CatalogProviderKey | null,
   ): StashLocalLibrarySceneItem | null {
     const id = this.normalizeOptionalString(scene.id);
     if (!id) {
@@ -811,17 +823,20 @@ export class StashAdapter {
           .map((entry) => this.toLinkedSceneStashId(entry))
           .filter((entry): entry is StashLinkedSceneStashId => entry !== null)
       : [];
-    const linkedStashIds = Array.from(
-      new Set(linkedEntries.map((entry) => entry.stashId)),
-    );
+    const linkedCatalogRefs = this.toLinkedCatalogRefs(linkedEntries);
     const performers = this.toNamedEntities(scene.performers ?? []);
     const tags = this.toNamedEntities(scene.tags ?? []);
     const duration = this.pickFirstDuration(scene.files ?? []);
 
     return {
       id,
-      linkedStashId: this.pickPrimaryLinkedStashId(linkedEntries),
-      linkedStashIds,
+      linkedStashId: activeCatalogProviderKey
+        ? findCatalogExternalIdForProvider(
+            linkedCatalogRefs,
+            activeCatalogProviderKey,
+          )
+        : null,
+      linkedCatalogRefs,
       title: this.normalizeOptionalString(scene.title) ?? `Scene #${id}`,
       description: this.normalizeOptionalString(scene.details),
       imageUrl: this.parseAssetUrl(scene.paths?.screenshot),
@@ -844,6 +859,41 @@ export class StashAdapter {
       hasFavoriteTag: Array.isArray(scene.tags)
         ? scene.tags.some((tag) => tag?.favorite === true)
         : false,
+    };
+  }
+
+  private toSceneMatch(
+    scene: StashLocalSceneRecord,
+    baseUrl: string,
+    stashId: string,
+    providerKey: CatalogProviderKey | null,
+  ): StashSceneMatch | null {
+    const id = this.normalizeOptionalString(scene.id);
+    if (!id) {
+      return null;
+    }
+
+    if (providerKey) {
+      const linkedEntries = Array.isArray(scene.stash_ids)
+        ? scene.stash_ids
+            .map((entry) => this.toLinkedSceneStashId(entry))
+            .filter((entry): entry is StashLinkedSceneStashId => entry !== null)
+        : [];
+      const linkedCatalogRefs = this.toLinkedCatalogRefs(linkedEntries);
+
+      if (!hasCatalogSceneRef(linkedCatalogRefs, providerKey, stashId)) {
+        return null;
+      }
+    }
+
+    const { width, height } = this.pickBestResolution(scene.files ?? []);
+
+    return {
+      id,
+      width,
+      height,
+      viewUrl: this.resolveSceneViewUrl(baseUrl, id),
+      label: this.buildSceneLabel(id, height),
     };
   }
 
@@ -963,17 +1013,15 @@ export class StashAdapter {
     };
   }
 
-  private pickPrimaryLinkedStashId(
+  private toLinkedCatalogRefs(
     linkedEntries: StashLinkedSceneStashId[],
-  ): string | null {
-    const stashdbEntry = linkedEntries.find((entry) =>
-      entry.endpoint.toLowerCase().includes('stashdb'),
+  ): string[] {
+    return normalizeCatalogSceneRefs(
+      linkedEntries.map((entry) => ({
+        endpoint: entry.endpoint,
+        externalId: entry.stashId,
+      })),
     );
-    if (stashdbEntry) {
-      return stashdbEntry.stashId;
-    }
-
-    return linkedEntries[0]?.stashId ?? null;
   }
 
   private toStudioOptions(

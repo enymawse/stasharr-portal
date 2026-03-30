@@ -7,6 +7,10 @@ import {
 import { IndexingService } from '../indexing/indexing.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  type CatalogProviderKey,
+  resolveCatalogProviderKey,
+} from '../providers/catalog/catalog-provider.util';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import {
   WhisparrAdapter,
@@ -65,15 +69,21 @@ export class SceneStatusService {
       return SceneStatusService.NOT_REQUESTED;
     }
 
-    const [fallbackRequestStatus, stashConfig, whisparrConfig] =
-      await Promise.all([
-        this.resolveFallbackStatusForScene(normalized),
-        this.getStashConfig(),
-        this.getWhisparrConfig(),
-      ]);
+    const [
+      fallbackRequestStatus,
+      stashConfig,
+      whisparrConfig,
+      activeCatalogProviderKey,
+    ] = await Promise.all([
+      this.resolveFallbackStatusForScene(normalized),
+      this.getStashConfig(),
+      this.getWhisparrConfig(),
+      this.getActiveCatalogProviderKey(),
+    ]);
     const stashAvailability = await this.resolveStashAvailabilityForScenes(
       [normalized],
       stashConfig,
+      activeCatalogProviderKey,
     );
     const stashAvailable = stashAvailability.get(normalized) === true;
     this.logger.debug(
@@ -204,14 +214,21 @@ export class SceneStatusService {
       );
     }
 
-    const [fallbackStatuses, stashConfig, whisparrConfig] = await Promise.all([
+    const [
+      fallbackStatuses,
+      stashConfig,
+      whisparrConfig,
+      activeCatalogProviderKey,
+    ] = await Promise.all([
       this.resolveFallbackStatusesForScenes(unresolvedIds),
       this.getStashConfig(),
       this.getWhisparrConfig(),
+      this.getActiveCatalogProviderKey(),
     ]);
     const stashAvailability = await this.resolveStashAvailabilityForScenes(
       unresolvedIds,
       stashConfig,
+      activeCatalogProviderKey,
     );
     const resolvedStatuses = this.resolveFallbackSceneStatuses(
       unresolvedIds,
@@ -484,8 +501,9 @@ export class SceneStatusService {
   private async resolveStashAvailabilityForScenes(
     normalizedIds: string[],
     stashConfig: { baseUrl: string; apiKey: string | null } | null,
+    activeCatalogProviderKey: CatalogProviderKey | null,
   ): Promise<Map<string, boolean>> {
-    if (!stashConfig) {
+    if (!stashConfig || !activeCatalogProviderKey) {
       return new Map();
     }
 
@@ -507,6 +525,7 @@ export class SceneStatusService {
             const available = await this.lookupStashAvailability(
               stashId,
               stashConfig,
+              activeCatalogProviderKey,
             );
             return {
               stashId,
@@ -543,8 +562,13 @@ export class SceneStatusService {
   private async lookupStashAvailability(
     stashId: string,
     stashConfig: { baseUrl: string; apiKey: string | null },
+    activeCatalogProviderKey: CatalogProviderKey,
   ): Promise<boolean> {
-    const cacheKey = this.buildStashAvailabilityCacheKey(stashId, stashConfig);
+    const cacheKey = this.buildStashAvailabilityCacheKey(
+      stashId,
+      stashConfig,
+      activeCatalogProviderKey,
+    );
     const cached = this.readStashAvailabilityCache(cacheKey);
     if (cached !== null) {
       return cached;
@@ -556,7 +580,9 @@ export class SceneStatusService {
     }
 
     const lookup = this.stashAdapter
-      .findScenesByStashId(stashId, stashConfig)
+      .findScenesByStashId(stashId, stashConfig, {
+        providerKey: activeCatalogProviderKey,
+      })
       .then((copies) => {
         const available = copies.length > 0;
         this.writeStashAvailabilityCache(cacheKey, available);
@@ -573,8 +599,9 @@ export class SceneStatusService {
   private buildStashAvailabilityCacheKey(
     stashId: string,
     stashConfig: { baseUrl: string; apiKey: string | null },
+    activeCatalogProviderKey: CatalogProviderKey,
   ): string {
-    return `${stashConfig.baseUrl.trim()}|${stashConfig.apiKey?.trim() ?? ''}|${stashId}`;
+    return `${stashConfig.baseUrl.trim()}|${stashConfig.apiKey?.trim() ?? ''}|${activeCatalogProviderKey}|${stashId}`;
   }
 
   private readStashAvailabilityCache(cacheKey: string): boolean | null {
@@ -714,6 +741,25 @@ export class SceneStatusService {
           this.serializeError(error),
         )}`,
       );
+      return null;
+    }
+  }
+
+  private async getActiveCatalogProviderKey(): Promise<CatalogProviderKey | null> {
+    try {
+      const integration = await this.integrationsService.findOne(
+        IntegrationType.STASHDB,
+      );
+
+      if (
+        !integration.enabled ||
+        integration.status !== IntegrationStatus.CONFIGURED
+      ) {
+        return null;
+      }
+
+      return resolveCatalogProviderKey(integration.baseUrl);
+    } catch {
       return null;
     }
   }

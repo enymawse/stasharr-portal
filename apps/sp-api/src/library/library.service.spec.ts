@@ -5,7 +5,7 @@ function buildLibraryRow(overrides: Record<string, unknown> = {}) {
   return {
     stashSceneId: '411',
     linkedStashId: 'stash-411',
-    linkedStashIds: ['stash-411'],
+    linkedCatalogRefs: ['STASHDB|stash-411'],
     title: 'Fresh Local Scene',
     description: 'Already indexed locally.',
     imageUrl: 'http://stash.local/images/411.jpg',

@@ -88,7 +88,7 @@ model SceneIndexSummary {
 model LibrarySceneIndex {
   stashSceneId          String   @id
   linkedStashId         String?
-  linkedStashIds        String[] @default([])
+  linkedCatalogRefs     String[] @default([])
   title                 String
   description           String?
   imageUrl              String?

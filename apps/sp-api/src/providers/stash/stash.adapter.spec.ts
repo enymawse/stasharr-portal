@@ -111,6 +111,62 @@ describe('StashAdapter', () => {
     });
   });
 
+  it('filters scene links to the requested catalog provider', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findScenes: {
+              count: 2,
+              scenes: [
+                {
+                  id: '3030',
+                  stash_ids: [
+                    {
+                      endpoint: 'https://fansdb.cc/graphql',
+                      stash_id: 'scene-1',
+                    },
+                  ],
+                  files: [{ width: 1920, height: 1080 }],
+                },
+                {
+                  id: '3027',
+                  stash_ids: [
+                    {
+                      endpoint: 'https://stashdb.org/graphql',
+                      stash_id: 'scene-1',
+                    },
+                  ],
+                  files: [{ width: 3840, height: 2160 }],
+                },
+              ],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.findScenesByStashId(
+        'scene-1',
+        {
+          baseUrl: 'http://stash.local',
+        },
+        {
+          providerKey: 'STASHDB',
+        },
+      ),
+    ).resolves.toEqual([
+      {
+        id: '3027',
+        width: 3840,
+        height: 2160,
+        viewUrl: 'http://stash.local/scenes/3027',
+        label: '2160p',
+      },
+    ]);
+  });
+
   it('falls back to Scene #id label when file dimensions are missing', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
@@ -429,8 +485,12 @@ describe('StashAdapter', () => {
                       stash_id: 'stash-411',
                     },
                     {
+                      endpoint: 'https://fansdb.cc/graphql',
+                      stash_id: 'fans-411',
+                    },
+                    {
                       endpoint: 'https://example.invalid/graphql',
-                      stash_id: 'other-411',
+                      stash_id: 'ignored-411',
                     },
                   ],
                   studio: {
@@ -479,6 +539,7 @@ describe('StashAdapter', () => {
           page: 1,
           perPage: 100,
         },
+        'STASHDB',
       ),
     ).resolves.toEqual({
       total: 2,
@@ -489,7 +550,7 @@ describe('StashAdapter', () => {
         {
           id: '411',
           linkedStashId: 'stash-411',
-          linkedStashIds: ['stash-411', 'other-411'],
+          linkedCatalogRefs: ['STASHDB|stash-411', 'FANSDB|fans-411'],
           title: 'Fresh Library Scene',
           description: 'Already local.',
           imageUrl: 'http://stash.local/images/411.jpg',

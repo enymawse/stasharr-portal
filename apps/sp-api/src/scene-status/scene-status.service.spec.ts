@@ -62,6 +62,13 @@ describe('SceneStatusService', () => {
     apiKey: 'stash-key',
   };
 
+  const configuredStashdbIntegration = {
+    enabled: true,
+    status: IntegrationStatus.CONFIGURED,
+    baseUrl: 'http://stashdb.local',
+    apiKey: 'stashdb-key',
+  };
+
   let service: SceneStatusService;
 
   beforeEach(() => {
@@ -81,6 +88,10 @@ describe('SceneStatusService', () => {
 
       if (type === IntegrationType.STASH) {
         return Promise.resolve(configuredStashIntegration);
+      }
+
+      if (type === IntegrationType.STASHDB) {
+        return Promise.resolve(configuredStashdbIntegration);
       }
 
       return Promise.reject(new Error(`Unexpected integration type: ${type}`));
@@ -260,6 +271,16 @@ describe('SceneStatusService', () => {
       await expect(service.resolveForScene('scene-1')).resolves.toEqual({
         state: 'AVAILABLE',
       });
+      expect(findScenesByStashIdMock).toHaveBeenCalledWith(
+        'scene-1',
+        {
+          baseUrl: 'http://stash.local',
+          apiKey: 'stash-key',
+        },
+        {
+          providerKey: 'STASHDB',
+        },
+      );
       expect(findMovieByStashIdMock).not.toHaveBeenCalled();
       expect(getQueueSnapshotMock).not.toHaveBeenCalled();
     });

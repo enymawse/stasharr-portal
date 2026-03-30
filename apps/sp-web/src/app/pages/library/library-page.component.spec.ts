@@ -56,11 +56,14 @@ describe('LibraryPageComponent', () => {
     TestBed.resetTestingModule();
   });
 
-  async function renderPage(initialQueryParams: Record<string, string> = {}) {
+  async function renderPage(
+    initialQueryParams: Record<string, string> = {},
+    feedResponse: LibraryScenesFeedResponse = buildFeedResponse(),
+  ) {
     const queryParamMap = convertToParamMap(initialQueryParams);
     const queryParamMap$ = new BehaviorSubject(queryParamMap);
     const libraryService = {
-      getScenesFeed: vi.fn().mockReturnValue(of(buildFeedResponse())),
+      getScenesFeed: vi.fn().mockReturnValue(of(feedResponse)),
       searchTags: vi.fn().mockReturnValue(of([])),
       searchStudios: vi.fn().mockReturnValue(of([])),
     };
@@ -190,5 +193,31 @@ describe('LibraryPageComponent', () => {
       favoriteStudiosOnly: true,
       favoriteTagsOnly: true,
     });
+  });
+
+  it('renders the catalog link only when an active-provider catalog id is available', async () => {
+    const { fixture } = await renderPage(
+      {},
+      buildFeedResponse([
+        buildScene({ id: '411', linkedStashId: 'stash-411' }),
+        buildScene({
+          id: '412',
+          linkedStashId: null,
+          viewUrl: 'http://stash.local/scenes/412',
+        }),
+      ]),
+    );
+
+    const articles = Array.from(
+      fixture.nativeElement.querySelectorAll('article.card'),
+    ) as HTMLElement[];
+
+    expect(articles[0]?.querySelector('a.catalog-link')?.getAttribute('href')).toContain(
+      '/scene/stash-411',
+    );
+    expect(articles[1]?.querySelector('a.catalog-link')).toBeNull();
+    expect(articles[1]?.querySelector('a.view-cta')?.getAttribute('href')).toBe(
+      'http://stash.local/scenes/412',
+    );
   });
 });

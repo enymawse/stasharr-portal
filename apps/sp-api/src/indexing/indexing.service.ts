@@ -12,6 +12,10 @@ import {
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  type CatalogProviderKey,
+  resolveCatalogProviderKey,
+} from '../providers/catalog/catalog-provider.util';
+import {
   StashAdapter,
   type StashLocalLibrarySceneItem,
 } from '../providers/stash/stash.adapter';
@@ -271,8 +275,7 @@ export class IndexingService {
           runReason: reason,
         }),
       },
-      async () =>
-        this.performStashAvailabilitySync(reason, normalizedIds),
+      async () => this.performStashAvailabilitySync(reason, normalizedIds),
     );
   }
 
@@ -750,8 +753,11 @@ export class IndexingService {
     stashIds: string[],
     reason: string,
   ): Promise<SyncRunSummary> {
-    const config = await this.getStashConfig();
-    if (!config) {
+    const [config, activeCatalogProviderKey] = await Promise.all([
+      this.getStashConfig(),
+      this.getActiveCatalogProviderKey(),
+    ]);
+    if (!config || !activeCatalogProviderKey) {
       return {
         processedCount: 0,
         updatedCount: 0,
@@ -784,6 +790,9 @@ export class IndexingService {
             const matches = await this.stashAdapter.findScenesByStashId(
               stashId,
               config,
+              {
+                providerKey: activeCatalogProviderKey,
+              },
             );
             return {
               stashId,
@@ -1102,7 +1111,10 @@ export class IndexingService {
   private async performLibraryProjectionSync(
     reason: string,
   ): Promise<SyncRunSummary> {
-    const config = await this.getStashConfig();
+    const [config, activeCatalogProviderKey] = await Promise.all([
+      this.getStashConfig(),
+      this.getActiveCatalogProviderKey(),
+    ]);
     if (!config) {
       return {
         processedCount: 0,
@@ -1123,6 +1135,7 @@ export class IndexingService {
           page,
           perPage: IndexingService.LIBRARY_SYNC_PAGE_SIZE,
         },
+        activeCatalogProviderKey,
       );
       localSceneCount += snapshotPage.items.length;
       projectionWrites += await this.upsertLibrarySceneProjectionPage(
@@ -1131,8 +1144,8 @@ export class IndexingService {
       );
 
       for (const item of snapshotPage.items) {
-        for (const linkedStashId of item.linkedStashIds) {
-          availableStashIds.add(linkedStashId);
+        if (item.linkedStashId) {
+          availableStashIds.add(item.linkedStashId);
         }
       }
 
@@ -1157,6 +1170,7 @@ export class IndexingService {
     this.logger.debug(
       `Library projection sync completed: ${this.safeJson({
         reason,
+        activeCatalogProviderKey,
         localSceneCount,
         indexedAvailableIds: availableStashIds.size,
         projectionWrites,
@@ -1175,8 +1189,11 @@ export class IndexingService {
     reason: string,
     stashIds: string[],
   ): Promise<SyncRunSummary> {
-    const config = await this.getStashConfig();
-    if (!config) {
+    const [config, activeCatalogProviderKey] = await Promise.all([
+      this.getStashConfig(),
+      this.getActiveCatalogProviderKey(),
+    ]);
+    if (!config || !activeCatalogProviderKey) {
       return {
         processedCount: 0,
         updatedCount: 0,
@@ -1209,6 +1226,9 @@ export class IndexingService {
             const matches = await this.stashAdapter.findScenesByStashId(
               stashId,
               config,
+              {
+                providerKey: activeCatalogProviderKey,
+              },
             );
             return {
               stashId,
@@ -2123,7 +2143,7 @@ export class IndexingService {
           create: {
             stashSceneId: item.id,
             linkedStashId: item.linkedStashId,
-            linkedStashIds: item.linkedStashIds,
+            linkedCatalogRefs: item.linkedCatalogRefs,
             title: item.title,
             description: item.description,
             imageUrl: item.imageUrl,
@@ -2146,7 +2166,7 @@ export class IndexingService {
           },
           update: {
             linkedStashId: item.linkedStashId,
-            linkedStashIds: item.linkedStashIds,
+            linkedCatalogRefs: item.linkedCatalogRefs,
             title: item.title,
             description: item.description,
             imageUrl: item.imageUrl,
@@ -2514,6 +2534,15 @@ export class IndexingService {
     } catch {
       return null;
     }
+  }
+
+  private async getActiveCatalogProviderKey(): Promise<CatalogProviderKey | null> {
+    const config = await this.getStashdbConfig();
+    if (!config) {
+      return null;
+    }
+
+    return resolveCatalogProviderKey(config.baseUrl);
   }
 
   private async getStashdbConfig(): Promise<{

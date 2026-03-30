@@ -6,6 +6,10 @@ import {
 } from '@nestjs/common';
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
+import {
+  type CatalogProviderKey,
+  resolveCatalogProviderKey,
+} from '../providers/catalog/catalog-provider.util';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
@@ -147,7 +151,10 @@ export class ScenesService {
       apiKey: integration.apiKey,
     });
     const status = await this.sceneStatusService.resolveForScene(scene.id);
-    const stash = await this.resolveStashAvailability(scene.id);
+    const stash = await this.resolveStashAvailability(
+      scene.id,
+      resolveCatalogProviderKey(integration.baseUrl),
+    );
     const whisparr = await this.resolveWhisparrAvailability(scene.id);
 
     return {
@@ -195,8 +202,13 @@ export class ScenesService {
 
   private async resolveStashAvailability(
     stashId: string,
+    activeCatalogProviderKey: CatalogProviderKey | null,
   ): Promise<SceneStashAvailabilityDto | null> {
     try {
+      if (!activeCatalogProviderKey) {
+        return null;
+      }
+
       const integration = await this.integrationsService.findOne(
         IntegrationType.STASH,
       );
@@ -213,10 +225,16 @@ export class ScenesService {
         return null;
       }
 
-      const copies = await this.stashAdapter.findScenesByStashId(stashId, {
-        baseUrl,
-        apiKey: integration.apiKey,
-      });
+      const copies = await this.stashAdapter.findScenesByStashId(
+        stashId,
+        {
+          baseUrl,
+          apiKey: integration.apiKey,
+        },
+        {
+          providerKey: activeCatalogProviderKey,
+        },
+      );
 
       return {
         exists: copies.length > 0,

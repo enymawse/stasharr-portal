@@ -173,6 +173,16 @@ describe('ScenesService', () => {
       },
       whisparr: null,
     });
+    expect(stashAdapter.findScenesByStashId).toHaveBeenCalledWith(
+      'stashdb-scene-1',
+      {
+        baseUrl: stashIntegration.baseUrl,
+        apiKey: stashIntegration.apiKey,
+      },
+      {
+        providerKey: 'STASHDB',
+      },
+    );
   });
 
   it('defaults to TRENDING sort for scenes feed and returns statuses', async () => {
