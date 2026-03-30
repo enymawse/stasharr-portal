@@ -31,11 +31,6 @@ import {
 export class DiscoverService {
   private readonly http = inject(HttpClient);
 
-  getDiscoverFeed(page: number, perPage: number): Observable<DiscoverResponse> {
-    const params = new HttpParams().set('page', page.toString()).set('perPage', perPage.toString());
-    return this.http.get<DiscoverResponse>('/api/discover', { params });
-  }
-
   getScenesFeed(
     page: number,
     perPage: number,

@@ -4,7 +4,6 @@ import {
   setupOnlyWhenIncompleteGuard,
 } from './core/guards/setup-route.guard';
 import { AppShellLayoutComponent } from './layouts/app-shell-layout/app-shell-layout.component';
-import { DiscoverPageComponent } from './features/discover/discover-page.component';
 import { SetupPageComponent } from './features/setup/setup-page.component';
 import { AcquisitionPageComponent } from './pages/acquisition/acquisition-page.component';
 import { ScenesPageComponent } from './pages/scenes/scenes-page.component';
@@ -30,10 +29,6 @@ export const routes: Routes = [
         path: 'home',
         loadComponent: () =>
           import('./pages/home/home-page.component').then((module) => module.HomePageComponent),
-      },
-      {
-        path: 'discover',
-        component: DiscoverPageComponent,
       },
       {
         path: 'scene/:stashId',

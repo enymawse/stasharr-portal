@@ -195,7 +195,7 @@ describe('ScenesService', () => {
     });
   });
 
-  it('defaults to DATE sort for scenes feed and returns statuses', async () => {
+  it('defaults to TRENDING sort for scenes feed and returns statuses', async () => {
     await expect(service.getScenesFeed()).resolves.toEqual({
       total: 1,
       page: 1,
@@ -226,7 +226,7 @@ describe('ScenesService', () => {
       apiKey: stashdbIntegration.apiKey,
       page: 1,
       perPage: 24,
-      sort: 'DATE',
+      sort: 'TRENDING',
       direction: 'DESC',
       favorites: undefined,
       tagFilter: undefined,

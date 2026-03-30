@@ -22,7 +22,7 @@ export const setupOnlyWhenIncompleteGuard: CanActivateFn = () => {
 
   return setupService.getStatus().pipe(
     map((status) =>
-      status.setupComplete ? router.createUrlTree(['/discover']) : true,
+      status.setupComplete ? router.createUrlTree(['/scenes']) : true,
     ),
     catchError(() => of(true)),
   );

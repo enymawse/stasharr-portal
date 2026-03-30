@@ -76,7 +76,7 @@ interface SelectedStudioChip {
 export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly PAGE_SIZE = 24;
   private static readonly SEARCH_DEBOUNCE_MS = 250;
-  private static readonly DEFAULT_SORT: SceneFeedSort = 'DATE';
+  private static readonly DEFAULT_SORT: SceneFeedSort = 'TRENDING';
   private static readonly DEFAULT_DIRECTION: SortDirection = 'DESC';
   private static readonly DEFAULT_FAVORITES: FavoritesFilterOption = 'NONE';
   private static readonly DEFAULT_TAG_MODE: SceneTagMatchMode = 'OR';
@@ -85,9 +85,9 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     value: SceneFeedSort;
     label: string;
   }> = [
+    { value: 'TRENDING', label: 'Trending' },
     { value: 'DATE', label: 'Release Date' },
     { value: 'TITLE', label: 'Title' },
-    { value: 'TRENDING', label: 'Trending' },
     { value: 'CREATED_AT', label: 'Created At' },
     { value: 'UPDATED_AT', label: 'Updated At' },
   ];
@@ -372,6 +372,52 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     );
   }
 
+  protected hasActiveFilters(): boolean {
+    return (
+      this.selectedSort() !== ScenesPageComponent.DEFAULT_SORT ||
+      this.selectedDirection() !== ScenesPageComponent.DEFAULT_DIRECTION ||
+      this.selectedFavorites() !== ScenesPageComponent.DEFAULT_FAVORITES ||
+      this.selectedLibraryAvailability() !== ScenesPageComponent.DEFAULT_LIBRARY_AVAILABILITY ||
+      this.stashFavoritePerformersOnly() ||
+      this.stashFavoriteStudiosOnly() ||
+      this.stashFavoriteTagsOnly() ||
+      this.selectedTagMode() !== ScenesPageComponent.DEFAULT_TAG_MODE ||
+      this.selectedTags().length > 0 ||
+      this.selectedStudios().length > 0
+    );
+  }
+
+  protected resetFilters(): void {
+    if (!this.hasActiveFilters()) {
+      return;
+    }
+
+    this.selectedSort.set(ScenesPageComponent.DEFAULT_SORT);
+    this.selectedDirection.set(ScenesPageComponent.DEFAULT_DIRECTION);
+    this.selectedFavorites.set(ScenesPageComponent.DEFAULT_FAVORITES);
+    this.selectedLibraryAvailability.set(ScenesPageComponent.DEFAULT_LIBRARY_AVAILABILITY);
+    this.stashFavoritePerformersOnly.set(false);
+    this.stashFavoriteStudiosOnly.set(false);
+    this.stashFavoriteTagsOnly.set(false);
+    this.selectedTagMode.set(ScenesPageComponent.DEFAULT_TAG_MODE);
+    this.selectedTags.set([]);
+    this.selectedTagIdsModel.set([]);
+    this.tagSearchTerm.set('');
+    this.tagOptions.set([]);
+    this.tagSelectOptions.set([]);
+    this.tagSearchError.set(null);
+    this.studioSearchTerm.set('');
+    this.selectedStudios.set([]);
+    this.studioSelectedIdsModel.set([]);
+    this.studioOptions.set([]);
+    this.studioSelectOptions.set([]);
+    this.studioSearchError.set(null);
+    this.tagSearchTerms.next('');
+    this.studioSearchTerms.next('');
+    this.syncUrlWithCurrentFilters(false);
+    this.resetFeedAndReload();
+  }
+
   protected scenesTotalLabel(): string {
     const total = this.total();
     if (total === null) {
@@ -383,6 +429,12 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected scenesResultsNote(): string {
     return 'Discovery filters come from StashDB. Lifecycle status comes from the Whisparr → Stash acquisition pipeline.';
+  }
+
+  protected emptyStateMessage(): string {
+    return this.hasActiveFilters()
+      ? 'No scenes match the current filters.'
+      : 'No trending scenes are available right now.';
   }
 
   protected onTagFilterChanged(nextValue: string | null | undefined): void {

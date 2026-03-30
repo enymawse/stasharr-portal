@@ -165,7 +165,7 @@ export class SetupPageComponent implements OnInit {
           });
 
           if (setupStatus.setupComplete) {
-            void this.router.navigateByUrl('/discover');
+            void this.router.navigateByUrl('/scenes');
           }
         },
         error: () => {
@@ -197,7 +197,7 @@ export class SetupPageComponent implements OnInit {
           this.applyIntegrations(response.integrations);
 
           if (response.status.setupComplete) {
-            void this.router.navigateByUrl('/discover');
+            void this.router.navigateByUrl('/scenes');
           }
         },
         error: () => {

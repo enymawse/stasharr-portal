@@ -10,6 +10,17 @@
   <section class="controls-shell" aria-label="Scenes controls">
     <div class="controls-header">
       <span class="controls-title">StashDB Discovery</span>
+      <div class="controls-actions">
+        <button
+          type="button"
+          class="reset-filters-button"
+          [disabled]="!hasActiveFilters()"
+          title="Clear filters and return to the default trending discovery view"
+          (click)="resetFilters()"
+        >
+          Clear Filters
+        </button>
+      </div>
     </div>
 
     <div class="controls-row">
@@ -146,7 +157,7 @@
     <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
     <button type="button" class="retry-button" (click)="retryInitialLoad()">Retry</button>
   } @else if (!hasItems()) {
-    <p class="state">No dated scenes are available right now.</p>
+    <p class="state">{{ emptyStateMessage() }}</p>
   } @else {
     <section class="grid">
       @for (item of items(); track item.id) {

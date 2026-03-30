@@ -42,9 +42,16 @@ header p {
 .controls-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
   min-width: 0;
   flex-wrap: wrap;
+}
+
+.controls-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .controls-title {
@@ -53,6 +60,28 @@ header p {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-primary);
+}
+
+.reset-filters-button {
+  padding: 0.38rem 0.68rem;
+  border-radius: 999px;
+  border: 1px solid var(--button-border);
+  background: var(--button-bg);
+  color: var(--button-text);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.reset-filters-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.reset-filters-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .controls-row {

@@ -59,19 +59,19 @@ export class ScenePageComponent implements OnInit, OnDestroy {
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
   protected readonly favoritingStudio = signal(false);
   protected readonly performerFavoriteInFlightById = signal<Record<string, boolean>>({});
-  protected readonly backLinkPath = signal('/discover');
+  protected readonly backLinkPath = signal('/scenes');
   protected readonly backLinkQueryParams = signal<Params>({});
-  protected readonly backLinkLabel = signal('Back to Discover');
+  protected readonly backLinkLabel = signal('Back to Scenes');
 
   ngOnInit(): void {
     this.routeSubscription = combineLatest([
       this.route.paramMap,
       this.route.queryParamMap,
     ]).subscribe(([paramMap, queryParamMap]) => {
-      const resolvedBackLink = this.parseReturnTo(queryParamMap.get('returnTo'), '/discover');
+      const resolvedBackLink = this.parseReturnTo(queryParamMap.get('returnTo'), '/scenes');
       this.backLinkPath.set(resolvedBackLink.path);
       this.backLinkQueryParams.set(resolvedBackLink.queryParams);
-      this.backLinkLabel.set(this.backLinkText(resolvedBackLink.path, 'Back to Discover'));
+      this.backLinkLabel.set(this.backLinkText(resolvedBackLink.path, 'Back to Scenes'));
 
       const stashIdParam = paramMap.get('stashId')?.trim();
       if (!stashIdParam) {
@@ -524,8 +524,9 @@ export class ScenePageComponent implements OnInit, OnDestroy {
       const parsed = this.router.parseUrl(trimmed);
       const primarySegments = parsed.root.children['primary']?.segments ?? [];
       const path = `/${primarySegments.map((segment) => segment.path).join('/')}`;
+      const canonicalPath = path === '/discover' ? '/scenes' : path;
       return {
-        path: path === '/' ? fallback : path,
+        path: canonicalPath === '/' ? fallback : canonicalPath,
         queryParams: parsed.queryParams,
       };
     } catch {
@@ -536,9 +537,6 @@ export class ScenePageComponent implements OnInit, OnDestroy {
   private backLinkText(returnTo: string, fallbackLabel: string): string {
     if (returnTo.startsWith('/home')) {
       return 'Back to Home';
-    }
-    if (returnTo.startsWith('/discover')) {
-      return 'Back to Discover';
     }
     if (returnTo.startsWith('/scenes')) {
       return 'Back to Scenes';

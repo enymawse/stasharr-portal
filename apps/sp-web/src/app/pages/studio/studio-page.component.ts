@@ -887,8 +887,9 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
       const parsed = this.router.parseUrl(trimmed);
       const primarySegments = parsed.root.children['primary']?.segments ?? [];
       const path = `/${primarySegments.map((segment) => segment.path).join('/')}`;
+      const canonicalPath = path === '/discover' ? '/scenes' : path;
       return {
-        path: path === '/' ? fallback : path,
+        path: canonicalPath === '/' ? fallback : canonicalPath,
         queryParams: parsed.queryParams,
       };
     } catch {
@@ -905,9 +906,6 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     if (returnTo.startsWith('/scenes')) {
       return 'Back to Scenes';
-    }
-    if (returnTo.startsWith('/discover')) {
-      return 'Back to Discover';
     }
     if (returnTo.startsWith('/acquisition')) {
       return 'Back to Acquisition';

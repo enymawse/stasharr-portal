@@ -558,12 +558,6 @@ export class StashdbAdapter {
     await this.executeQuery(config, query);
   }
 
-  async getTrendingScenes(
-    config: StashdbAdapterTrendingConfig,
-  ): Promise<StashdbTrendingScenesResult> {
-    return this.getSceneFeed(config, 'TRENDING');
-  }
-
   async getScenesSortedByDate(
     config: StashdbAdapterTrendingConfig,
   ): Promise<StashdbTrendingScenesResult> {

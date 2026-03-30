@@ -75,10 +75,12 @@ describe('StashdbAdapter', () => {
         }),
     } as Response);
 
-    const result = await adapter.getTrendingScenes({
+    const result = await adapter.getScenesBySort({
       baseUrl: 'http://stashdb.local/graphql',
       page: 1,
       perPage: 25,
+      sort: 'TRENDING',
+      direction: 'DESC',
     });
 
     expect(result).toEqual({

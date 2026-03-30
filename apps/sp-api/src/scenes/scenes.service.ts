@@ -48,7 +48,7 @@ export class ScenesService {
   async getScenesFeed(
     page = ScenesService.DEFAULT_PAGE,
     perPage = ScenesService.DEFAULT_PER_PAGE,
-    sort: SceneFeedSort = 'DATE',
+    sort: SceneFeedSort = 'TRENDING',
     direction: SortDirection = 'DESC',
     tagIds: string[] = [],
     tagMode: SceneTagMatchMode = 'OR',

@@ -60,7 +60,7 @@ describe('setup route guards', () => {
     expect(result).toBe(true);
   });
 
-  it('redirects /setup to /discover when setup is complete', async () => {
+  it('redirects /setup to /scenes when setup is complete', async () => {
     setupService.getStatus.mockReturnValue(
       of({
         setupComplete: true,
@@ -70,7 +70,7 @@ describe('setup route guards', () => {
 
     const result = await runGuard(setupOnlyWhenIncompleteGuard);
 
-    expect(router.serializeUrl(result as UrlTree)).toBe('/discover');
+    expect(router.serializeUrl(result as UrlTree)).toBe('/scenes');
   });
 
   it('allows /setup when setup status check fails', async () => {
