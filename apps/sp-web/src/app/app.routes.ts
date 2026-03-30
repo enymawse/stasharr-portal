@@ -6,6 +6,7 @@ import {
 import { AppShellLayoutComponent } from './layouts/app-shell-layout/app-shell-layout.component';
 import { SetupPageComponent } from './features/setup/setup-page.component';
 import { AcquisitionPageComponent } from './pages/acquisition/acquisition-page.component';
+import { LibraryPageComponent } from './pages/library/library-page.component';
 import { ScenesPageComponent } from './pages/scenes/scenes-page.component';
 import { ScenePageComponent } from './pages/scene/scene-page.component';
 import { SettingsPageComponent } from './pages/settings/settings-page.component';
@@ -41,6 +42,10 @@ export const routes: Routes = [
       {
         path: 'acquisition',
         component: AcquisitionPageComponent,
+      },
+      {
+        path: 'library',
+        component: LibraryPageComponent,
       },
       {
         path: 'performers',

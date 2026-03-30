@@ -407,6 +407,127 @@ describe('StashAdapter', () => {
     expect(String(body.query)).toContain('stash_id');
   });
 
+  it('returns rich local-library projection pages for background indexing', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findScenes: {
+              count: 2,
+              scenes: [
+                {
+                  id: '411',
+                  title: 'Fresh Library Scene',
+                  details: 'Already local.',
+                  date: '2026-03-24',
+                  created_at: '2026-03-23T11:00:00.000Z',
+                  updated_at: '2026-03-24T12:00:00.000Z',
+                  stash_ids: [
+                    {
+                      endpoint: 'https://stashdb.org/graphql',
+                      stash_id: 'stash-411',
+                    },
+                    {
+                      endpoint: 'https://example.invalid/graphql',
+                      stash_id: 'other-411',
+                    },
+                  ],
+                  studio: {
+                    id: 'studio-1',
+                    name: 'Archive',
+                    image_path: 'http://stash.local/studios/archive.jpg',
+                    favorite: true,
+                  },
+                  performers: [
+                    {
+                      id: 'performer-1',
+                      name: 'Performer One',
+                      favorite: true,
+                    },
+                  ],
+                  tags: [
+                    {
+                      id: 'tag-1',
+                      name: 'Tag One',
+                      favorite: false,
+                    },
+                    {
+                      id: 'tag-2',
+                      name: 'Tag Two',
+                      favorite: true,
+                    },
+                  ],
+                  files: [{ duration: 1800 }],
+                  paths: {
+                    screenshot: 'http://stash.local/images/411.jpg',
+                  },
+                },
+              ],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.getLocalLibraryScenePage(
+        {
+          baseUrl: 'http://stash.local',
+          apiKey: 'secret',
+        },
+        {
+          page: 1,
+          perPage: 100,
+        },
+      ),
+    ).resolves.toEqual({
+      total: 2,
+      page: 1,
+      perPage: 100,
+      hasMore: false,
+      items: [
+        {
+          id: '411',
+          linkedStashId: 'stash-411',
+          linkedStashIds: ['stash-411', 'other-411'],
+          title: 'Fresh Library Scene',
+          description: 'Already local.',
+          imageUrl: 'http://stash.local/images/411.jpg',
+          studioId: 'studio-1',
+          studio: 'Archive',
+          studioImageUrl: 'http://stash.local/studios/archive.jpg',
+          performerIds: ['performer-1'],
+          performerNames: ['Performer One'],
+          tagIds: ['tag-1', 'tag-2'],
+          tagNames: ['Tag One', 'Tag Two'],
+          releaseDate: '2026-03-24',
+          duration: 1800,
+          viewUrl: 'http://stash.local/scenes/411',
+          createdAt: new Date('2026-03-23T11:00:00.000Z'),
+          updatedAt: new Date('2026-03-24T12:00:00.000Z'),
+          hasFavoritePerformer: true,
+          favoriteStudio: true,
+          hasFavoriteTag: true,
+        },
+      ],
+    });
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    const body = JSON.parse(String(init?.body));
+    expect(body.variables).toEqual({
+      filter: {
+        page: 1,
+        per_page: 100,
+        sort: 'updated_at',
+        direction: 'DESC',
+      },
+    });
+    expect(String(body.query)).toContain('performers');
+    expect(String(body.query)).toContain('tags');
+    expect(String(body.query)).toContain('created_at');
+    expect(String(body.query)).toContain('updated_at');
+  });
+
   it('supports updated_at and title local scene feed sorts', async () => {
     fetchMock.mockResolvedValue({
       ok: true,

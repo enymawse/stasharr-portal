@@ -29,9 +29,9 @@ export class IndexingScheduler implements OnApplicationBootstrap {
   }
 
   @Interval(5 * 60_000)
-  handleStashAvailabilitySync(): void {
-    this.runInBackground('stash-availability', () =>
-      this.indexingService.syncStashAvailability('interval'),
+  handleLibraryProjectionSync(): void {
+    this.runInBackground('library-projection', () =>
+      this.indexingService.syncLibraryProjection('interval'),
     );
   }
 

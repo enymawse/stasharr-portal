@@ -46,6 +46,11 @@ export interface StashLocalSceneIdentityPageConfig {
   perPage: number;
 }
 
+export interface StashLocalLibraryScenePageConfig {
+  page: number;
+  perPage: number;
+}
+
 export interface StashLinkedSceneStashId {
   endpoint: string;
   stashId: string;
@@ -62,6 +67,38 @@ export interface StashLocalSceneIdentityPage {
   perPage: number;
   hasMore: boolean;
   items: StashLocalSceneIdentityItem[];
+}
+
+export interface StashLocalLibrarySceneItem {
+  id: string;
+  linkedStashId: string | null;
+  linkedStashIds: string[];
+  title: string;
+  description: string | null;
+  imageUrl: string | null;
+  studioId: string | null;
+  studio: string | null;
+  studioImageUrl: string | null;
+  performerIds: string[];
+  performerNames: string[];
+  tagIds: string[];
+  tagNames: string[];
+  releaseDate: string | null;
+  duration: number | null;
+  viewUrl: string;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  hasFavoritePerformer: boolean;
+  favoriteStudio: boolean;
+  hasFavoriteTag: boolean;
+}
+
+export interface StashLocalLibraryScenePage {
+  total: number;
+  page: number;
+  perPage: number;
+  hasMore: boolean;
+  items: StashLocalLibrarySceneItem[];
 }
 
 export interface StashSceneMatchOverlayConfig {
@@ -115,6 +152,8 @@ interface StashLocalSceneRecord {
   title?: unknown;
   details?: unknown;
   date?: unknown;
+  created_at?: unknown;
+  updated_at?: unknown;
   stash_ids?: Array<{
     endpoint?: unknown;
     stash_id?: unknown;
@@ -126,7 +165,18 @@ interface StashLocalSceneRecord {
     id?: unknown;
     name?: unknown;
     image_path?: unknown;
+    favorite?: unknown;
   } | null;
+  performers?: Array<{
+    id?: unknown;
+    name?: unknown;
+    favorite?: unknown;
+  }> | null;
+  tags?: Array<{
+    id?: unknown;
+    name?: unknown;
+    favorite?: unknown;
+  }> | null;
   files?: Array<{
     width?: unknown;
     height?: unknown;
@@ -359,6 +409,81 @@ export class StashAdapter {
         .filter(
           (scene): scene is StashLocalSceneIdentityItem => scene !== null,
         ),
+    };
+  }
+
+  async getLocalLibraryScenePage(
+    config: StashAdapterBaseConfig,
+    pageConfig: StashLocalLibraryScenePageConfig,
+  ): Promise<StashLocalLibraryScenePage> {
+    const page = this.normalizePositiveInteger(pageConfig.page, 1);
+    const perPage = this.normalizePositiveInteger(pageConfig.perPage, 100);
+
+    const query = `
+      query FindScenes($filter: FindFilterType) {
+        findScenes(filter: $filter) {
+          count
+          scenes {
+            id
+            title
+            details
+            date
+            created_at
+            updated_at
+            stash_ids {
+              endpoint
+              stash_id
+            }
+            paths {
+              screenshot
+            }
+            studio {
+              id
+              name
+              image_path
+              favorite
+            }
+            performers {
+              id
+              name
+              favorite
+            }
+            tags {
+              id
+              name
+              favorite
+            }
+            files {
+              duration
+            }
+          }
+        }
+      }
+    `;
+
+    const payload = await this.executeQuery(config, query, {
+      filter: {
+        page,
+        per_page: perPage,
+        sort: 'updated_at',
+        direction: 'DESC',
+      },
+    });
+
+    const scenes = payload.data?.findScenes?.scenes ?? [];
+    const total =
+      typeof payload.data?.findScenes?.count === 'number'
+        ? payload.data.findScenes.count
+        : 0;
+
+    return {
+      total,
+      page,
+      perPage,
+      hasMore: page * perPage < total,
+      items: scenes
+        .map((scene) => this.toLocalLibrarySceneItem(scene, config.baseUrl))
+        .filter((scene): scene is StashLocalLibrarySceneItem => scene !== null),
     };
   }
 
@@ -672,6 +797,56 @@ export class StashAdapter {
     };
   }
 
+  private toLocalLibrarySceneItem(
+    scene: StashLocalSceneRecord,
+    baseUrl: string,
+  ): StashLocalLibrarySceneItem | null {
+    const id = this.normalizeOptionalString(scene.id);
+    if (!id) {
+      return null;
+    }
+
+    const linkedEntries = Array.isArray(scene.stash_ids)
+      ? scene.stash_ids
+          .map((entry) => this.toLinkedSceneStashId(entry))
+          .filter((entry): entry is StashLinkedSceneStashId => entry !== null)
+      : [];
+    const linkedStashIds = Array.from(
+      new Set(linkedEntries.map((entry) => entry.stashId)),
+    );
+    const performers = this.toNamedEntities(scene.performers ?? []);
+    const tags = this.toNamedEntities(scene.tags ?? []);
+    const duration = this.pickFirstDuration(scene.files ?? []);
+
+    return {
+      id,
+      linkedStashId: this.pickPrimaryLinkedStashId(linkedEntries),
+      linkedStashIds,
+      title: this.normalizeOptionalString(scene.title) ?? `Scene #${id}`,
+      description: this.normalizeOptionalString(scene.details),
+      imageUrl: this.parseAssetUrl(scene.paths?.screenshot),
+      studioId: this.normalizeOptionalString(scene.studio?.id),
+      studio: this.normalizeOptionalString(scene.studio?.name),
+      studioImageUrl: this.normalizeOptionalString(scene.studio?.image_path),
+      performerIds: performers.ids,
+      performerNames: performers.names,
+      tagIds: tags.ids,
+      tagNames: tags.names,
+      releaseDate: this.normalizeOptionalString(scene.date),
+      duration,
+      viewUrl: this.resolveSceneViewUrl(baseUrl, id),
+      createdAt: this.parseOptionalDate(scene.created_at),
+      updatedAt: this.parseOptionalDate(scene.updated_at),
+      hasFavoritePerformer: Array.isArray(scene.performers)
+        ? scene.performers.some((performer) => performer?.favorite === true)
+        : false,
+      favoriteStudio: scene.studio?.favorite === true,
+      hasFavoriteTag: Array.isArray(scene.tags)
+        ? scene.tags.some((tag) => tag?.favorite === true)
+        : false,
+    };
+  }
+
   private buildSceneFilter(
     feedConfig: StashLocalSceneFeedConfig,
   ): Record<string, unknown> | undefined {
@@ -765,6 +940,40 @@ export class StashAdapter {
     }
 
     return { id, name };
+  }
+
+  private toNamedEntities(
+    values: Array<{ id?: unknown; name?: unknown } | null | undefined>,
+  ): { ids: string[]; names: string[] } {
+    const deduped = new Map<string, string>();
+
+    for (const value of values) {
+      const id = this.normalizeOptionalString(value?.id);
+      const name = this.normalizeOptionalString(value?.name);
+      if (!id || !name || deduped.has(id)) {
+        continue;
+      }
+
+      deduped.set(id, name);
+    }
+
+    return {
+      ids: [...deduped.keys()],
+      names: [...deduped.values()],
+    };
+  }
+
+  private pickPrimaryLinkedStashId(
+    linkedEntries: StashLinkedSceneStashId[],
+  ): string | null {
+    const stashdbEntry = linkedEntries.find((entry) =>
+      entry.endpoint.toLowerCase().includes('stashdb'),
+    );
+    if (stashdbEntry) {
+      return stashdbEntry.stashId;
+    }
+
+    return linkedEntries[0]?.stashId ?? null;
   }
 
   private toStudioOptions(
@@ -887,6 +1096,15 @@ export class StashAdapter {
     return typeof value === 'string' && value.trim().length > 0
       ? value.trim()
       : null;
+  }
+
+  private parseOptionalDate(value: unknown): Date | null {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      return null;
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
   private resolveProtectedAssetUrl(baseUrl: string, assetUrl: string): string {

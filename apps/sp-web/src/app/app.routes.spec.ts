@@ -10,6 +10,7 @@ describe('app routes', () => {
       'scene/:stashId',
       'scenes',
       'acquisition',
+      'library',
       'performers',
       'studios',
       'performer/:performerId',

@@ -14,6 +14,7 @@ import { INDEXING_JOB_NAMES, IndexingService } from './indexing.service';
 import { SyncStateService } from './sync-state.service';
 
 type SceneIndexRow = Record<string, unknown>;
+type LibrarySceneIndexRow = Record<string, unknown>;
 type TransactionOperation = Promise<unknown> | (() => Promise<unknown>);
 
 function buildSceneIndexRow(
@@ -76,6 +77,13 @@ function matchesScalar(value: unknown, filter: unknown): boolean {
     }
 
     return value !== null && value !== undefined && value <= record.lte;
+  }
+  if (Object.prototype.hasOwnProperty.call(record, 'lt')) {
+    if (value instanceof Date && record.lt instanceof Date) {
+      return value.getTime() < record.lt.getTime();
+    }
+
+    return value !== null && value !== undefined && value < record.lt;
   }
 
   return value === filter;
@@ -177,6 +185,7 @@ function applySelect(
 
 function createPrismaMock(config: {
   sceneIndexRows?: SceneIndexRow[];
+  librarySceneIndexRows?: LibrarySceneIndexRow[];
   requestRows?: Array<{
     stashId: string;
     status: RequestStatus;
@@ -188,6 +197,12 @@ function createPrismaMock(config: {
 }) {
   const sceneIndexStore = new Map<string, SceneIndexRow>(
     (config.sceneIndexRows ?? []).map((row) => [String(row.stashId), row]),
+  );
+  const librarySceneIndexStore = new Map<string, LibrarySceneIndexRow>(
+    (config.librarySceneIndexRows ?? []).map((row) => [
+      String(row.stashSceneId),
+      row,
+    ]),
   );
   const requestRows = config.requestRows ?? [];
   const syncStateStore = new Map<string, Record<string, unknown>>(
@@ -395,9 +410,72 @@ function createPrismaMock(config: {
     ),
   };
 
+  const librarySceneIndex = {
+    findMany: jest.fn(async (args: Record<string, unknown> = {}) => {
+      const filtered = Array.from(librarySceneIndexStore.values()).filter((row) =>
+        matchesWhere(row, args.where as Record<string, unknown> | undefined),
+      );
+      const ordered = sortRows(
+        filtered,
+        args.orderBy as
+          | Array<Record<string, 'asc' | 'desc'>>
+          | Record<string, 'asc' | 'desc'>
+          | undefined,
+      );
+      const skipped = ordered.slice(Number(args.skip ?? 0));
+      const limited =
+        typeof args.take === 'number' ? skipped.slice(0, args.take) : skipped;
+      return applySelect(
+        limited,
+        args.select as Record<string, boolean> | undefined,
+      );
+    }),
+    count: jest.fn(async (args?: Record<string, unknown>) => {
+      return Array.from(librarySceneIndexStore.values()).filter((row) =>
+        matchesWhere(row, args?.where as Record<string, unknown> | undefined),
+      ).length;
+    }),
+    upsert: jest.fn(
+      (args: {
+        where: { stashSceneId: string };
+        create: LibrarySceneIndexRow;
+        update: LibrarySceneIndexRow;
+      }) =>
+        async () => {
+          const stashSceneId = args.where.stashSceneId;
+          const existing = librarySceneIndexStore.get(stashSceneId);
+          const next = existing
+            ? {
+                ...existing,
+                ...args.update,
+                stashSceneId,
+              }
+            : {
+                ...args.create,
+                stashSceneId,
+              };
+          librarySceneIndexStore.set(stashSceneId, next);
+          return next;
+        },
+    ),
+    deleteMany: jest.fn(async (args?: Record<string, unknown>) => {
+      const matchingIds = Array.from(librarySceneIndexStore.values())
+        .filter((row) =>
+          matchesWhere(row, args?.where as Record<string, unknown> | undefined),
+        )
+        .map((row) => String(row.stashSceneId));
+      for (const id of matchingIds) {
+        librarySceneIndexStore.delete(id);
+      }
+
+      return { count: matchingIds.length };
+    }),
+  };
+
   return {
     prisma: {
       sceneIndex,
+      librarySceneIndex,
       sceneIndexSummary,
       request,
       syncState,
@@ -410,6 +488,7 @@ function createPrismaMock(config: {
       ),
     } as unknown as PrismaService,
     sceneIndexStore,
+    librarySceneIndexStore,
     sceneIndexSummaryStore,
   };
 }
@@ -422,6 +501,7 @@ describe('IndexingService', () => {
   const findMovieByIdMock = jest.fn();
   const findScenesByStashIdMock = jest.fn();
   const getLocalSceneIdentityPageMock = jest.fn();
+  const getLocalLibraryScenePageMock = jest.fn();
   const getSceneMetadataByIdsMock = jest.fn();
   const runWithLeaseMock = jest.fn();
   const recordSuccessMock = jest.fn();
@@ -440,6 +520,7 @@ describe('IndexingService', () => {
   const stashAdapter = {
     findScenesByStashId: findScenesByStashIdMock,
     getLocalSceneIdentityPage: getLocalSceneIdentityPageMock,
+    getLocalLibraryScenePage: getLocalLibraryScenePageMock,
   } as unknown as StashAdapter;
 
   const stashdbAdapter = {
@@ -502,6 +583,13 @@ describe('IndexingService', () => {
       total: 0,
       page: 1,
       perPage: 250,
+      hasMore: false,
+      items: [],
+    });
+    getLocalLibraryScenePageMock.mockResolvedValue({
+      total: 0,
+      page: 1,
+      perPage: 100,
       hasMore: false,
       items: [],
     });
@@ -640,8 +728,8 @@ describe('IndexingService', () => {
     );
   });
 
-  it('reconciles Stash availability from the paginated bulk snapshot path', async () => {
-    const { prisma, sceneIndexStore } = createPrismaMock({
+  it('syncs the local-library projection and reconciles linked stash availability', async () => {
+    const { prisma, sceneIndexStore, librarySceneIndexStore } = createPrismaMock({
       sceneIndexRows: [
         buildSceneIndexRow({
           stashId: 'scene-1',
@@ -657,42 +745,89 @@ describe('IndexingService', () => {
         }),
       ],
     });
-    getLocalSceneIdentityPageMock
+    getLocalLibraryScenePageMock
       .mockResolvedValueOnce({
         total: 3,
         page: 1,
-        perPage: 250,
+        perPage: 100,
         hasMore: true,
         items: [
           {
             id: 'local-1',
-            linkedStashIds: [
-              {
-                endpoint: 'https://stashdb.org/graphql',
-                stashId: 'scene-1',
-              },
-            ],
+            linkedStashId: 'scene-1',
+            linkedStashIds: ['scene-1'],
+            title: 'Local Scene One',
+            description: 'Already local.',
+            imageUrl: 'http://stash.local/images/local-1.jpg',
+            studioId: 'studio-1',
+            studio: 'Archive',
+            studioImageUrl: 'http://stash.local/studios/archive.jpg',
+            performerIds: ['performer-1'],
+            performerNames: ['Performer One'],
+            tagIds: ['tag-1'],
+            tagNames: ['Tag One'],
+            releaseDate: '2026-03-24',
+            duration: 1800,
+            viewUrl: 'http://stash.local/scenes/local-1',
+            createdAt: new Date('2026-03-23T00:00:00.000Z'),
+            updatedAt: new Date('2026-03-24T00:00:00.000Z'),
+            hasFavoritePerformer: false,
+            favoriteStudio: false,
+            hasFavoriteTag: false,
           },
           {
             id: 'local-2',
-            linkedStashIds: [
-              {
-                endpoint: 'https://stashdb.org/graphql',
-                stashId: 'scene-2',
-              },
-            ],
+            linkedStashId: 'scene-2',
+            linkedStashIds: ['scene-2'],
+            title: 'Local Scene Two',
+            description: null,
+            imageUrl: null,
+            studioId: null,
+            studio: null,
+            studioImageUrl: null,
+            performerIds: [],
+            performerNames: [],
+            tagIds: [],
+            tagNames: [],
+            releaseDate: null,
+            duration: null,
+            viewUrl: 'http://stash.local/scenes/local-2',
+            createdAt: null,
+            updatedAt: null,
+            hasFavoritePerformer: false,
+            favoriteStudio: false,
+            hasFavoriteTag: false,
           },
         ],
       })
       .mockResolvedValueOnce({
         total: 3,
         page: 2,
-        perPage: 250,
+        perPage: 100,
         hasMore: false,
         items: [
           {
             id: 'local-3',
+            linkedStashId: null,
             linkedStashIds: [],
+            title: 'Unlinked Local Scene',
+            description: null,
+            imageUrl: null,
+            studioId: null,
+            studio: null,
+            studioImageUrl: null,
+            performerIds: [],
+            performerNames: [],
+            tagIds: [],
+            tagNames: [],
+            releaseDate: null,
+            duration: null,
+            viewUrl: 'http://stash.local/scenes/local-3',
+            createdAt: null,
+            updatedAt: null,
+            hasFavoritePerformer: false,
+            favoriteStudio: false,
+            hasFavoriteTag: false,
           },
         ],
       });
@@ -708,25 +843,34 @@ describe('IndexingService', () => {
 
     await service.syncStashAvailability('test');
 
-    expect(getLocalSceneIdentityPageMock).toHaveBeenNthCalledWith(
+    expect(getLocalLibraryScenePageMock).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
         baseUrl: 'http://stash.local',
       }),
       {
         page: 1,
-        perPage: 250,
+        perPage: 100,
       },
     );
-    expect(getLocalSceneIdentityPageMock).toHaveBeenNthCalledWith(
+    expect(getLocalLibraryScenePageMock).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         baseUrl: 'http://stash.local',
       }),
       {
         page: 2,
-        perPage: 250,
+        perPage: 100,
       },
+    );
+    expect(librarySceneIndexStore.get('local-1')).toEqual(
+      expect.objectContaining({
+        stashSceneId: 'local-1',
+        linkedStashId: 'scene-1',
+        title: 'Local Scene One',
+        tagIds: ['tag-1'],
+        lastSyncedAt: expect.any(Date),
+      }),
     );
     expect(sceneIndexStore.get('scene-1')).toEqual(
       expect.objectContaining({
@@ -749,7 +893,7 @@ describe('IndexingService', () => {
     );
   });
 
-  it('retries a deadlocked stash availability scene-index batch', async () => {
+  it('retries a deadlocked targeted stash-availability scene-index batch', async () => {
     const { prisma, sceneIndexStore } = createPrismaMock({
       sceneIndexRows: [
         buildSceneIndexRow({
@@ -785,23 +929,7 @@ describe('IndexingService', () => {
         return executeTransaction?.(operations);
       },
     );
-    getLocalSceneIdentityPageMock.mockResolvedValue({
-      total: 1,
-      page: 1,
-      perPage: 250,
-      hasMore: false,
-      items: [
-        {
-          id: 'local-1',
-          linkedStashIds: [
-            {
-              endpoint: 'https://stashdb.org/graphql',
-              stashId: 'scene-1',
-            },
-          ],
-        },
-      ],
-    });
+    findScenesByStashIdMock.mockResolvedValue([{ id: 'local-1' }]);
 
     const service = new IndexingService(
       prisma,
@@ -838,7 +966,7 @@ describe('IndexingService', () => {
           lastSuccessAt: new Date(now - 5 * 60_000),
         },
         {
-          jobName: INDEXING_JOB_NAMES.STASH_AVAILABILITY,
+          jobName: INDEXING_JOB_NAMES.LIBRARY_PROJECTION,
           status: SyncJobStatus.SUCCEEDED,
           lastSuccessAt: new Date(now - 5 * 60_000),
         },
@@ -873,7 +1001,7 @@ describe('IndexingService', () => {
           lastSuccessAt: new Date(now - 5 * 60_000),
         },
         {
-          jobName: INDEXING_JOB_NAMES.STASH_AVAILABILITY,
+          jobName: INDEXING_JOB_NAMES.LIBRARY_PROJECTION,
           status: SyncJobStatus.SUCCEEDED,
           lastSuccessAt: new Date(now - 21 * 60_000),
         },
@@ -947,7 +1075,7 @@ describe('IndexingService', () => {
     );
     expect(getQueueSnapshotMock).not.toHaveBeenCalled();
     expect(getMovieSnapshotMock).not.toHaveBeenCalled();
-    expect(getLocalSceneIdentityPageMock).not.toHaveBeenCalled();
+    expect(getLocalLibraryScenePageMock).not.toHaveBeenCalled();
     expect(sceneIndexStore.get('scene-1')).toEqual(
       expect.objectContaining({
         whisparrMovieId: 77,
@@ -979,7 +1107,7 @@ describe('IndexingService', () => {
           lastRunReason: 'interval',
         },
         {
-          jobName: INDEXING_JOB_NAMES.STASH_AVAILABILITY,
+          jobName: INDEXING_JOB_NAMES.LIBRARY_PROJECTION,
           status: SyncJobStatus.SUCCEEDED,
           lastSuccessAt: new Date(now - 2 * 60_000),
           lastDurationMs: 900,

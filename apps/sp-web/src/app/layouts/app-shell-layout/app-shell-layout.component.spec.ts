@@ -29,6 +29,7 @@ describe('AppShellLayoutComponent', () => {
       'Home',
       'Scenes',
       'Acquisition',
+      'Library',
       'Performers',
       'Studios',
       'Settings',

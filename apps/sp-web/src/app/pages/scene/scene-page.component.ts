@@ -544,6 +544,9 @@ export class ScenePageComponent implements OnInit, OnDestroy {
     if (returnTo.startsWith('/acquisition')) {
       return 'Back to Acquisition';
     }
+    if (returnTo.startsWith('/library')) {
+      return 'Back to Library';
+    }
     if (returnTo.startsWith('/performers')) {
       return 'Back to Performers';
     }

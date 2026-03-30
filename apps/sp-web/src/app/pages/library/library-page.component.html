@@ -1,0 +1,278 @@
+<main>
+  <header>
+    <h1>Library</h1>
+    <p>Browse scenes already present in your local Stash library.</p>
+    @if (!loading() && !error()) {
+      <p class="state">{{ libraryTotalLabel() }}</p>
+    }
+  </header>
+
+  <section class="controls-shell" aria-label="Library controls">
+    <div class="controls-header">
+      <span class="controls-title">Local Stash Library</span>
+      <div class="controls-actions">
+        <button
+          type="button"
+          class="reset-filters-button"
+          [disabled]="!hasActiveFilters()"
+          title="Clear filters and return to the default library view"
+          (click)="resetFilters()"
+        >
+          Clear Filters
+        </button>
+      </div>
+    </div>
+
+    <div class="controls-row">
+      <label class="control-field search-field">
+        <span>Text Query</span>
+        <input
+          type="search"
+          inputmode="search"
+          [ngModel]="queryTerm()"
+          (ngModelChange)="onQueryChanged($event)"
+          placeholder="Search titles, descriptions, or studios"
+        />
+      </label>
+
+      <label class="control-field">
+        <span>Studio Filter</span>
+        <p-multiselect
+          inputId="library-studios"
+          [ngModel]="studioSelectedIdsModel()"
+          (ngModelChange)="onStudioSelectionChanged($event)"
+          (onFilter)="onStudioFilterChanged($event.filter)"
+          (onPanelHide)="onStudioFilterPanelHide()"
+          [filter]="true"
+          [filterValue]="studioSearchTerm()"
+          filterPlaceHolder="Search local studios"
+          [loading]="studioSearchLoading()"
+          [options]="studioSelectOptions()"
+          optionLabel="label"
+          optionValue="value"
+          [showToggleAll]="false"
+          display="chip"
+          [emptyMessage]="studioSelectEmptyMessage()"
+          [emptyFilterMessage]="studioSelectEmptyMessage()"
+          [resetFilterOnHide]="true"
+          [appendTo]="'body'"
+          panelStyleClass="library-filter-panel"
+          placeholder="Choose local studios"
+          scrollHeight="16rem"
+        />
+      </label>
+
+      <label class="control-field">
+        <span>Tag Filter</span>
+        <div class="tag-input-row">
+          <p-multiselect
+            inputId="library-tags"
+            [ngModel]="selectedTagIdsModel()"
+            (ngModelChange)="onTagSelectionChanged($event)"
+            (onFilter)="onTagFilterChanged($event.filter)"
+            (onPanelHide)="onTagFilterPanelHide()"
+            [filter]="true"
+            [filterValue]="tagSearchTerm()"
+            filterPlaceHolder="Search local tags"
+            [loading]="tagSearchLoading()"
+            [options]="tagSelectOptions()"
+            optionLabel="label"
+            optionValue="value"
+            [showToggleAll]="false"
+            display="chip"
+            [emptyMessage]="tagSelectEmptyMessage()"
+            [emptyFilterMessage]="tagSelectEmptyMessage()"
+            [resetFilterOnHide]="true"
+            [appendTo]="'body'"
+            panelStyleClass="library-filter-panel"
+            placeholder="Select matching tags"
+            scrollHeight="16rem"
+          />
+          <p-select
+            class="tag-mode-select"
+            inputId="library-tag-mode"
+            [ngModel]="selectedTagMode()"
+            (ngModelChange)="onTagMatchModeChanged($event)"
+            [options]="tagMatchOptions"
+            optionLabel="label"
+            optionValue="value"
+            [appendTo]="'body'"
+            panelStyleClass="library-filter-select-panel"
+          />
+        </div>
+      </label>
+
+      <div class="control-field">
+        <span>Sort By</span>
+        <div class="sort-with-direction">
+          <p-select
+            inputId="library-sort"
+            [ngModel]="selectedSort()"
+            (ngModelChange)="onSortChanged($event)"
+            [options]="sortOptions"
+            optionLabel="label"
+            optionValue="value"
+            [appendTo]="'body'"
+            panelStyleClass="library-filter-select-panel"
+          />
+          <button
+            type="button"
+            class="sort-direction-toggle"
+            [attr.aria-label]="sortDirectionToggleLabel()"
+            [attr.title]="sortDirectionToggleLabel()"
+            (click)="toggleSortDirection()"
+          >
+            <i [class]="sortDirectionIconClass()" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p class="controls-note">
+      {{ libraryResultsNote() }}
+    </p>
+  </section>
+
+  @if (loading()) {
+    <div class="app-blocking-loader" role="status" aria-live="polite">
+      <p-progressspinner
+        styleClass="app-blocking-spinner"
+        strokeWidth="4"
+        [style]="{ width: '2.25rem', height: '2.25rem' }"
+      />
+      <p>Loading local library...</p>
+    </div>
+  } @else if (error()) {
+    <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
+    <button type="button" class="retry-button" (click)="retryInitialLoad()">Retry</button>
+  } @else if (!hasItems()) {
+    <p class="state">{{ emptyStateMessage() }}</p>
+  } @else {
+    <section class="grid">
+      @for (item of items(); track item.id) {
+        <article class="card">
+          <div class="media">
+            <a
+              class="media-link-stretch"
+              [href]="item.viewUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              [attr.aria-label]="'View ' + item.title + ' in Stash'"
+            ></a>
+
+            @if (item.cardImageUrl || item.imageUrl) {
+              <img
+                class="thumbnail"
+                [src]="item.cardImageUrl ?? item.imageUrl"
+                [alt]="item.title"
+                loading="lazy"
+              />
+            } @else {
+              <div class="thumbnail placeholder" aria-hidden="true"></div>
+            }
+
+            <div class="media-top">
+              @if (item.studioImageUrl) {
+                @if (studioBadgeQueryParams(item); as studioParams) {
+                  <a
+                    class="studio-badge-link"
+                    [routerLink]="['/library']"
+                    [queryParams]="studioParams"
+                    [attr.aria-label]="'Filter library by studio ' + (item.studio ?? 'Unknown')"
+                  >
+                    <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                      <img
+                        [src]="item.studioImageUrl"
+                        [alt]="item.studio ?? 'Studio logo'"
+                        loading="lazy"
+                      />
+                    </div>
+                  </a>
+                } @else {
+                  <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                    <img
+                      [src]="item.studioImageUrl"
+                      [alt]="item.studio ?? 'Studio logo'"
+                      loading="lazy"
+                    />
+                  </div>
+                }
+              } @else if (item.studio) {
+                @if (studioBadgeQueryParams(item); as studioParams) {
+                  <a
+                    class="studio-badge-link"
+                    [routerLink]="['/library']"
+                    [queryParams]="studioParams"
+                    [attr.aria-label]="'Filter library by studio ' + item.studio"
+                  >
+                    <div class="studio-badge text-badge" [title]="item.studio">
+                      {{ item.studio }}
+                    </div>
+                  </a>
+                } @else {
+                  <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                }
+              }
+
+              <div class="media-flags">
+                <span class="library-badge">In Library</span>
+                @if (item.linkedStashId) {
+                  <a
+                    class="catalog-link"
+                    [routerLink]="['/scene', item.linkedStashId]"
+                    [queryParams]="{ returnTo: currentRouteUrl() }"
+                  >
+                    Catalog
+                  </a>
+                }
+              </div>
+            </div>
+
+            <div class="media-bottom">
+              <h2 class="media-title">{{ item.title }}</h2>
+              <div class="media-meta-row">
+                <p class="media-date">
+                  @if (item.releaseDate) {
+                    <time [attr.datetime]="item.releaseDate">{{ item.releaseDate }}</time>
+                  } @else {
+                    <span class="media-date-placeholder">No date</span>
+                  }
+                </p>
+                <div class="media-action">
+                  <a
+                    class="view-cta"
+                    [href]="item.viewUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    View in Stash
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      }
+    </section>
+
+    <div #loadMoreSentinel class="load-sentinel"></div>
+
+    @if (loadingMore()) {
+      <div class="app-blocking-loader inline" role="status" aria-live="polite">
+        <p-progressspinner
+          styleClass="app-blocking-spinner"
+          strokeWidth="4"
+          [style]="{ width: '2rem', height: '2rem' }"
+        />
+        <p>Loading more scenes...</p>
+      </div>
+    }
+
+    @if (loadMoreError()) {
+      <p-message severity="error" styleClass="app-page-message load-more-error">
+        {{ loadMoreError() }}
+      </p-message>
+      <button type="button" class="retry-button" (click)="retryLoadMore()">Retry</button>
+    }
+  }
+</main>

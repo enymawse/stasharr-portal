@@ -85,6 +85,42 @@ model SceneIndexSummary {
   updatedAt                DateTime  @updatedAt
 }
 
+model LibrarySceneIndex {
+  stashSceneId          String   @id
+  linkedStashId         String?
+  linkedStashIds        String[] @default([])
+  title                 String
+  description           String?
+  imageUrl              String?
+  studioId              String?
+  studioName            String?
+  studioImageUrl        String?
+  performerIds          String[] @default([])
+  performerNames        String[] @default([])
+  tagIds                String[] @default([])
+  tagNames              String[] @default([])
+  releaseDate           String?
+  duration              Int?
+  viewUrl               String
+  localCreatedAt        DateTime?
+  localUpdatedAt        DateTime?
+  hasFavoritePerformer  Boolean  @default(false)
+  favoriteStudio        Boolean  @default(false)
+  hasFavoriteTag        Boolean  @default(false)
+  lastSyncedAt          DateTime
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([linkedStashId])
+  @@index([studioId])
+  @@index([studioName])
+  @@index([title])
+  @@index([releaseDate])
+  @@index([localCreatedAt])
+  @@index([localUpdatedAt])
+  @@index([lastSyncedAt])
+}
+
 model HomeRail {
   id          String              @id @default(cuid())
   key         HomeRailKey?        @unique

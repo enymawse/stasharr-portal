@@ -11,7 +11,10 @@ import {
 } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { StashAdapter } from '../providers/stash/stash.adapter';
+import {
+  StashAdapter,
+  type StashLocalLibrarySceneItem,
+} from '../providers/stash/stash.adapter';
 import {
   StashdbAdapter,
   StashdbSceneMetadata,
@@ -34,6 +37,7 @@ export const INDEXING_JOB_NAMES = {
   REQUEST_ROWS: 'scene-index-request-rows',
   WHISPARR_QUEUE: 'scene-index-whisparr-queue',
   WHISPARR_MOVIES: 'scene-index-whisparr-movies',
+  LIBRARY_PROJECTION: 'scene-index-library-projection',
   STASH_AVAILABILITY: 'scene-index-stash-availability',
   METADATA_BACKFILL: 'scene-index-metadata-backfill',
 } as const;
@@ -121,6 +125,7 @@ export class IndexingService {
   private static readonly WHISPARR_LOOKUP_BATCH_SIZE = 8;
   private static readonly STASH_LOOKUP_BATCH_SIZE = 6;
   private static readonly STASH_IDENTITY_PAGE_SIZE = 250;
+  private static readonly LIBRARY_SYNC_PAGE_SIZE = 100;
   private static readonly METADATA_BATCH_SIZE = 24;
   private static readonly METADATA_QUERY_BATCH_SIZE = 8;
   private static readonly METADATA_ACCELERATED_INTERVAL_MS = 10_000;
@@ -130,6 +135,7 @@ export class IndexingService {
   private static readonly BOOTSTRAP_LEASE_MS = 20 * 60_000;
   private static readonly QUEUE_LEASE_MS = 25_000;
   private static readonly MOVIES_LEASE_MS = 4 * 60_000;
+  private static readonly LIBRARY_LEASE_MS = 20 * 60_000;
   private static readonly STASH_LEASE_MS = 4 * 60_000;
   private static readonly METADATA_LEASE_MS = 20 * 60_000;
 
@@ -179,10 +185,8 @@ export class IndexingService {
           `${reason}:bootstrap`,
           true,
         );
-        const stashResult = await this.syncStashAvailability(
+        const libraryResult = await this.syncLibraryProjection(
           `${reason}:bootstrap`,
-          undefined,
-          true,
         );
         const metadataResult = await this.syncMetadataBackfill(
           `${reason}:bootstrap`,
@@ -194,13 +198,13 @@ export class IndexingService {
             requestRows.length +
             (movieResult?.processedCount ?? 0) +
             (queueResult?.processedCount ?? 0) +
-            (stashResult?.processedCount ?? 0) +
+            (libraryResult?.processedCount ?? 0) +
             (metadataResult?.processedCount ?? 0),
           updatedCount:
             requestRows.length +
             (movieResult?.updatedCount ?? 0) +
             (queueResult?.updatedCount ?? 0) +
-            (stashResult?.updatedCount ?? 0) +
+            (libraryResult?.updatedCount ?? 0) +
             (metadataResult?.updatedCount ?? 0),
         };
       },
@@ -250,6 +254,12 @@ export class IndexingService {
     stashIds?: string[],
     forceFullPass = false,
   ): Promise<SyncRunSummary | null> {
+    const normalizedIds =
+      stashIds && stashIds.length > 0 ? this.normalizeStashIds(stashIds) : [];
+    if (normalizedIds.length === 0 || forceFullPass) {
+      return this.syncLibraryProjection(reason);
+    }
+
     return this.syncStateService.runWithLease(
       {
         jobName: INDEXING_JOB_NAMES.STASH_AVAILABILITY,
@@ -262,7 +272,25 @@ export class IndexingService {
         }),
       },
       async () =>
-        this.performStashAvailabilitySync(reason, stashIds, forceFullPass),
+        this.performStashAvailabilitySync(reason, normalizedIds),
+    );
+  }
+
+  async syncLibraryProjection(
+    reason = 'scheduled',
+  ): Promise<SyncRunSummary | null> {
+    return this.syncStateService.runWithLease(
+      {
+        jobName: INDEXING_JOB_NAMES.LIBRARY_PROJECTION,
+        leaseMs: IndexingService.LIBRARY_LEASE_MS,
+        onSuccess: (result, context) => ({
+          processedCount: result.processedCount,
+          updatedCount: result.updatedCount,
+          durationMs: context.durationMs,
+          runReason: reason,
+        }),
+      },
+      async () => this.performLibraryProjectionSync(reason),
     );
   }
 
@@ -423,7 +451,7 @@ export class IndexingService {
       await this.bootstrapIndex('manual');
       await this.syncWhisparrMovies('manual');
       await this.syncWhisparrQueue('manual');
-      await this.syncStashAvailability('manual');
+      await this.syncLibraryProjection('manual');
       await this.syncMetadataBackfill('manual');
       return;
     }
@@ -439,7 +467,8 @@ export class IndexingService {
         await this.syncWhisparrMovies('manual');
         return;
       case 'stash':
-        await this.syncStashAvailability('manual');
+      case 'library':
+        await this.syncLibraryProjection('manual');
         return;
       case 'metadata':
         await this.syncMetadataBackfill('manual');
@@ -511,7 +540,7 @@ export class IndexingService {
           IndexingService.SNAPSHOT_FRESHNESS_MAX_AGE_MS,
         ),
         stashAvailabilityFresh: this.isSuccessfulSyncFresh(
-          jobByName.get(INDEXING_JOB_NAMES.STASH_AVAILABILITY) ?? null,
+          jobByName.get(INDEXING_JOB_NAMES.LIBRARY_PROJECTION) ?? null,
           IndexingService.SNAPSHOT_FRESHNESS_MAX_AGE_MS,
         ),
         canResolveUnknownScenesAsNotRequested:
@@ -597,7 +626,7 @@ export class IndexingService {
             in: [
               INDEXING_JOB_NAMES.REQUEST_ROWS,
               INDEXING_JOB_NAMES.WHISPARR_MOVIES,
-              INDEXING_JOB_NAMES.STASH_AVAILABILITY,
+              INDEXING_JOB_NAMES.LIBRARY_PROJECTION,
             ],
           },
         },
@@ -620,7 +649,7 @@ export class IndexingService {
         )) &&
       (!hasStash ||
         this.isSuccessfulSyncFresh(
-          stateByJobName.get(INDEXING_JOB_NAMES.STASH_AVAILABILITY) ?? null,
+          stateByJobName.get(INDEXING_JOB_NAMES.LIBRARY_PROJECTION) ?? null,
           IndexingService.SNAPSHOT_FRESHNESS_MAX_AGE_MS,
         ))
     );
@@ -1070,10 +1099,8 @@ export class IndexingService {
     };
   }
 
-  private async performStashAvailabilitySync(
+  private async performLibraryProjectionSync(
     reason: string,
-    stashIds?: string[],
-    forceFullPass = false,
   ): Promise<SyncRunSummary> {
     const config = await this.getStashConfig();
     if (!config) {
@@ -1083,40 +1110,129 @@ export class IndexingService {
       };
     }
 
-    const now = new Date();
-    const targetedIds =
-      stashIds && stashIds.length > 0 ? this.normalizeStashIds(stashIds) : null;
-    const fullReconciliation = forceFullPass || targetedIds === null;
-    const snapshot = await this.collectLocalStashIdentitySnapshot(config);
-    const patches: SceneIndexPatch[] = [];
+    const syncStartedAt = new Date();
+    const availableStashIds = new Set<string>();
+    let page = 1;
+    let localSceneCount = 0;
+    let projectionWrites = 0;
 
-    for (const stashId of targetedIds ?? snapshot.availableStashIds) {
-      patches.push({
-        stashId,
-        stashAvailable: snapshot.availableStashIds.has(stashId),
-        stashLastSyncedAt: now,
-        lastSyncedAt: now,
-      });
+    while (true) {
+      const snapshotPage = await this.stashAdapter.getLocalLibraryScenePage(
+        config,
+        {
+          page,
+          perPage: IndexingService.LIBRARY_SYNC_PAGE_SIZE,
+        },
+      );
+      localSceneCount += snapshotPage.items.length;
+      projectionWrites += await this.upsertLibrarySceneProjectionPage(
+        snapshotPage.items,
+        syncStartedAt,
+      );
+
+      for (const item of snapshotPage.items) {
+        for (const linkedStashId of item.linkedStashIds) {
+          availableStashIds.add(linkedStashId);
+        }
+      }
+
+      if (!snapshotPage.hasMore || snapshotPage.items.length === 0) {
+        break;
+      }
+
+      page += 1;
     }
 
-    if (fullReconciliation) {
-      const previouslyAvailableRows = await this.prisma.sceneIndex.findMany({
+    const [deletedRows, availabilityWrites] = await Promise.all([
+      this.prisma.librarySceneIndex.deleteMany({
         where: {
-          stashAvailable: true,
+          lastSyncedAt: {
+            lt: syncStartedAt,
+          },
         },
-        select: {
-          stashId: true,
-        },
-      });
+      }),
+      this.applyLibraryAvailabilitySnapshot(availableStashIds, syncStartedAt),
+    ]);
 
-      for (const row of previouslyAvailableRows) {
-        if (snapshot.availableStashIds.has(row.stashId)) {
+    this.logger.debug(
+      `Library projection sync completed: ${this.safeJson({
+        reason,
+        localSceneCount,
+        indexedAvailableIds: availableStashIds.size,
+        projectionWrites,
+        deletedRows: deletedRows.count,
+        availabilityWrites,
+      })}`,
+    );
+
+    return {
+      processedCount: localSceneCount,
+      updatedCount: projectionWrites + deletedRows.count + availabilityWrites,
+    };
+  }
+
+  private async performStashAvailabilitySync(
+    reason: string,
+    stashIds: string[],
+  ): Promise<SyncRunSummary> {
+    const config = await this.getStashConfig();
+    if (!config) {
+      return {
+        processedCount: 0,
+        updatedCount: 0,
+      };
+    }
+
+    const normalizedIds = this.normalizeStashIds(stashIds);
+    if (normalizedIds.length === 0) {
+      return {
+        processedCount: 0,
+        updatedCount: 0,
+      };
+    }
+
+    const now = new Date();
+    const patches: SceneIndexPatch[] = [];
+
+    for (
+      let i = 0;
+      i < normalizedIds.length;
+      i += IndexingService.STASH_LOOKUP_BATCH_SIZE
+    ) {
+      const batch = normalizedIds.slice(
+        i,
+        i + IndexingService.STASH_LOOKUP_BATCH_SIZE,
+      );
+      const results = await Promise.all(
+        batch.map(async (stashId) => {
+          try {
+            const matches = await this.stashAdapter.findScenesByStashId(
+              stashId,
+              config,
+            );
+            return {
+              stashId,
+              stashAvailable: matches.length > 0,
+            };
+          } catch (error) {
+            this.logger.warn(
+              `Targeted Stash availability lookup failed. reason=${reason} stashId=${stashId} error=${this.safeJson(
+                this.serializeError(error),
+              )}`,
+            );
+            return null;
+          }
+        }),
+      );
+
+      for (const result of results) {
+        if (!result) {
           continue;
         }
 
         patches.push({
-          stashId: row.stashId,
-          stashAvailable: false,
+          stashId: result.stashId,
+          stashAvailable: result.stashAvailable,
           stashLastSyncedAt: now,
           lastSyncedAt: now,
         });
@@ -1125,18 +1241,16 @@ export class IndexingService {
 
     await this.applySceneIndexPatches(patches);
     this.logger.debug(
-      `Stash availability sync completed: ${this.safeJson({
+      `Targeted Stash refresh completed: ${this.safeJson({
         reason,
-        localSceneCount: snapshot.localSceneCount,
-        indexedAvailableIds: snapshot.availableStashIds.size,
-        targetedIds: targetedIds?.length ?? null,
+        requestedIds: normalizedIds.length,
         updated: patches.length,
       })}`,
     );
 
     return {
-      processedCount: snapshot.localSceneCount,
-      updatedCount: this.mergePatchesByStashId(patches).length,
+      processedCount: normalizedIds.length,
+      updatedCount: patches.length,
     };
   }
 
@@ -1992,44 +2106,113 @@ export class IndexingService {
     return 4;
   }
 
-  private async collectLocalStashIdentitySnapshot(config: {
-    baseUrl: string;
-    apiKey: string | null;
-  }): Promise<{
-    localSceneCount: number;
-    availableStashIds: Set<string>;
-  }> {
-    const availableStashIds = new Set<string>();
-    let page = 1;
-    let localSceneCount = 0;
-
-    while (true) {
-      const snapshotPage = await this.stashAdapter.getLocalSceneIdentityPage(
-        config,
-        {
-          page,
-          perPage: IndexingService.STASH_IDENTITY_PAGE_SIZE,
-        },
-      );
-
-      localSceneCount += snapshotPage.items.length;
-      for (const item of snapshotPage.items) {
-        for (const linkedStashId of item.linkedStashIds) {
-          availableStashIds.add(linkedStashId.stashId);
-        }
-      }
-
-      if (!snapshotPage.hasMore || snapshotPage.items.length === 0) {
-        break;
-      }
-
-      page += 1;
+  private async upsertLibrarySceneProjectionPage(
+    items: StashLocalLibrarySceneItem[],
+    syncedAt: Date,
+  ): Promise<number> {
+    if (items.length === 0) {
+      return 0;
     }
 
-    return {
-      localSceneCount,
-      availableStashIds,
-    };
+    await this.prisma.$transaction(
+      items.map((item) =>
+        this.prisma.librarySceneIndex.upsert({
+          where: {
+            stashSceneId: item.id,
+          },
+          create: {
+            stashSceneId: item.id,
+            linkedStashId: item.linkedStashId,
+            linkedStashIds: item.linkedStashIds,
+            title: item.title,
+            description: item.description,
+            imageUrl: item.imageUrl,
+            studioId: item.studioId,
+            studioName: item.studio,
+            studioImageUrl: item.studioImageUrl,
+            performerIds: item.performerIds,
+            performerNames: item.performerNames,
+            tagIds: item.tagIds,
+            tagNames: item.tagNames,
+            releaseDate: item.releaseDate,
+            duration: item.duration,
+            viewUrl: item.viewUrl,
+            localCreatedAt: item.createdAt,
+            localUpdatedAt: item.updatedAt,
+            hasFavoritePerformer: item.hasFavoritePerformer,
+            favoriteStudio: item.favoriteStudio,
+            hasFavoriteTag: item.hasFavoriteTag,
+            lastSyncedAt: syncedAt,
+          },
+          update: {
+            linkedStashId: item.linkedStashId,
+            linkedStashIds: item.linkedStashIds,
+            title: item.title,
+            description: item.description,
+            imageUrl: item.imageUrl,
+            studioId: item.studioId,
+            studioName: item.studio,
+            studioImageUrl: item.studioImageUrl,
+            performerIds: item.performerIds,
+            performerNames: item.performerNames,
+            tagIds: item.tagIds,
+            tagNames: item.tagNames,
+            releaseDate: item.releaseDate,
+            duration: item.duration,
+            viewUrl: item.viewUrl,
+            localCreatedAt: item.createdAt,
+            localUpdatedAt: item.updatedAt,
+            hasFavoritePerformer: item.hasFavoritePerformer,
+            favoriteStudio: item.favoriteStudio,
+            hasFavoriteTag: item.hasFavoriteTag,
+            lastSyncedAt: syncedAt,
+          },
+        }),
+      ),
+    );
+
+    return items.length;
+  }
+
+  private async applyLibraryAvailabilitySnapshot(
+    availableStashIds: Set<string>,
+    syncedAt: Date,
+  ): Promise<number> {
+    const patches: SceneIndexPatch[] = [];
+
+    for (const stashId of availableStashIds) {
+      patches.push({
+        stashId,
+        stashAvailable: true,
+        stashLastSyncedAt: syncedAt,
+        lastSyncedAt: syncedAt,
+      });
+    }
+
+    const previouslyAvailableRows = await this.prisma.sceneIndex.findMany({
+      where: {
+        stashAvailable: true,
+      },
+      select: {
+        stashId: true,
+      },
+    });
+
+    for (const row of previouslyAvailableRows) {
+      if (availableStashIds.has(row.stashId)) {
+        continue;
+      }
+
+      patches.push({
+        stashId: row.stashId,
+        stashAvailable: false,
+        stashLastSyncedAt: syncedAt,
+        lastSyncedAt: syncedAt,
+      });
+    }
+
+    await this.applySceneIndexPatches(patches);
+    return this.mergePatchesByStashId(patches).length;
   }
 
   private isSuccessfulSyncFresh(
