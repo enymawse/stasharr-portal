@@ -38,3 +38,32 @@ export interface UpdateIntegrationPayload {
   baseUrl?: string;
   apiKey?: string;
 }
+
+export function resolveConfiguredCatalogProviderType(
+  integrations: ReadonlyArray<
+    Pick<IntegrationResponse, 'type' | 'enabled' | 'status' | 'baseUrl'>
+  >,
+): CatalogProviderType | null {
+  const configuredProviders = integrations.filter(
+    (integration): integration is Pick<
+      IntegrationResponse,
+      'type' | 'enabled' | 'status' | 'baseUrl'
+    > & { type: CatalogProviderType } =>
+      isCatalogProviderType(integration.type) &&
+      integration.status === 'CONFIGURED' &&
+      !!integration.baseUrl?.trim(),
+  );
+
+  if (configuredProviders.length === 0) {
+    return null;
+  }
+
+  const enabledConfiguredProviders = configuredProviders.filter(
+    (integration) => integration.enabled,
+  );
+  if (enabledConfiguredProviders.length === 1) {
+    return enabledConfiguredProviders[0].type;
+  }
+
+  return configuredProviders[0].type;
+}

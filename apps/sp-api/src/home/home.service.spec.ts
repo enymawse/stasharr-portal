@@ -146,7 +146,7 @@ describe('HomeService', () => {
     resolveForScenes: sceneStatusResolveForScenesMock,
   } as unknown as SceneStatusService;
   const catalogProviderService = {
-    getActiveCatalogProvider: jest.fn(),
+    getConfiguredCatalogProvider: jest.fn(),
   } as unknown as CatalogProviderService;
 
   let service: HomeService;
@@ -168,7 +168,7 @@ describe('HomeService', () => {
     librarySearchTagsMock.mockResolvedValue([]);
     librarySearchStudiosMock.mockResolvedValue([]);
     sceneStatusResolveForScenesMock.mockResolvedValue(new Map());
-    catalogProviderService.getActiveCatalogProvider = jest
+    catalogProviderService.getConfiguredCatalogProvider = jest
       .fn()
       .mockResolvedValue({
         integrationType: 'STASHDB',
@@ -1418,17 +1418,17 @@ describe('HomeService', () => {
         id: 'custom-hybrid-4',
       }),
     );
-    catalogProviderService.getActiveCatalogProvider = jest
+    catalogProviderService.getConfiguredCatalogProvider = jest
       .fn()
       .mockRejectedValue(new Error('catalog unavailable'));
 
     await expect(service.getRailContent('custom-hybrid-4')).resolves.toEqual({
       items: [],
       message:
-        'Configure and enable an active catalog provider to populate this hybrid rail.',
+        'Configure the catalog provider for this Stasharr instance to populate this hybrid rail.',
     });
 
-    catalogProviderService.getActiveCatalogProvider = jest
+    catalogProviderService.getConfiguredCatalogProvider = jest
       .fn()
       .mockResolvedValue({
         integrationType: 'STASHDB',

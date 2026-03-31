@@ -1,6 +1,7 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { finalize, forkJoin, switchMap } from 'rxjs';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonDirective } from 'primeng/button';
@@ -19,6 +20,7 @@ import {
   UpdateIntegrationPayload,
   integrationLabel,
   isCatalogProviderType,
+  resolveConfiguredCatalogProviderType,
 } from '../../core/api/integrations.types';
 
 type ServiceTab = IntegrationType;
@@ -47,6 +49,7 @@ export class SettingsPageComponent implements OnInit {
   private readonly healthService = inject(HealthService);
   private readonly confirmationService = inject(ConfirmationService);
   private readonly notifications = inject(AppNotificationsService);
+  private readonly router = inject(Router);
 
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
@@ -56,12 +59,19 @@ export class SettingsPageComponent implements OnInit {
   protected readonly activeTab = signal<SettingsTab>('STASH');
   protected readonly resettingAll = signal(false);
 
-  protected readonly serviceTabs: ServiceTab[] = [
+  private readonly allServiceTypes: IntegrationType[] = [
     'STASH',
     'WHISPARR',
     'STASHDB',
     'FANSDB',
   ];
+
+  protected readonly serviceTabs = computed<ServiceTab[]>(() => {
+    const catalogProvider = this.configuredCatalogProvider();
+    return catalogProvider
+      ? ['STASH', 'WHISPARR', catalogProvider]
+      : ['STASH', 'WHISPARR'];
+  });
 
   protected readonly forms: Record<IntegrationType, IntegrationForm> = {
     STASH: this.createIntegrationForm(),
@@ -104,26 +114,17 @@ export class SettingsPageComponent implements OnInit {
     this.loadSettingsData();
   }
 
-  protected setActiveTab(tab: SettingsTab): void {
-    this.activeTab.set(tab);
-  }
-
   protected onTabsValueChange(nextValue: string | number | undefined): void {
     if (!nextValue) {
       return;
     }
 
-    if (nextValue === 'ABOUT' || this.serviceTabs.includes(nextValue as IntegrationType)) {
+    if (
+      nextValue === 'ABOUT' ||
+      this.serviceTabs().includes(nextValue as IntegrationType)
+    ) {
       this.activeTab.set(nextValue as SettingsTab);
     }
-  }
-
-  protected isActiveTab(tab: SettingsTab): boolean {
-    return this.activeTab() === tab;
-  }
-
-  protected isServiceTabActive(type: IntegrationType): boolean {
-    return this.activeTab() === type;
   }
 
   protected configured(type: IntegrationType): boolean {
@@ -138,29 +139,31 @@ export class SettingsPageComponent implements OnInit {
     return isCatalogProviderType(type);
   }
 
-  protected isActiveCatalogProvider(type: IntegrationType): boolean {
-    return this.isCatalogProvider(type) && this.activeCatalogProvider() === type;
+  protected showEnabledToggle(type: IntegrationType): boolean {
+    return !this.isCatalogProvider(type);
+  }
+
+  protected configuredCatalogProviderLabel(): string | null {
+    const catalogProvider = this.configuredCatalogProvider();
+    return catalogProvider ? this.labelFor(catalogProvider) : null;
+  }
+
+  protected catalogProviderSummary(): string {
+    const label = this.configuredCatalogProviderLabel();
+    if (label) {
+      return `This Stasharr instance is configured for ${label}. To use a different catalog provider, reset catalog setup and re-run setup.`;
+    }
+
+    return 'No catalog provider is configured right now. Return to setup to choose StashDB or FansDB for this instance.';
   }
 
   protected catalogProviderHelp(type: IntegrationType): string | null {
-    if (!this.isCatalogProvider(type)) {
+    const configuredCatalogProvider = this.configuredCatalogProvider();
+    if (!this.isCatalogProvider(type) || configuredCatalogProvider !== type) {
       return null;
     }
 
-    if (this.isActiveCatalogProvider(type)) {
-      return `${this.labelFor(type)} is the current active discovery provider. Saving another enabled catalog provider will deactivate this one.`;
-    }
-
-    const enabledInForm = this.forms[type].controls.enabled.value;
-    if (this.configured(type)) {
-      return enabledInForm
-        ? `Save changes to switch discovery to ${this.labelFor(type)}.`
-        : `Enable ${this.labelFor(type)} and save to make it the active discovery source.`;
-    }
-
-    return enabledInForm
-      ? `Finish configuring ${this.labelFor(type)} and save to make it the active discovery source.`
-      : `Configure ${this.labelFor(type)}, enable it, and save to make it the active discovery source.`;
+    return `${this.labelFor(type)} is the catalog provider configured for this Stasharr instance. Reset catalog setup before changing provider type.`;
   }
 
   protected formFor(type: IntegrationType): IntegrationForm {
@@ -197,14 +200,19 @@ export class SettingsPageComponent implements OnInit {
       return;
     }
 
+    const isCatalogProvider = this.isCatalogProvider(type);
     this.confirmationService.confirm({
       key: 'app-destructive',
-      header: `Reset ${this.labelFor(type)} Integration?`,
-      message: 'Reset this integration and clear saved configuration?',
+      header: isCatalogProvider
+        ? 'Reset Catalog Setup?'
+        : `Reset ${this.labelFor(type)} Integration?`,
+      message: isCatalogProvider
+        ? `Resetting ${this.labelFor(type)} clears this instance's catalog provider choice. Return to setup to choose StashDB or FansDB again.`
+        : 'Reset this integration and clear saved configuration?',
       icon: 'pi pi-exclamation-triangle',
       rejectLabel: 'Cancel',
       rejectButtonStyleClass: 'p-button-text',
-      acceptLabel: 'Confirm reset',
+      acceptLabel: isCatalogProvider ? 'Reset catalog setup' : 'Confirm reset',
       acceptButtonStyleClass: 'p-button-danger',
       accept: () => {
         this.resetIntegration(type);
@@ -220,7 +228,8 @@ export class SettingsPageComponent implements OnInit {
     this.confirmationService.confirm({
       key: 'app-destructive',
       header: 'Reset All Integrations?',
-      message: 'Resetting all integrations clears configuration for Stash, Whisparr, StashDB, and FansDB.',
+      message:
+        'Resetting all integrations clears Stash, Whisparr, and the catalog provider choice for this instance.',
       icon: 'pi pi-exclamation-triangle',
       rejectLabel: 'Cancel',
       rejectButtonStyleClass: 'p-button-text',
@@ -258,11 +267,15 @@ export class SettingsPageComponent implements OnInit {
             error: null,
           });
         },
-        error: () => {
-          this.notifications.error(`Failed to save ${this.labelFor(type)} settings`);
+        error: (error: unknown) => {
+          const message = this.describeMutationError(
+            error,
+            `Failed to save ${this.labelFor(type)} settings.`,
+          );
+          this.notifications.error(message);
           this.patchActionState(this.saveState, type, {
             success: null,
-            error: `Failed to save ${this.labelFor(type)} settings.`,
+            error: message,
           });
         },
       });
@@ -292,11 +305,15 @@ export class SettingsPageComponent implements OnInit {
             error: null,
           });
         },
-        error: () => {
-          this.notifications.error(`${this.labelFor(type)} test failed`);
+        error: (error: unknown) => {
+          const message = this.describeMutationError(
+            error,
+            `${this.labelFor(type)} test failed.`,
+          );
+          this.notifications.error(message);
           this.patchActionState(this.testState, type, {
             success: null,
-            error: `${this.labelFor(type)} test failed.`,
+            error: message,
           });
         },
       });
@@ -312,30 +329,37 @@ export class SettingsPageComponent implements OnInit {
     this.integrationsService
       .resetIntegration(type)
       .pipe(
+        switchMap(() => this.integrationsService.getIntegrations()),
         finalize(() => {
           this.patchActionState(this.resetState, type, { running: false });
         }),
       )
       .subscribe({
-        next: (integration) => {
-          this.updateIntegration(type, integration);
-          this.forms[type].setValue({
-            name: '',
-            baseUrl: '',
-            apiKey: '',
-            enabled: integration.enabled,
-          });
-          this.notifications.info(`${this.labelFor(type)} integration reset`);
+        next: (integrations) => {
+          this.applyIntegrations(integrations);
+          if (this.isCatalogProvider(type)) {
+            this.notifications.info('Catalog setup was reset');
+            this.activeTab.set('STASH');
+            void this.router.navigateByUrl('/setup');
+          } else {
+            this.notifications.info(`${this.labelFor(type)} integration reset`);
+          }
           this.patchActionState(this.resetState, type, {
-            success: `${this.labelFor(type)} has been reset.`,
+            success: this.isCatalogProvider(type)
+              ? 'Catalog setup has been reset.'
+              : `${this.labelFor(type)} has been reset.`,
             error: null,
           });
         },
-        error: () => {
-          this.notifications.error(`Failed to reset ${this.labelFor(type)}`);
+        error: (error: unknown) => {
+          const message = this.describeMutationError(
+            error,
+            `Failed to reset ${this.labelFor(type)}.`,
+          );
+          this.notifications.error(message);
           this.patchActionState(this.resetState, type, {
             success: null,
-            error: `Failed to reset ${this.labelFor(type)}.`,
+            error: message,
           });
         },
       });
@@ -355,9 +379,13 @@ export class SettingsPageComponent implements OnInit {
         next: (integrations) => {
           this.applyIntegrations(integrations);
           this.notifications.info('All integrations were reset to not configured');
+          this.activeTab.set('STASH');
+          void this.router.navigateByUrl('/setup');
         },
-        error: () => {
-          this.notifications.error('Failed to reset all integrations');
+        error: (error: unknown) => {
+          this.notifications.error(
+            this.describeMutationError(error, 'Failed to reset all integrations.'),
+          );
         },
       });
   }
@@ -423,7 +451,7 @@ export class SettingsPageComponent implements OnInit {
   private payloadFromForm(type: IntegrationType): UpdateIntegrationPayload {
     const formValue = this.forms[type].getRawValue();
     const payload: UpdateIntegrationPayload = {
-      enabled: formValue.enabled,
+      enabled: this.isCatalogProvider(type) ? true : formValue.enabled,
       name: this.normalizeInput(formValue.name),
       baseUrl: this.normalizeInput(formValue.baseUrl),
     };
@@ -450,7 +478,7 @@ export class SettingsPageComponent implements OnInit {
 
     this.integrations.set(byType);
 
-    for (const type of this.serviceTabs) {
+    for (const type of this.allServiceTypes) {
       const integration = byType[type];
       this.forms[type].setValue({
         name: integration?.name ?? '',
@@ -459,22 +487,14 @@ export class SettingsPageComponent implements OnInit {
         enabled: this.defaultEnabledValue(type, integration),
       });
     }
-  }
 
-  private activeCatalogProvider(): CatalogProviderType | null {
-    const integrations = this.integrations();
-    for (const type of ['STASHDB', 'FANSDB'] as const) {
-      const integration = integrations[type];
-      if (
-        integration?.enabled &&
-        integration.status === 'CONFIGURED' &&
-        !!integration.baseUrl?.trim()
-      ) {
-        return type;
-      }
+    const activeTab = this.activeTab();
+    if (
+      activeTab !== 'ABOUT' &&
+      !this.serviceTabs().includes(activeTab as IntegrationType)
+    ) {
+      this.activeTab.set('STASH');
     }
-
-    return null;
   }
 
   private defaultEnabledValue(
@@ -493,6 +513,14 @@ export class SettingsPageComponent implements OnInit {
       ...current,
       [type]: integration,
     }));
+  }
+
+  private configuredCatalogProvider(): CatalogProviderType | null {
+    return resolveConfiguredCatalogProviderType(
+      Object.values(this.integrations()).filter(
+        (integration): integration is IntegrationResponse => integration !== null,
+      ),
+    );
   }
 
   private createIntegrationForm(): IntegrationForm {
@@ -516,6 +544,21 @@ export class SettingsPageComponent implements OnInit {
     }
 
     return date.toLocaleString();
+  }
+
+  private describeMutationError(error: unknown, fallback: string): string {
+    if (error instanceof HttpErrorResponse) {
+      const message = error.error?.message;
+      if (typeof message === 'string' && message.trim().length > 0) {
+        return message;
+      }
+
+      if (Array.isArray(message) && message.length > 0) {
+        return message.join(' ');
+      }
+    }
+
+    return fallback;
   }
 
   private defaultActionState(): ActionState {

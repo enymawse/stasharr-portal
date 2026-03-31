@@ -1,7 +1,7 @@
 <main>
   <header>
     <h1>Studios</h1>
-    <p>Studio feed from your active catalog provider.</p>
+    <p>Studio feed from the catalog provider configured for this instance.</p>
     @if (!loading() && !error()) {
       <p class="state">Total studios: {{ total() }}</p>
     }

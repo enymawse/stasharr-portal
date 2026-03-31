@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
@@ -6,6 +7,7 @@ import { ButtonDirective } from 'primeng/button';
 import { Message } from 'primeng/message';
 import { ProgressSpinner } from 'primeng/progressspinner';
 import {
+  CatalogProviderType,
   IntegrationResponse,
   IntegrationType,
   UpdateIntegrationPayload,
@@ -39,13 +41,21 @@ export class SetupPageComponent implements OnInit {
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
   protected readonly status = signal<SetupStatusResponse | null>(null);
+  protected readonly resettingCatalogProvider = signal(false);
 
-  protected readonly integrationTypes: IntegrationType[] = [
+  private readonly allIntegrationTypes: IntegrationType[] = [
     'STASH',
     'WHISPARR',
     'STASHDB',
     'FANSDB',
   ];
+
+  protected readonly requiredServiceTypes: IntegrationType[] = ['STASH', 'WHISPARR'];
+  protected readonly catalogProviderTypes: CatalogProviderType[] = ['STASHDB', 'FANSDB'];
+  protected readonly visibleCatalogProviderTypes = computed<CatalogProviderType[]>(() => {
+    const catalogProvider = this.catalogProvider();
+    return catalogProvider ? [catalogProvider] : this.catalogProviderTypes;
+  });
 
   protected readonly forms: Record<IntegrationType, IntegrationForm> = {
     STASH: this.createIntegrationForm(),
@@ -90,29 +100,33 @@ export class SetupPageComponent implements OnInit {
     return isCatalogProviderType(type);
   }
 
-  protected isActiveCatalogProvider(type: IntegrationType): boolean {
-    return this.status()?.activeCatalogProvider === type;
+  protected showEnabledToggle(type: IntegrationType): boolean {
+    return !this.isCatalogProvider(type);
+  }
+
+  protected catalogProvider(): CatalogProviderType | null {
+    return this.status()?.catalogProvider ?? null;
   }
 
   protected integrationMeta(type: IntegrationType): string {
     if (this.isCatalogProvider(type)) {
-      return `${this.isActiveCatalogProvider(type) ? 'Active Catalog Provider' : 'Catalog Provider'} | Status: ${this.statusText(type)}`;
+      return `${this.catalogProvider() === type ? 'Instance Catalog Provider' : 'Catalog Provider Option'} | Status: ${this.statusText(type)}`;
     }
 
     return `Required Service | Status: ${this.statusText(type)}`;
   }
 
   protected setupSummary(): string {
-    const activeCatalogProvider = this.status()?.activeCatalogProvider;
+    const catalogProvider = this.catalogProvider();
     if (this.isSetupComplete()) {
-      return `Setup complete: Stash, Whisparr, and ${activeCatalogProvider ? this.labelFor(activeCatalogProvider) : 'your active catalog provider'} are configured.`;
+      return `Setup complete: this Stasharr instance uses ${catalogProvider ? this.labelFor(catalogProvider) : 'its catalog provider'} with Stash and Whisparr configured.`;
     }
 
-    if (activeCatalogProvider) {
-      return `Setup incomplete: finish configuring Stash, Whisparr, and the active catalog provider ${this.labelFor(activeCatalogProvider)}.`;
+    if (catalogProvider) {
+      return `Setup in progress: this Stasharr instance is configured for ${this.labelFor(catalogProvider)}. Finish Stash and Whisparr, or reset catalog setup to choose a different provider.`;
     }
 
-    return 'Setup incomplete: configure Stash, Whisparr, and enable one catalog provider to continue.';
+    return 'Setup in progress: choose the catalog provider for this Stasharr instance, then configure Stash and Whisparr.';
   }
 
   protected catalogProviderHelp(type: IntegrationType): string | null {
@@ -120,9 +134,11 @@ export class SetupPageComponent implements OnInit {
       return null;
     }
 
-    return this.isActiveCatalogProvider(type)
-      ? `${this.labelFor(type)} currently drives /scenes, scene detail, performers, studios, and request metadata.`
-      : `Enable and save ${this.labelFor(type)} to make it the active discovery source.`;
+    if (this.catalogProvider() === type) {
+      return `${this.labelFor(type)} is locked in as this instance's catalog provider. /scenes, performers, studios, requests, and indexing will use it.`;
+    }
+
+    return `Choose ${this.labelFor(type)} for this Stasharr instance. Changing provider type later requires resetting catalog setup and running setup again.`;
   }
 
   protected statusText(type: IntegrationType): string {
@@ -145,7 +161,7 @@ export class SetupPageComponent implements OnInit {
   protected saveIntegration(type: IntegrationType): void {
     const formValue = this.forms[type].getRawValue();
     const payload: UpdateIntegrationPayload = {
-      enabled: formValue.enabled,
+      enabled: this.isCatalogProvider(type) ? true : formValue.enabled,
       name: this.normalizeInput(formValue.name),
       baseUrl: this.normalizeInput(formValue.baseUrl),
     };
@@ -188,12 +204,50 @@ export class SetupPageComponent implements OnInit {
             void this.router.navigateByUrl('/scenes');
           }
         },
-        error: () => {
-          this.notifications.error(`Failed to save ${this.labelFor(type)}`);
+        error: (error: unknown) => {
+          const message = this.describeMutationError(
+            error,
+            `Failed to save ${this.labelFor(type)}.`,
+          );
+          this.notifications.error(message);
           this.patchSaveState(type, {
             success: null,
-            error: `Failed to save ${this.labelFor(type)}.`,
+            error: message,
           });
+        },
+      });
+  }
+
+  protected resetCatalogProviderChoice(): void {
+    const catalogProvider = this.catalogProvider();
+    if (!catalogProvider || this.resettingCatalogProvider()) {
+      return;
+    }
+
+    this.resettingCatalogProvider.set(true);
+    this.integrationsService
+      .resetIntegration(catalogProvider)
+      .pipe(
+        switchMap(() =>
+          forkJoin({
+            status: this.setupService.getStatus(),
+            integrations: this.integrationsService.getIntegrations(),
+          }),
+        ),
+        finalize(() => {
+          this.resettingCatalogProvider.set(false);
+        }),
+      )
+      .subscribe({
+        next: ({ status, integrations }) => {
+          this.status.set(status);
+          this.applyIntegrations(integrations);
+          this.notifications.info('Catalog setup was reset');
+        },
+        error: (error: unknown) => {
+          this.notifications.error(
+            this.describeMutationError(error, 'Failed to reset catalog setup.'),
+          );
         },
       });
   }
@@ -240,7 +294,7 @@ export class SetupPageComponent implements OnInit {
 
     this.integrations.set(byType);
 
-    for (const type of this.integrationTypes) {
+    for (const type of this.allIntegrationTypes) {
       const integration = byType[type];
       this.forms[type].setValue({
         name: integration?.name ?? '',
@@ -274,6 +328,21 @@ export class SetupPageComponent implements OnInit {
   private normalizeInput(value: string): string | undefined {
     const trimmed = value.trim();
     return trimmed === '' ? undefined : trimmed;
+  }
+
+  private describeMutationError(error: unknown, fallback: string): string {
+    if (error instanceof HttpErrorResponse) {
+      const message = error.error?.message;
+      if (typeof message === 'string' && message.trim().length > 0) {
+        return message;
+      }
+
+      if (Array.isArray(message) && message.length > 0) {
+        return message.join(' ');
+      }
+    }
+
+    return fallback;
   }
 
   private defaultSaveState(): SaveState {

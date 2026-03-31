@@ -39,8 +39,7 @@ describe('setup route guards', () => {
       of({
         setupComplete: false,
         required: { stash: false, catalog: false, whisparr: false },
-        activeCatalogProvider: null,
-        catalogProviders: { STASHDB: false, FANSDB: false },
+        catalogProvider: null,
       }),
     );
 
@@ -54,8 +53,7 @@ describe('setup route guards', () => {
       of({
         setupComplete: true,
         required: { stash: true, catalog: true, whisparr: true },
-        activeCatalogProvider: 'FANSDB',
-        catalogProviders: { STASHDB: true, FANSDB: true },
+        catalogProvider: 'FANSDB',
       }),
     );
 
@@ -69,8 +67,7 @@ describe('setup route guards', () => {
       of({
         setupComplete: true,
         required: { stash: true, catalog: true, whisparr: true },
-        activeCatalogProvider: 'STASHDB',
-        catalogProviders: { STASHDB: true, FANSDB: false },
+        catalogProvider: 'STASHDB',
       }),
     );
 

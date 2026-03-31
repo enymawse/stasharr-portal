@@ -48,7 +48,7 @@ export class PerformersService {
     },
   ): Promise<PerformerFeedResponseDto> {
     const catalogProvider =
-      await this.catalogProviderService.getActiveCatalogProvider();
+      await this.catalogProviderService.getConfiguredCatalogProvider();
 
     const performers = await this.stashdbAdapter.getPerformersFeed({
       baseUrl: catalogProvider.baseUrl,
@@ -144,7 +144,7 @@ export class PerformersService {
     }
 
     const catalogProvider =
-      await this.catalogProviderService.getActiveCatalogProvider();
+      await this.catalogProviderService.getConfiguredCatalogProvider();
     const scenes = await this.stashdbAdapter.getScenesForPerformer({
       baseUrl: catalogProvider.baseUrl,
       apiKey: catalogProvider.apiKey,
@@ -218,7 +218,7 @@ export class PerformersService {
     apiKey: string | null;
   }> {
     const catalogProvider =
-      await this.catalogProviderService.getActiveCatalogProvider();
+      await this.catalogProviderService.getConfiguredCatalogProvider();
 
     return {
       baseUrl: catalogProvider.baseUrl,

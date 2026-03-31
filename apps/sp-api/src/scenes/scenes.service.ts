@@ -51,7 +51,7 @@ export class ScenesService {
     studioIds: string[] = [],
   ): Promise<ScenesFeedResponseDto> {
     const catalogProvider =
-      await this.catalogProviderService.getActiveCatalogProvider();
+      await this.catalogProviderService.getConfiguredCatalogProvider();
     const normalizedTagIds = this.normalizeTagIds(tagIds);
     const normalizedStudioIds = this.normalizeStudioIds(studioIds);
     const scenes = await this.stashdbAdapter.getScenesBySort({
@@ -99,7 +99,7 @@ export class ScenesService {
     }
 
     const catalogProvider =
-      await this.catalogProviderService.getActiveCatalogProvider();
+      await this.catalogProviderService.getConfiguredCatalogProvider();
 
     return this.stashdbAdapter.searchTags({
       baseUrl: catalogProvider.baseUrl,
@@ -115,7 +115,7 @@ export class ScenesService {
     }
 
     const catalogProvider =
-      await this.catalogProviderService.getActiveCatalogProvider();
+      await this.catalogProviderService.getConfiguredCatalogProvider();
 
     const scene = await this.stashdbAdapter.getSceneById(sceneId, {
       baseUrl: catalogProvider.baseUrl,
@@ -164,7 +164,7 @@ export class ScenesService {
     }
 
     const catalogProvider =
-      await this.catalogProviderService.getActiveCatalogProvider();
+      await this.catalogProviderService.getConfiguredCatalogProvider();
     return this.stashdbAdapter.favoriteStudio(
       normalizedStudioId,
       favorite,

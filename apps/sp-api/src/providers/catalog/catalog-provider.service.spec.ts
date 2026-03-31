@@ -16,15 +16,19 @@ describe('CatalogProviderService', () => {
     service = new CatalogProviderService(integrationsService);
   });
 
-  it('resolves STASHDB as the active catalog provider when enabled', async () => {
+  it('resolves STASHDB as the configured catalog provider', async () => {
     integrationsService.findAll = jest.fn().mockResolvedValue([
       {
         type: IntegrationType.STASHDB,
         enabled: true,
+        status: IntegrationStatus.CONFIGURED,
+        baseUrl: 'http://stashdb.local/graphql',
       },
       {
         type: IntegrationType.FANSDB,
-        enabled: false,
+        enabled: true,
+        status: IntegrationStatus.NOT_CONFIGURED,
+        baseUrl: null,
       },
     ]);
     integrationsService.findOne = jest.fn().mockResolvedValue({
@@ -35,7 +39,7 @@ describe('CatalogProviderService', () => {
       apiKey: 'stashdb-key',
     });
 
-    await expect(service.getActiveCatalogProvider()).resolves.toEqual({
+    await expect(service.getConfiguredCatalogProvider()).resolves.toEqual({
       integrationType: 'STASHDB',
       providerKey: 'STASHDB',
       label: 'StashDB',
@@ -44,41 +48,13 @@ describe('CatalogProviderService', () => {
     });
   });
 
-  it('resolves FANSDB as the active catalog provider when enabled', async () => {
+  it('keeps using the enabled configured provider in a legacy dual-config state', async () => {
     integrationsService.findAll = jest.fn().mockResolvedValue([
       {
         type: IntegrationType.STASHDB,
         enabled: false,
-      },
-      {
-        type: IntegrationType.FANSDB,
-        enabled: true,
-      },
-    ]);
-    integrationsService.findOne = jest.fn().mockResolvedValue({
-      type: IntegrationType.FANSDB,
-      enabled: true,
-      status: IntegrationStatus.CONFIGURED,
-      baseUrl: 'http://fansdb.local/graphql',
-      apiKey: 'fansdb-key',
-    });
-
-    await expect(service.getActiveCatalogProvider()).resolves.toEqual({
-      integrationType: 'FANSDB',
-      providerKey: 'FANSDB',
-      label: 'FansDB',
-      baseUrl: 'http://fansdb.local/graphql',
-      apiKey: 'fansdb-key',
-    });
-  });
-
-  it('prefers a configured provider over an earlier enabled but unconfigured provider', async () => {
-    integrationsService.findAll = jest.fn().mockResolvedValue([
-      {
-        type: IntegrationType.STASHDB,
-        enabled: true,
-        status: IntegrationStatus.NOT_CONFIGURED,
-        baseUrl: null,
+        status: IntegrationStatus.CONFIGURED,
+        baseUrl: 'http://stashdb.local/graphql',
       },
       {
         type: IntegrationType.FANSDB,
@@ -95,7 +71,7 @@ describe('CatalogProviderService', () => {
       apiKey: 'fansdb-key',
     });
 
-    await expect(service.getActiveCatalogProvider()).resolves.toEqual({
+    await expect(service.getConfiguredCatalogProvider()).resolves.toEqual({
       integrationType: 'FANSDB',
       providerKey: 'FANSDB',
       label: 'FansDB',
@@ -104,11 +80,13 @@ describe('CatalogProviderService', () => {
     });
   });
 
-  it('throws when the selected catalog provider is missing a base URL', async () => {
+  it('throws when the configured catalog provider is missing a base URL', async () => {
     integrationsService.findAll = jest.fn().mockResolvedValue([
       {
         type: IntegrationType.FANSDB,
         enabled: true,
+        status: IntegrationStatus.CONFIGURED,
+        baseUrl: 'http://fansdb.local/graphql',
       },
     ]);
     integrationsService.findOne = jest.fn().mockResolvedValue({
@@ -119,24 +97,28 @@ describe('CatalogProviderService', () => {
       apiKey: null,
     });
 
-    await expect(service.getActiveCatalogProvider()).rejects.toBeInstanceOf(
+    await expect(service.getConfiguredCatalogProvider()).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });
 
-  it('throws when no catalog provider is enabled', async () => {
+  it('throws when no catalog provider is configured', async () => {
     integrationsService.findAll = jest.fn().mockResolvedValue([
       {
         type: IntegrationType.STASHDB,
-        enabled: false,
+        enabled: true,
+        status: IntegrationStatus.NOT_CONFIGURED,
+        baseUrl: null,
       },
       {
         type: IntegrationType.FANSDB,
-        enabled: false,
+        enabled: true,
+        status: IntegrationStatus.NOT_CONFIGURED,
+        baseUrl: null,
       },
     ]);
 
-    await expect(service.getActiveCatalogProvider()).rejects.toBeInstanceOf(
+    await expect(service.getConfiguredCatalogProvider()).rejects.toBeInstanceOf(
       ConflictException,
     );
   });

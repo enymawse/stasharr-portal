@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   IntegrationConfig,
   IntegrationStatus,
@@ -17,7 +17,13 @@ import {
   WhisparrAdapter,
   WhisparrAdapterBaseConfig,
 } from '../providers/whisparr/whisparr.adapter';
-import { isCatalogProviderIntegrationType } from '../providers/catalog/catalog-provider.util';
+import {
+  CATALOG_PROVIDER_KEYS,
+  type CatalogProviderIntegrationType,
+  configuredCatalogProviderTypeFromIntegrations,
+  getCatalogProviderLabel,
+  isCatalogProviderIntegrationType,
+} from '../providers/catalog/catalog-provider.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
 
@@ -40,16 +46,25 @@ export class IntegrationsService {
     type: IntegrationType,
     dto: UpdateIntegrationDto,
   ): Promise<IntegrationConfig> {
-    const configured =
-      !!dto.baseUrl?.trim() || !!dto.apiKey?.trim() || !!dto.name?.trim();
+    const normalizedName = this.normalizeInput(dto.name);
+    const normalizedBaseUrl = this.normalizeInput(dto.baseUrl);
+    const normalizedApiKey = this.normalizeInput(dto.apiKey);
+    const isCatalogProvider = isCatalogProviderIntegrationType(type);
+    const configured = isCatalogProvider
+      ? !!normalizedBaseUrl
+      : !!normalizedBaseUrl || !!normalizedApiKey || !!normalizedName;
+
+    if (isCatalogProvider) {
+      await this.assertCatalogProviderUpdateAllowed(type, configured);
+    }
 
     const upsertArgs = {
       where: { type },
       update: {
-        enabled: dto.enabled,
-        name: dto.name,
-        baseUrl: dto.baseUrl,
-        apiKey: dto.apiKey,
+        enabled: isCatalogProvider ? true : dto.enabled,
+        name: normalizedName,
+        baseUrl: normalizedBaseUrl,
+        apiKey: normalizedApiKey,
         status: configured
           ? IntegrationStatus.CONFIGURED
           : IntegrationStatus.NOT_CONFIGURED,
@@ -58,29 +73,25 @@ export class IntegrationsService {
       },
       create: {
         type,
-        enabled: dto.enabled ?? true,
-        name: dto.name,
-        baseUrl: dto.baseUrl,
-        apiKey: dto.apiKey,
+        enabled: isCatalogProvider ? true : dto.enabled ?? true,
+        name: normalizedName,
+        baseUrl: normalizedBaseUrl,
+        apiKey: normalizedApiKey,
         status: configured
           ? IntegrationStatus.CONFIGURED
           : IntegrationStatus.NOT_CONFIGURED,
       },
     } satisfies Prisma.IntegrationConfigUpsertArgs;
 
-    if (isCatalogProviderIntegrationType(type) && dto.enabled === true) {
+    if (isCatalogProvider && configured) {
       const [, integration] = await this.prisma.$transaction([
         this.prisma.integrationConfig.updateMany({
           where: {
             type: {
-              in: Object.values(IntegrationType).filter(
-                (candidate) => candidate !== type && isCatalogProviderIntegrationType(candidate),
-              ),
+              in: this.otherCatalogProviderTypes(type),
             },
           },
-          data: {
-            enabled: false,
-          },
+          data: this.resetPayload(),
         }),
         this.prisma.integrationConfig.upsert(upsertArgs),
       ]);
@@ -164,6 +175,28 @@ export class IntegrationsService {
   }
 
   async reset(type: IntegrationType): Promise<IntegrationConfig> {
+    if (isCatalogProviderIntegrationType(type)) {
+      const resetRecords = await this.prisma.$transaction(
+        CATALOG_PROVIDER_KEYS.map((providerType) =>
+          this.prisma.integrationConfig.upsert({
+            where: { type: providerType },
+            update: this.resetPayload(),
+            create: {
+              type: providerType,
+              ...this.resetPayload(),
+            },
+          }),
+        ),
+      );
+
+      const resetIntegration = resetRecords.find(
+        (integration) => integration.type === type,
+      );
+      if (resetIntegration) {
+        return resetIntegration;
+      }
+    }
+
     return this.prisma.integrationConfig.upsert({
       where: { type },
       update: this.resetPayload(),
@@ -205,6 +238,45 @@ export class IntegrationsService {
       lastErrorAt: null,
       lastErrorMessage: null,
     };
+  }
+
+  private async assertCatalogProviderUpdateAllowed(
+    type: CatalogProviderIntegrationType,
+    nextConfigured: boolean,
+  ): Promise<void> {
+    const catalogIntegrations = await this.prisma.integrationConfig.findMany({
+      where: {
+        type: {
+          in: [...CATALOG_PROVIDER_KEYS],
+        },
+      },
+      orderBy: { type: 'asc' },
+    });
+    const configuredType = configuredCatalogProviderTypeFromIntegrations(
+      catalogIntegrations,
+    );
+
+    if (!configuredType) {
+      return;
+    }
+
+    if (configuredType !== type) {
+      throw new ConflictException(
+        `This Stasharr instance is configured for ${getCatalogProviderLabel(configuredType)}. Reset catalog setup before configuring ${getCatalogProviderLabel(type)}.`,
+      );
+    }
+
+    if (!nextConfigured) {
+      throw new ConflictException(
+        `This Stasharr instance is configured for ${getCatalogProviderLabel(type)}. Reset catalog setup before clearing or changing the catalog provider.`,
+      );
+    }
+  }
+
+  private otherCatalogProviderTypes(
+    type: CatalogProviderIntegrationType,
+  ): CatalogProviderIntegrationType[] {
+    return CATALOG_PROVIDER_KEYS.filter((providerType) => providerType !== type);
   }
 
   private async resolveTestConfig(

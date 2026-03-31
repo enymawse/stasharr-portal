@@ -15,7 +15,7 @@ describe('ScenesService', () => {
     findOne: jest.fn(),
   } as unknown as IntegrationsService;
   const catalogProviderService = {
-    getActiveCatalogProvider: jest.fn(),
+    getConfiguredCatalogProvider: jest.fn(),
   } as unknown as CatalogProviderService;
 
   const stashdbAdapter = {
@@ -102,7 +102,7 @@ describe('ScenesService', () => {
 
         throw new Error('Unexpected integration type');
       });
-    catalogProviderService.getActiveCatalogProvider = jest
+    catalogProviderService.getConfiguredCatalogProvider = jest
       .fn()
       .mockResolvedValue({
         integrationType: 'STASHDB',
@@ -236,7 +236,7 @@ describe('ScenesService', () => {
   });
 
   it('uses the active FANSDB provider for discovery feed and scene detail source', async () => {
-    catalogProviderService.getActiveCatalogProvider = jest
+    catalogProviderService.getConfiguredCatalogProvider = jest
       .fn()
       .mockResolvedValue({
         integrationType: 'FANSDB',

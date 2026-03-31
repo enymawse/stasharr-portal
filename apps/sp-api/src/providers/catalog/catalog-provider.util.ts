@@ -1,3 +1,5 @@
+import { IntegrationStatus } from '@prisma/client';
+
 export const CATALOG_PROVIDER_KEYS = ['STASHDB', 'FANSDB'] as const;
 
 export type CatalogProviderKey = (typeof CATALOG_PROVIDER_KEYS)[number];
@@ -64,6 +66,41 @@ export function getCatalogProviderLabel(
     default:
       return 'StashDB';
   }
+}
+
+export function configuredCatalogProviderTypeFromIntegrations(
+  integrations: ReadonlyArray<{
+    type: string;
+    enabled?: boolean | null;
+    status?: IntegrationStatus | null;
+    baseUrl?: string | null;
+  }>,
+): CatalogProviderIntegrationType | null {
+  const integrationsByType = new Map(
+    integrations.map((integration) => [integration.type, integration]),
+  );
+  const configuredTypes = CATALOG_PROVIDER_KEYS.filter((providerType) => {
+    const integration = integrationsByType.get(providerType);
+    return (
+      integration?.status === IntegrationStatus.CONFIGURED &&
+      !!integration.baseUrl?.trim()
+    );
+  });
+
+  if (configuredTypes.length === 0) {
+    return null;
+  }
+
+  const enabledConfiguredTypes = configuredTypes.filter((providerType) => {
+    const integration = integrationsByType.get(providerType);
+    return integration?.enabled === true;
+  });
+
+  if (enabledConfiguredTypes.length === 1) {
+    return enabledConfiguredTypes[0];
+  }
+
+  return configuredTypes[0];
 }
 
 export function buildCatalogSceneRef(

@@ -512,7 +512,7 @@ describe('IndexingService', () => {
     findOne: findOneMock,
   } as unknown as IntegrationsService;
   const catalogProviderService = {
-    getActiveCatalogProviderOrNull: jest.fn(),
+    getConfiguredCatalogProviderOrNull: jest.fn(),
   } as unknown as CatalogProviderService;
 
   const whisparrAdapter = {
@@ -580,7 +580,7 @@ describe('IndexingService', () => {
 
       throw new Error(`Unexpected integration type: ${type}`);
     });
-    catalogProviderService.getActiveCatalogProviderOrNull = jest
+    catalogProviderService.getConfiguredCatalogProviderOrNull = jest
       .fn()
       .mockImplementation(() =>
         Promise.resolve({

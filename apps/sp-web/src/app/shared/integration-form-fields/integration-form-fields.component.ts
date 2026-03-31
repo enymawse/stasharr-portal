@@ -14,4 +14,5 @@ export class IntegrationFormFieldsComponent {
   @Input({ required: true }) form!: FormGroup;
   @Input() hasStoredApiKey = false;
   @Input() enabledInputId = 'integration-enabled';
+  @Input() showEnabledToggle = true;
 }

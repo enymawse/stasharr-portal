@@ -8,6 +8,7 @@ import { IntegrationsService } from './integrations.service';
 describe('IntegrationsService', () => {
   const upsert = jest.fn<Promise<unknown>, [Record<string, unknown>]>();
   const updateMany = jest.fn<Promise<unknown>, [Record<string, unknown>]>();
+  const findMany = jest.fn();
   const findUnique = jest.fn();
   const transaction = jest.fn();
   const stashTestConnection = jest.fn();
@@ -18,6 +19,7 @@ describe('IntegrationsService', () => {
     integrationConfig: {
       upsert,
       updateMany,
+      findMany,
       findUnique,
     },
     $transaction: transaction,
@@ -101,7 +103,21 @@ describe('IntegrationsService', () => {
     ]);
   });
 
-  it('disables other catalog providers when enabling one catalog integration', async () => {
+  it('resets other catalog providers when saving the chosen catalog integration', async () => {
+    findMany.mockResolvedValue([
+      {
+        type: IntegrationType.FANSDB,
+        enabled: true,
+        status: IntegrationStatus.CONFIGURED,
+        baseUrl: 'http://fansdb.old/graphql',
+      },
+      {
+        type: IntegrationType.STASHDB,
+        enabled: false,
+        status: IntegrationStatus.CONFIGURED,
+        baseUrl: 'http://stashdb.old/graphql',
+      },
+    ]);
     upsert.mockResolvedValue({
       type: IntegrationType.FANSDB,
       enabled: true,
@@ -113,7 +129,6 @@ describe('IntegrationsService', () => {
 
     await expect(
       service.upsert(IntegrationType.FANSDB, {
-        enabled: true,
         baseUrl: 'http://fansdb.local/graphql',
       }),
     ).resolves.toMatchObject({
@@ -128,7 +143,15 @@ describe('IntegrationsService', () => {
         },
       },
       data: {
-        enabled: false,
+        enabled: true,
+        name: null,
+        baseUrl: null,
+        apiKey: null,
+        config: Prisma.JsonNull,
+        status: IntegrationStatus.NOT_CONFIGURED,
+        lastHealthyAt: null,
+        lastErrorAt: null,
+        lastErrorMessage: null,
       },
     });
     expect(upsert).toHaveBeenCalledWith(
@@ -141,6 +164,39 @@ describe('IntegrationsService', () => {
         }),
       }),
     );
+  });
+
+  it('rejects configuring a different catalog provider until catalog setup is reset', async () => {
+    findMany.mockResolvedValue([
+      {
+        type: IntegrationType.FANSDB,
+        enabled: true,
+        status: IntegrationStatus.CONFIGURED,
+        baseUrl: 'http://fansdb.local/graphql',
+      },
+    ]);
+
+    await expect(
+      service.upsert(IntegrationType.STASHDB, {
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
+    ).rejects.toThrow(
+      'This Stasharr instance is configured for FansDB. Reset catalog setup before configuring StashDB.',
+    );
+
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('resets both catalog providers when clearing one provider choice', async () => {
+    transaction.mockResolvedValue([
+      { type: IntegrationType.STASHDB },
+      { type: IntegrationType.FANSDB },
+    ]);
+
+    const result = await service.reset(IntegrationType.FANSDB);
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ type: IntegrationType.FANSDB });
   });
 
   it('tests stash integration and stores success metadata', async () => {

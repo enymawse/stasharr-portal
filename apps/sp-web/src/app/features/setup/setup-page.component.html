@@ -1,7 +1,7 @@
 <main>
   <header>
     <h1>Stasharr Setup</h1>
-    <p>Configure required integrations before using the app.</p>
+    <p>Choose the catalog provider for this Stasharr instance, then configure Stash and Whisparr.</p>
   </header>
 
   @if (loading()) {
@@ -27,7 +27,7 @@
     }
 
     <section class="cards">
-      @for (type of integrationTypes; track type) {
+      @for (type of visibleCatalogProviderTypes(); track type) {
         <article class="card">
           <h2>{{ labelFor(type) }}</h2>
           <p class="meta">{{ integrationMeta(type) }}</p>
@@ -40,6 +40,42 @@
               [form]="formFor(type)"
               [hasStoredApiKey]="hasStoredApiKey(type)"
               [enabledInputId]="'setup-enabled-' + type"
+              [showEnabledToggle]="showEnabledToggle(type)"
+            />
+
+            <div class="actions">
+              <button pButton type="submit" [disabled]="isSaving(type)">
+                {{ isSaving(type) ? 'Saving...' : 'Save' }}
+              </button>
+              @if (catalogProvider() === type) {
+                <button
+                  pButton
+                  type="button"
+                  text
+                  [disabled]="resettingCatalogProvider()"
+                  (click)="resetCatalogProviderChoice()"
+                >
+                  {{ resettingCatalogProvider() ? 'Resetting...' : 'Reset catalog setup' }}
+                </button>
+              }
+            </div>
+          </form>
+        </article>
+      }
+    </section>
+
+    <section class="cards">
+      @for (type of requiredServiceTypes; track type) {
+        <article class="card">
+          <h2>{{ labelFor(type) }}</h2>
+          <p class="meta">{{ integrationMeta(type) }}</p>
+
+          <form [formGroup]="formFor(type)" (ngSubmit)="saveIntegration(type)">
+            <app-integration-form-fields
+              [form]="formFor(type)"
+              [hasStoredApiKey]="hasStoredApiKey(type)"
+              [enabledInputId]="'setup-enabled-' + type"
+              [showEnabledToggle]="showEnabledToggle(type)"
             />
 
             <div class="actions">

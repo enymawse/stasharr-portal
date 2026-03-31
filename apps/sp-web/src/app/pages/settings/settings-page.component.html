@@ -24,6 +24,16 @@
   } @else if (loadError()) {
     <p-message severity="error" styleClass="state-message">{{ loadError() }}</p-message>
   } @else {
+    <section class="indexing-link-card">
+      <div>
+        <h2>Catalog Provider</h2>
+        <p>{{ catalogProviderSummary() }}</p>
+      </div>
+      @if (!configuredCatalogProviderLabel()) {
+        <a class="page-link" [routerLink]="['/setup']">Return to setup</a>
+      }
+    </section>
+
     <section class="tabs-shell">
       <p-tabs
         [value]="activeTab()"
@@ -31,7 +41,7 @@
         styleClass="settings-tabs"
       >
         <p-tablist>
-          @for (type of serviceTabs; track type) {
+          @for (type of serviceTabs(); track type) {
             <p-tab [value]="type">
               <span>{{ labelFor(type) }}</span>
               @if (configured(type)) {
@@ -45,7 +55,7 @@
         </p-tablist>
 
         <p-tabpanels>
-          @for (type of serviceTabs; track type) {
+          @for (type of serviceTabs(); track type) {
             <p-tabpanel [value]="type">
               <section class="service-panel">
               <div class="panel-head">
@@ -61,6 +71,7 @@
                   [form]="formFor(type)"
                   [hasStoredApiKey]="hasStoredApiKey(type)"
                   [enabledInputId]="'settings-enabled-' + type"
+                  [showEnabledToggle]="showEnabledToggle(type)"
                 />
 
                 <div class="actions">
@@ -169,7 +180,10 @@
 
     <section class="global-danger">
       <h2>Global Danger Zone</h2>
-      <p>Resetting all integrations clears configuration for Stash, Whisparr, StashDB, and FansDB.</p>
+      <p>
+        Resetting all integrations clears Stash, Whisparr, and the catalog provider choice for
+        this instance.
+      </p>
 
       <button pButton type="button" class="danger" (click)="requestResetAll()">
         Reset all integrations

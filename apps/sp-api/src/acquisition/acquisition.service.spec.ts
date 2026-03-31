@@ -46,7 +46,7 @@ function buildIndexedRow(overrides: Record<string, unknown> = {}) {
 
 describe('AcquisitionService', () => {
   const findOneMock = jest.fn();
-  const getSelectedCatalogProviderTypeMock = jest.fn();
+  const getConfiguredCatalogProviderTypeMock = jest.fn();
   const buildSceneViewUrlMock = jest.fn();
   const requestMetadataHydrationForStashIdsMock = jest.fn();
   const toSceneStatusMock = jest.fn();
@@ -64,7 +64,7 @@ describe('AcquisitionService', () => {
     findOne: findOneMock,
   } as unknown as IntegrationsService;
   const catalogProviderService = {
-    getSelectedCatalogProviderType: getSelectedCatalogProviderTypeMock,
+    getConfiguredCatalogProviderType: getConfiguredCatalogProviderTypeMock,
   } as unknown as CatalogProviderService;
 
   const whisparrAdapter = {
@@ -112,7 +112,7 @@ describe('AcquisitionService', () => {
 
       throw new Error(`Unexpected integration type: ${type}`);
     });
-    getSelectedCatalogProviderTypeMock.mockResolvedValue('STASHDB');
+    getConfiguredCatalogProviderTypeMock.mockResolvedValue('STASHDB');
     getSceneIndexSummaryMock.mockResolvedValue({
       indexedScenes: 10,
       acquisitionTrackedScenes: 4,
@@ -253,7 +253,7 @@ describe('AcquisitionService', () => {
   });
 
   it('marks acquisition scenes with the active FANSDB provider source', async () => {
-    getSelectedCatalogProviderTypeMock.mockResolvedValue('FANSDB');
+    getConfiguredCatalogProviderTypeMock.mockResolvedValue('FANSDB');
 
     const result = await service.getScenesFeed(1, 2);
 

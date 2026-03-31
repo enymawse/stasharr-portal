@@ -1,7 +1,7 @@
 <main>
   <header>
     <h1>Performers</h1>
-    <p>Performer feed from your active catalog provider.</p>
+    <p>Performer feed from the catalog provider configured for this instance.</p>
     @if (!loading() && !error()) {
       <p class="state">Total performers: {{ total() }}</p>
     }

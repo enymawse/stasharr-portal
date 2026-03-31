@@ -82,7 +82,7 @@ export class AcquisitionService {
       }),
       this.indexingService.getSceneIndexSummary(),
       this.getWhisparrConfig(),
-      this.catalogProviderService.getSelectedCatalogProviderType(),
+      this.catalogProviderService.getConfiguredCatalogProviderType(),
     ]);
     const countsByLifecycle = this.toCountsByLifecycle(summary);
     const total =
@@ -190,7 +190,9 @@ export class AcquisitionService {
     const title = row.title?.trim() || row.stashId;
     const description =
       row.description ??
-      (row.title ? null : 'Scene metadata is unavailable from the active catalog provider.');
+      (row.title
+        ? null
+        : 'Scene metadata is unavailable from the catalog provider configured for this instance.');
 
     return {
       id: row.stashId,

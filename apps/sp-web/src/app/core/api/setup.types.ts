@@ -7,6 +7,5 @@ export interface SetupStatusResponse {
     catalog: boolean;
     whisparr: boolean;
   };
-  activeCatalogProvider: CatalogProviderType | null;
-  catalogProviders: Record<CatalogProviderType, boolean>;
+  catalogProvider: CatalogProviderType | null;
 }

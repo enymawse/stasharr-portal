@@ -364,7 +364,7 @@ export class HomeService {
       return {
         items: [],
         message:
-          'Configure and enable an active catalog provider to populate this hybrid rail.',
+          'Configure the catalog provider for this Stasharr instance to populate this hybrid rail.',
       };
     }
 
@@ -1129,7 +1129,7 @@ export class HomeService {
     apiKey?: string | null;
   }> {
     const catalogProvider =
-      await this.catalogProviderService.getActiveCatalogProvider();
+      await this.catalogProviderService.getConfiguredCatalogProvider();
 
     return {
       baseUrl: catalogProvider.baseUrl,

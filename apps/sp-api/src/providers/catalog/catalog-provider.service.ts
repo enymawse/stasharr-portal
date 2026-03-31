@@ -1,16 +1,15 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { IntegrationConfig, IntegrationStatus, IntegrationType } from '@prisma/client';
+import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../../integrations/integrations.service';
 import {
-  CATALOG_PROVIDER_KEYS,
   type CatalogProviderIntegrationType,
   type CatalogProviderKey,
   catalogProviderKeyFromIntegrationType,
+  configuredCatalogProviderTypeFromIntegrations,
   getCatalogProviderLabel,
-  isCatalogProviderIntegrationType,
 } from './catalog-provider.util';
 
-export interface ActiveCatalogProvider {
+export interface ConfiguredCatalogProvider {
   integrationType: CatalogProviderIntegrationType;
   providerKey: CatalogProviderKey;
   label: string;
@@ -22,49 +21,20 @@ export interface ActiveCatalogProvider {
 export class CatalogProviderService {
   constructor(private readonly integrationsService: IntegrationsService) {}
 
-  async getSelectedCatalogProviderType(): Promise<CatalogProviderIntegrationType | null> {
+  async getConfiguredCatalogProviderType(): Promise<CatalogProviderIntegrationType | null> {
     const integrations = await this.integrationsService.findAll();
-    const integrationsByType = new Map(
-      integrations.map((integration) => [integration.type, integration]),
-    );
-
-    const configuredProvider = this.findCatalogProviderType(
-      integrationsByType,
-      (integration) =>
-        integration.enabled &&
-        integration.status === IntegrationStatus.CONFIGURED &&
-        !!integration.baseUrl?.trim(),
-    );
-    if (configuredProvider) {
-      return configuredProvider;
-    }
-
-    return this.findCatalogProviderType(
-      integrationsByType,
-      (integration) => integration.enabled,
+    return configuredCatalogProviderTypeFromIntegrations(
+      integrations.map((integration) => ({
+        type: integration.type,
+        enabled: integration.enabled,
+        status: integration.status,
+        baseUrl: integration.baseUrl,
+      })),
     );
   }
 
-  private findCatalogProviderType(
-    integrationsByType: Map<IntegrationType, IntegrationConfig>,
-    predicate: (integration: IntegrationConfig) => boolean,
-  ): CatalogProviderIntegrationType | null {
-    for (const providerType of CATALOG_PROVIDER_KEYS) {
-      const integration = integrationsByType.get(providerType as IntegrationType);
-      if (
-        isCatalogProviderIntegrationType(providerType) &&
-        integration &&
-        predicate(integration)
-      ) {
-        return providerType;
-      }
-    }
-
-    return null;
-  }
-
-  async getActiveCatalogProviderOrNull(): Promise<ActiveCatalogProvider | null> {
-    const selectedType = await this.getSelectedCatalogProviderType();
+  async getConfiguredCatalogProviderOrNull(): Promise<ConfiguredCatalogProvider | null> {
+    const selectedType = await this.getConfiguredCatalogProviderType();
     if (!selectedType) {
       return null;
     }
@@ -74,10 +44,7 @@ export class CatalogProviderService {
         selectedType as IntegrationType,
       );
 
-      if (
-        !integration.enabled ||
-        integration.status !== IntegrationStatus.CONFIGURED
-      ) {
+      if (integration.status !== IntegrationStatus.CONFIGURED) {
         return null;
       }
 
@@ -98,10 +65,12 @@ export class CatalogProviderService {
     }
   }
 
-  async getActiveCatalogProvider(): Promise<ActiveCatalogProvider> {
-    const selectedType = await this.getSelectedCatalogProviderType();
+  async getConfiguredCatalogProvider(): Promise<ConfiguredCatalogProvider> {
+    const selectedType = await this.getConfiguredCatalogProviderType();
     if (!selectedType) {
-      throw new ConflictException('No active catalog provider is enabled.');
+      throw new ConflictException(
+        'No catalog provider is configured for this Stasharr instance.',
+      );
     }
 
     const integration = await this.integrationsService.findOne(
@@ -109,17 +78,15 @@ export class CatalogProviderService {
     );
     const label = getCatalogProviderLabel(selectedType);
 
-    if (!integration.enabled) {
-      throw new ConflictException(`No active catalog provider is enabled.`);
-    }
-
     if (integration.status !== IntegrationStatus.CONFIGURED) {
-      throw new ConflictException(`${label} integration is not configured.`);
+      throw new ConflictException(`${label} catalog provider is not configured.`);
     }
 
     const baseUrl = integration.baseUrl?.trim();
     if (!baseUrl) {
-      throw new BadRequestException(`${label} integration is missing a base URL.`);
+      throw new BadRequestException(
+        `${label} catalog provider is missing a base URL.`,
+      );
     }
 
     return {

@@ -5,7 +5,7 @@ import { PerformersService } from './performers.service';
 
 describe('PerformersService', () => {
   const catalogProviderService = {
-    getActiveCatalogProvider: jest.fn(),
+    getConfiguredCatalogProvider: jest.fn(),
   } as unknown as CatalogProviderService;
 
   const stashdbAdapter = {
@@ -38,7 +38,7 @@ describe('PerformersService', () => {
       sceneStatusService,
     );
 
-    catalogProviderService.getActiveCatalogProvider = jest
+    catalogProviderService.getConfiguredCatalogProvider = jest
       .fn()
       .mockResolvedValue(stashdbIntegration);
 
@@ -282,7 +282,7 @@ describe('PerformersService', () => {
   });
 
   it('uses the active FANSDB provider for performer scenes', async () => {
-    catalogProviderService.getActiveCatalogProvider = jest
+    catalogProviderService.getConfiguredCatalogProvider = jest
       .fn()
       .mockResolvedValue({
         integrationType: 'FANSDB',

@@ -104,32 +104,52 @@ describe('SettingsPageComponent', () => {
     return { fixture, component: fixture.componentInstance as any };
   }
 
-  it('does not mark an unconfigured FansDB tab as active when StashDB is configured', async () => {
+  it('shows only the configured catalog provider tab and reset guidance after setup', async () => {
     const { component } = await renderPage([
       buildIntegration({ type: 'STASH' }),
       buildIntegration({ type: 'WHISPARR' }),
-      buildIntegration({ type: 'STASHDB', enabled: true, baseUrl: 'http://stashdb.local/graphql' }),
+      buildIntegration({
+        type: 'STASHDB',
+        enabled: true,
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
+      buildIntegration({
+        type: 'FANSDB',
+        enabled: false,
+        baseUrl: 'http://fansdb.local/graphql',
+      }),
     ]);
 
-    expect(component.forms['FANSDB'].controls.enabled.value).toBe(false);
-    expect(component.isActiveCatalogProvider('STASHDB')).toBe(true);
-    expect(component.isActiveCatalogProvider('FANSDB')).toBe(false);
-    expect(component.catalogProviderHelp('FANSDB')).toBe(
-      'Configure FansDB, enable it, and save to make it the active discovery source.',
+    expect(component.serviceTabs()).toEqual(['STASH', 'WHISPARR', 'STASHDB']);
+    expect(component.catalogProviderSummary()).toBe(
+      'This Stasharr instance is configured for StashDB. To use a different catalog provider, reset catalog setup and re-run setup.',
     );
+    expect(component.catalogProviderHelp('STASHDB')).toBe(
+      'StashDB is the catalog provider configured for this Stasharr instance. Reset catalog setup before changing provider type.',
+    );
+    expect(component.showEnabledToggle('STASHDB')).toBe(false);
   });
 
-  it('tells the user to finish configuring FansDB when they enable it before saving', async () => {
+  it('hides catalog tabs when no provider is configured and points the user back to setup', async () => {
     const { component } = await renderPage([
       buildIntegration({ type: 'STASH' }),
       buildIntegration({ type: 'WHISPARR' }),
-      buildIntegration({ type: 'STASHDB', enabled: true, baseUrl: 'http://stashdb.local/graphql' }),
+      buildIntegration({
+        type: 'STASHDB',
+        status: 'NOT_CONFIGURED',
+        baseUrl: null,
+      }),
+      buildIntegration({
+        type: 'FANSDB',
+        status: 'NOT_CONFIGURED',
+        baseUrl: null,
+      }),
     ]);
 
-    component.forms['FANSDB'].controls.enabled.setValue(true);
-
-    expect(component.catalogProviderHelp('FANSDB')).toBe(
-      'Finish configuring FansDB and save to make it the active discovery source.',
+    expect(component.serviceTabs()).toEqual(['STASH', 'WHISPARR']);
+    expect(component.configuredCatalogProviderLabel()).toBeNull();
+    expect(component.catalogProviderSummary()).toBe(
+      'No catalog provider is configured right now. Return to setup to choose StashDB or FansDB for this instance.',
     );
   });
 });

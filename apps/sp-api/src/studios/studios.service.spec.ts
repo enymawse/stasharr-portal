@@ -5,7 +5,7 @@ import { StudiosService } from './studios.service';
 
 describe('StudiosService', () => {
   const catalogProviderService = {
-    getActiveCatalogProvider: jest.fn(),
+    getConfiguredCatalogProvider: jest.fn(),
   } as unknown as CatalogProviderService;
 
   const stashdbAdapter = {
@@ -27,7 +27,7 @@ describe('StudiosService', () => {
     jest.clearAllMocks();
     service = new StudiosService(catalogProviderService, stashdbAdapter);
 
-    catalogProviderService.getActiveCatalogProvider = jest
+    catalogProviderService.getConfiguredCatalogProvider = jest
       .fn()
       .mockResolvedValue(stashdbIntegration);
 
@@ -160,7 +160,7 @@ describe('StudiosService', () => {
   });
 
   it('uses the active FANSDB provider for studio discovery', async () => {
-    catalogProviderService.getActiveCatalogProvider = jest
+    catalogProviderService.getConfiguredCatalogProvider = jest
       .fn()
       .mockResolvedValue({
         integrationType: 'FANSDB',

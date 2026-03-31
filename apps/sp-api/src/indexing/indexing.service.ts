@@ -2573,7 +2573,7 @@ export class IndexingService {
 
   private async getActiveCatalogProviderKey(): Promise<CatalogProviderKey | null> {
     const catalogProvider =
-      await this.catalogProviderService.getActiveCatalogProviderOrNull();
+      await this.catalogProviderService.getConfiguredCatalogProviderOrNull();
     return catalogProvider?.providerKey ?? null;
   }
 
@@ -2582,7 +2582,7 @@ export class IndexingService {
     apiKey: string | null;
   } | null> {
     const catalogProvider =
-      await this.catalogProviderService.getActiveCatalogProviderOrNull();
+      await this.catalogProviderService.getConfiguredCatalogProviderOrNull();
     if (!catalogProvider) {
       return null;
     }

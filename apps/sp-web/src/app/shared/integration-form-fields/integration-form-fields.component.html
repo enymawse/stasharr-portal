@@ -22,8 +22,10 @@
     />
   }
 
-  <label class="toggle-row">
-    <p-toggleswitch [inputId]="enabledInputId" formControlName="enabled" />
-    <span>Enabled</span>
-  </label>
+  @if (showEnabledToggle) {
+    <label class="toggle-row">
+      <p-toggleswitch [inputId]="enabledInputId" formControlName="enabled" />
+      <span>Enabled</span>
+    </label>
+  }
 </div>

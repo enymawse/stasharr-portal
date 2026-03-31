@@ -748,7 +748,7 @@ export class SceneStatusService {
 
   private async getActiveCatalogProviderKey(): Promise<CatalogProviderKey | null> {
     const catalogProvider =
-      await this.catalogProviderService.getActiveCatalogProviderOrNull();
+      await this.catalogProviderService.getConfiguredCatalogProviderOrNull();
     return catalogProvider?.providerKey ?? null;
   }
 

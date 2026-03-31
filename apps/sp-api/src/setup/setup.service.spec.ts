@@ -14,7 +14,7 @@ describe('SetupService', () => {
     service = new SetupService(integrationsService);
   });
 
-  it('reports setup complete when stash, whisparr, and an active catalog provider are configured', async () => {
+  it('reports setup complete when stash, whisparr, and a configured catalog provider are present', async () => {
     integrationsService.findAll = jest.fn().mockResolvedValue([
       {
         type: IntegrationType.STASH,
@@ -28,14 +28,9 @@ describe('SetupService', () => {
       },
       {
         type: IntegrationType.FANSDB,
-        enabled: true,
-        status: IntegrationStatus.CONFIGURED,
-        baseUrl: 'http://fansdb.local/graphql',
-      },
-      {
-        type: IntegrationType.STASHDB,
         enabled: false,
         status: IntegrationStatus.CONFIGURED,
+        baseUrl: 'http://fansdb.local/graphql',
       },
     ]);
 
@@ -46,54 +41,11 @@ describe('SetupService', () => {
         catalog: true,
         whisparr: true,
       },
-      activeCatalogProvider: 'FANSDB',
-      catalogProviders: {
-        STASHDB: true,
-        FANSDB: true,
-      },
+      catalogProvider: 'FANSDB',
     });
   });
 
-  it('reports catalog setup incomplete when no active catalog provider is enabled', async () => {
-    integrationsService.findAll = jest.fn().mockResolvedValue([
-      {
-        type: IntegrationType.STASH,
-        enabled: true,
-        status: IntegrationStatus.CONFIGURED,
-      },
-      {
-        type: IntegrationType.WHISPARR,
-        enabled: true,
-        status: IntegrationStatus.CONFIGURED,
-      },
-      {
-        type: IntegrationType.STASHDB,
-        enabled: false,
-        status: IntegrationStatus.CONFIGURED,
-      },
-      {
-        type: IntegrationType.FANSDB,
-        enabled: false,
-        status: IntegrationStatus.NOT_CONFIGURED,
-      },
-    ]);
-
-    await expect(service.getStatus()).resolves.toEqual({
-      setupComplete: false,
-      required: {
-        stash: true,
-        catalog: false,
-        whisparr: true,
-      },
-      activeCatalogProvider: null,
-      catalogProviders: {
-        STASHDB: true,
-        FANSDB: false,
-      },
-    });
-  });
-
-  it('prefers a configured active catalog provider over an earlier enabled but incomplete one', async () => {
+  it('reports catalog setup incomplete when no catalog provider is configured', async () => {
     integrationsService.findAll = jest.fn().mockResolvedValue([
       {
         type: IntegrationType.STASH,
@@ -114,6 +66,43 @@ describe('SetupService', () => {
       {
         type: IntegrationType.FANSDB,
         enabled: true,
+        status: IntegrationStatus.NOT_CONFIGURED,
+        baseUrl: null,
+      },
+    ]);
+
+    await expect(service.getStatus()).resolves.toEqual({
+      setupComplete: false,
+      required: {
+        stash: true,
+        catalog: false,
+        whisparr: true,
+      },
+      catalogProvider: null,
+    });
+  });
+
+  it('prefers the enabled configured provider when legacy data still has both catalogs saved', async () => {
+    integrationsService.findAll = jest.fn().mockResolvedValue([
+      {
+        type: IntegrationType.STASH,
+        enabled: true,
+        status: IntegrationStatus.CONFIGURED,
+      },
+      {
+        type: IntegrationType.WHISPARR,
+        enabled: true,
+        status: IntegrationStatus.CONFIGURED,
+      },
+      {
+        type: IntegrationType.STASHDB,
+        enabled: false,
+        status: IntegrationStatus.CONFIGURED,
+        baseUrl: 'http://stashdb.local/graphql',
+      },
+      {
+        type: IntegrationType.FANSDB,
+        enabled: true,
         status: IntegrationStatus.CONFIGURED,
         baseUrl: 'http://fansdb.local/graphql',
       },
@@ -126,11 +115,7 @@ describe('SetupService', () => {
         catalog: true,
         whisparr: true,
       },
-      activeCatalogProvider: 'FANSDB',
-      catalogProviders: {
-        STASHDB: false,
-        FANSDB: true,
-      },
+      catalogProvider: 'FANSDB',
     });
   });
 });

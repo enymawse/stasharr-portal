@@ -14,7 +14,7 @@ import { RequestsService } from './requests.service';
 
 describe('RequestsService', () => {
   const findOneMock = jest.fn();
-  const getActiveCatalogProviderMock = jest.fn();
+  const getConfiguredCatalogProviderMock = jest.fn();
   const findMovieByStashIdMock = jest.fn();
   const getRootFoldersMock = jest.fn();
   const getQualityProfilesMock = jest.fn();
@@ -34,7 +34,7 @@ describe('RequestsService', () => {
     findOne: findOneMock,
   } as unknown as IntegrationsService;
   const catalogProviderService = {
-    getActiveCatalogProvider: getActiveCatalogProviderMock,
+    getConfiguredCatalogProvider: getConfiguredCatalogProviderMock,
   } as unknown as CatalogProviderService;
 
   const whisparrAdapter = {
@@ -91,7 +91,7 @@ describe('RequestsService', () => {
 
       throw new Error('Unexpected integration type');
     });
-    getActiveCatalogProviderMock.mockResolvedValue(configuredStashdbIntegration);
+    getConfiguredCatalogProviderMock.mockResolvedValue(configuredStashdbIntegration);
 
     getSceneByIdMock.mockImplementation((stashId: string) =>
       Promise.resolve({
@@ -300,7 +300,7 @@ describe('RequestsService', () => {
   });
 
   it('throws when STASHDB integration has no baseUrl', async () => {
-    getActiveCatalogProviderMock.mockRejectedValue(
+    getConfiguredCatalogProviderMock.mockRejectedValue(
       new BadRequestException('StashDB integration is missing a base URL.'),
     );
 
@@ -315,7 +315,7 @@ describe('RequestsService', () => {
     ]);
     getQualityProfilesMock.mockResolvedValue([{ id: 10, name: 'Default' }]);
     getTagsMock.mockResolvedValue([]);
-    getActiveCatalogProviderMock.mockResolvedValue({
+    getConfiguredCatalogProviderMock.mockResolvedValue({
       integrationType: 'FANSDB',
       providerKey: 'FANSDB',
       label: 'FansDB',

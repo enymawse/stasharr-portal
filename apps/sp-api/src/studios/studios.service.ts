@@ -92,7 +92,7 @@ export class StudiosService {
     apiKey: string | null;
   }> {
     const catalogProvider =
-      await this.catalogProviderService.getActiveCatalogProvider();
+      await this.catalogProviderService.getConfiguredCatalogProvider();
 
     return {
       baseUrl: catalogProvider.baseUrl,
