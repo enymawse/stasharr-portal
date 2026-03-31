@@ -7,5 +7,6 @@ import { LibraryService } from './library.service';
   imports: [PrismaModule],
   controllers: [LibraryController],
   providers: [LibraryService],
+  exports: [LibraryService],
 })
 export class LibraryModule {}

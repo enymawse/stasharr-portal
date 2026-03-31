@@ -114,7 +114,7 @@ describe('HomePageComponent', () => {
           studioIds: ['studio-2'],
           studioNames: ['Archive'],
           favoritePerformersOnly: true,
-          favoriteStudiosOnly: false,
+          favoriteStudiosOnly: true,
           favoriteTagsOnly: true,
           limit: 16,
         },
@@ -255,8 +255,11 @@ describe('HomePageComponent', () => {
     expect(discoveryLink?.getAttribute('href')).toContain('studios=studio-1');
 
     expect(libraryLink?.getAttribute('href')).toContain('/library');
+    expect(libraryLink?.getAttribute('href')).toContain('sort=CREATED_AT');
+    expect(libraryLink?.getAttribute('href')).toContain('dir=DESC');
     expect(libraryLink?.getAttribute('href')).toContain('query=archive');
     expect(libraryLink?.getAttribute('href')).toContain('favoritePerformersOnly=1');
+    expect(libraryLink?.getAttribute('href')).toContain('favoriteStudiosOnly=1');
     expect(libraryLink?.getAttribute('href')).toContain('favoriteTagsOnly=1');
     expect(libraryLink?.getAttribute('href')).toContain('tags=tag-2');
     expect(libraryLink?.getAttribute('href')).toContain('studios=studio-2');

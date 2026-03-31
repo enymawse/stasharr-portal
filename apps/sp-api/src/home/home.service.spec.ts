@@ -5,6 +5,7 @@ import {
   HomeRailKind,
   HomeRailSource,
 } from '@prisma/client';
+import { LibraryService } from '../library/library.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SceneStatusService } from '../scene-status/scene-status.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
@@ -95,6 +96,9 @@ describe('HomeService', () => {
   const findUniqueMock = jest.fn();
   const deleteMock = jest.fn();
   const integrationFindUniqueMock = jest.fn();
+  const libraryGetScenesFeedMock = jest.fn();
+  const librarySearchTagsMock = jest.fn();
+  const librarySearchStudiosMock = jest.fn();
   const stashGetLocalSceneFeedMock = jest.fn();
   const stashSearchTagsMock = jest.fn();
   const stashSearchStudiosMock = jest.fn();
@@ -117,6 +121,12 @@ describe('HomeService', () => {
     },
     $transaction: transactionMock,
   } as unknown as PrismaService;
+
+  const libraryService = {
+    getScenesFeed: libraryGetScenesFeedMock,
+    searchTags: librarySearchTagsMock,
+    searchStudios: librarySearchStudiosMock,
+  } as unknown as LibraryService;
 
   const stashAdapter = {
     getLocalSceneFeed: stashGetLocalSceneFeedMock,
@@ -141,12 +151,20 @@ describe('HomeService', () => {
     transactionMock.mockImplementation((operations: Array<Promise<unknown>>) =>
       Promise.all(operations),
     );
+    libraryGetScenesFeedMock.mockResolvedValue({
+      total: 0,
+      page: 1,
+      perPage: 16,
+      hasMore: false,
+      items: [],
+    });
+    librarySearchTagsMock.mockResolvedValue([]);
+    librarySearchStudiosMock.mockResolvedValue([]);
     sceneStatusResolveForScenesMock.mockResolvedValue(new Map());
     hybridScenesService = new HybridScenesService(stashAdapter, stashdbAdapter);
     service = new HomeService(
       prismaService,
-      stashAdapter,
-      stashdbAdapter,
+      libraryService,
       sceneStatusService,
       hybridScenesService,
     );
@@ -914,7 +932,7 @@ describe('HomeService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('returns stash-backed rail items for the recently added library built-in', async () => {
+  it('returns projection-backed rail items for the recently added library built-in', async () => {
     upsertMock.mockResolvedValue({});
     findUniqueMock.mockResolvedValue(
       buildStashRail({
@@ -938,25 +956,21 @@ describe('HomeService', () => {
         },
       }),
     );
-    integrationFindUniqueMock.mockResolvedValue({
-      type: 'STASH',
-      enabled: true,
-      status: 'CONFIGURED',
-      baseUrl: 'http://stash.local',
-      apiKey: 'secret',
-    });
-    stashGetLocalSceneFeedMock.mockResolvedValue({
+    libraryGetScenesFeedMock.mockResolvedValue({
       total: 1,
+      page: 1,
+      perPage: 12,
+      hasMore: false,
       items: [
         {
           id: '411',
           title: 'Fresh Library Scene',
           description: null,
-          imageUrl: 'http://stash.local/images/411.jpg',
-          cardImageUrl: 'http://stash.local/images/411.jpg',
+          imageUrl: '/api/media/stash/scenes/411/screenshot',
+          cardImageUrl: '/api/media/stash/scenes/411/screenshot',
           studioId: 'studio-1',
           studio: 'Archive',
-          studioImageUrl: 'http://stash.local/studios/archive.jpg',
+          studioImageUrl: '/api/media/stash/studios/studio-1/logo',
           releaseDate: '2026-03-24',
           duration: 1800,
           viewUrl: 'http://stash.local/scenes/411',
@@ -966,28 +980,21 @@ describe('HomeService', () => {
 
     const result = await service.getRailContent('built-in-3');
 
-    expect(integrationFindUniqueMock).toHaveBeenCalledWith({
-      where: { type: 'STASH' },
-    });
-    expect(stashGetLocalSceneFeedMock).toHaveBeenCalledWith(
-      {
-        baseUrl: 'http://stash.local',
-        apiKey: 'secret',
-      },
-      {
-        page: 1,
-        perPage: 12,
-        sort: 'CREATED_AT',
-        direction: 'DESC',
-        titleQuery: null,
-        tagIds: [],
-        tagMode: null,
-        studioIds: [],
-        favoritePerformersOnly: false,
-        favoriteStudiosOnly: false,
-        favoriteTagsOnly: false,
-      },
+    expect(libraryGetScenesFeedMock).toHaveBeenCalledWith(
+      1,
+      12,
+      'CREATED_AT',
+      'DESC',
+      undefined,
+      [],
+      undefined,
+      [],
+      false,
+      false,
+      false,
     );
+    expect(integrationFindUniqueMock).not.toHaveBeenCalled();
+    expect(stashGetLocalSceneFeedMock).not.toHaveBeenCalled();
     expect(result).toEqual({
       items: [
         expect.objectContaining({
@@ -1005,7 +1012,7 @@ describe('HomeService', () => {
     });
   });
 
-  it('returns a helpful message when stash is not configured for the built-in rail', async () => {
+  it('loads the built-in library rail without requiring live stash integration', async () => {
     upsertMock.mockResolvedValue({});
     findUniqueMock.mockResolvedValue(
       buildStashRail({
@@ -1014,13 +1021,61 @@ describe('HomeService', () => {
         kind: HomeRailKind.BUILTIN,
       }),
     );
-    integrationFindUniqueMock.mockResolvedValue(null);
+    libraryGetScenesFeedMock.mockResolvedValue({
+      total: 1,
+      page: 1,
+      perPage: 16,
+      hasMore: false,
+      items: [
+        {
+          id: '512',
+          title: 'Indexed Library Scene',
+          description: 'Served from the projection.',
+          imageUrl: '/api/media/stash/scenes/512/screenshot',
+          cardImageUrl: '/api/media/stash/scenes/512/screenshot',
+          studioId: 'studio-9',
+          studio: 'Signal',
+          studioImageUrl: '/api/media/stash/studios/studio-9/logo',
+          releaseDate: '2026-03-25',
+          duration: 900,
+          type: 'SCENE',
+          source: 'STASH',
+          viewUrl: 'http://stash.local/scenes/512',
+          linkedStashId: null,
+        },
+      ],
+    });
+
+    await expect(service.getRailContent('built-in-3')).resolves.toEqual({
+      items: [
+        expect.objectContaining({
+          id: '512',
+          viewUrl: 'http://stash.local/scenes/512',
+          status: { state: 'AVAILABLE' },
+        }),
+      ],
+      message: null,
+    });
+    expect(integrationFindUniqueMock).not.toHaveBeenCalled();
+    expect(stashGetLocalSceneFeedMock).not.toHaveBeenCalled();
+  });
+
+  it('returns a helpful message when the indexed library query fails for a stash rail', async () => {
+    upsertMock.mockResolvedValue({});
+    findUniqueMock.mockResolvedValue(
+      buildStashRail({
+        id: 'built-in-3',
+        key: HomeRailKey.RECENTLY_ADDED_LIBRARY,
+        kind: HomeRailKind.BUILTIN,
+      }),
+    );
+    libraryGetScenesFeedMock.mockRejectedValue(new Error('projection timeout'));
 
     await expect(service.getRailContent('built-in-3')).resolves.toEqual({
       items: [],
-      message:
-        'Configure and enable your Stash integration to populate this rail.',
+      message: 'Unable to load indexed local-library scenes right now.',
     });
+    expect(integrationFindUniqueMock).not.toHaveBeenCalled();
     expect(stashGetLocalSceneFeedMock).not.toHaveBeenCalled();
   });
 
@@ -1048,15 +1103,11 @@ describe('HomeService', () => {
         },
       }),
     );
-    integrationFindUniqueMock.mockResolvedValue({
-      type: 'STASH',
-      enabled: true,
-      status: 'CONFIGURED',
-      baseUrl: 'http://stash.local',
-      apiKey: 'secret',
-    });
-    stashGetLocalSceneFeedMock.mockResolvedValue({
+    libraryGetScenesFeedMock.mockResolvedValue({
       total: 0,
+      page: 1,
+      perPage: 9,
+      hasMore: false,
       items: [],
     });
 
@@ -1064,25 +1115,21 @@ describe('HomeService', () => {
       items: [],
       message: null,
     });
-    expect(stashGetLocalSceneFeedMock).toHaveBeenCalledWith(
-      {
-        baseUrl: 'http://stash.local',
-        apiKey: 'secret',
-      },
-      {
-        page: 1,
-        perPage: 9,
-        sort: 'UPDATED_AT',
-        direction: 'DESC',
-        titleQuery: 'anthology',
-        tagIds: ['tag-1'],
-        tagMode: 'AND',
-        studioIds: ['studio-5'],
-        favoritePerformersOnly: true,
-        favoriteStudiosOnly: true,
-        favoriteTagsOnly: true,
-      },
+    expect(libraryGetScenesFeedMock).toHaveBeenCalledWith(
+      1,
+      9,
+      'UPDATED_AT',
+      'DESC',
+      'anthology',
+      ['tag-1'],
+      'AND',
+      ['studio-5'],
+      true,
+      true,
+      true,
     );
+    expect(integrationFindUniqueMock).not.toHaveBeenCalled();
+    expect(stashGetLocalSceneFeedMock).not.toHaveBeenCalled();
   });
 
   it('loads hybrid content by discovering on StashDB and matching in-library scenes in Stash', async () => {
@@ -1205,6 +1252,7 @@ describe('HomeService', () => {
         favoritePerformersOnly: true,
         favoriteStudiosOnly: false,
         favoriteTagsOnly: true,
+        providerKey: 'STASHDB',
       },
     );
     expect(sceneStatusResolveForScenesMock).not.toHaveBeenCalled();
@@ -1344,6 +1392,7 @@ describe('HomeService', () => {
         favoritePerformersOnly: false,
         favoriteStudiosOnly: false,
         favoriteTagsOnly: false,
+        providerKey: 'STASHDB',
       },
     );
     expect(stashFindScenesByStashIdMock).toHaveBeenCalledWith(
@@ -1356,6 +1405,7 @@ describe('HomeService', () => {
         favoritePerformersOnly: false,
         favoriteStudiosOnly: false,
         favoriteTagsOnly: false,
+        providerKey: 'STASHDB',
       },
     );
     expect(sceneStatusResolveForScenesMock).toHaveBeenCalledWith([
@@ -1415,17 +1465,10 @@ describe('HomeService', () => {
     });
   });
 
-  it('searches stash-local tags and studios through dedicated Home endpoints', async () => {
-    integrationFindUniqueMock.mockResolvedValue({
-      type: 'STASH',
-      enabled: true,
-      status: 'CONFIGURED',
-      baseUrl: 'http://stash.local',
-      apiKey: 'secret',
-    });
-    stashSearchTagsMock.mockResolvedValue([{ id: 'tag-1', name: 'Archive' }]);
-    stashSearchStudiosMock.mockResolvedValue([
-      { id: 'studio-1', name: 'Pulse', childStudios: [] },
+  it('searches indexed library tags and studios through the Home stash endpoints', async () => {
+    librarySearchTagsMock.mockResolvedValue([{ id: 'tag-1', name: 'Archive' }]);
+    librarySearchStudiosMock.mockResolvedValue([
+      { id: 'studio-1', name: 'Pulse' },
     ]);
 
     await expect(service.searchStashTags('archive')).resolves.toEqual([
@@ -1434,5 +1477,8 @@ describe('HomeService', () => {
     await expect(service.searchStashStudios('pulse')).resolves.toEqual([
       { id: 'studio-1', name: 'Pulse', childStudios: [] },
     ]);
+    expect(integrationFindUniqueMock).not.toHaveBeenCalled();
+    expect(stashSearchTagsMock).not.toHaveBeenCalled();
+    expect(stashSearchStudiosMock).not.toHaveBeenCalled();
   });
 });

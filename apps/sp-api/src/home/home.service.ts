@@ -13,16 +13,10 @@ import {
   HomeRailSource,
   Prisma,
 } from '@prisma/client';
+import { LibrarySceneFeedItemDto } from '../library/dto/library-scenes-feed.dto';
+import { LibraryService } from '../library/library.service';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  StashAdapter,
-  type StashLocalSceneFeedItem,
-  type StashLocalTagOption,
-} from '../providers/stash/stash.adapter';
-import {
-  StashdbAdapter,
-  type StashdbScene,
-} from '../providers/stashdb/stashdb.adapter';
+import { type StashdbScene } from '../providers/stashdb/stashdb.adapter';
 import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import { PerformerStudioOptionDto } from '../performers/dto/performer-studio-option.dto';
 import { SceneTagOptionDto } from '../scenes/dto/scene-tag-option.dto';
@@ -116,7 +110,7 @@ const DEFAULT_HOME_RAILS: Array<{
     key: HomeRailKey.RECENTLY_ADDED_LIBRARY,
     title: 'Recently Added to Library',
     subtitle:
-      'Fresh local-library scenes pulled from your configured Stash instance.',
+      'Fresh scenes from the indexed local-library projection.',
     enabled: true,
     sortOrder: 2,
     source: HomeRailSource.STASH,
@@ -144,8 +138,7 @@ export class HomeService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly stashAdapter: StashAdapter,
-    private readonly stashdbAdapter: StashdbAdapter,
+    private readonly libraryService: LibraryService,
     private readonly sceneStatusService: SceneStatusService,
     private readonly hybridScenesService: HybridScenesService,
   ) {}
@@ -267,9 +260,13 @@ export class HomeService {
       return [];
     }
 
-    const config = await this.getRequiredStashConfig();
-    const tags = await this.stashAdapter.searchTags(normalizedQuery, config);
-    return tags.map((tag) => this.toTagOptionDto(tag));
+    const tags = await this.libraryService.searchTags(normalizedQuery);
+    return tags.map((tag) => ({
+      id: tag.id,
+      name: tag.name,
+      description: null,
+      aliases: [],
+    }));
   }
 
   async searchStashStudios(
@@ -280,8 +277,11 @@ export class HomeService {
       return [];
     }
 
-    const config = await this.getRequiredStashConfig();
-    return this.stashAdapter.searchStudios(normalizedQuery, config);
+    const studios = await this.libraryService.searchStudios(normalizedQuery);
+    return studios.map((studio) => ({
+      ...studio,
+      childStudios: [],
+    }));
   }
 
   private async ensureDefaultRails(): Promise<void> {
@@ -314,23 +314,6 @@ export class HomeService {
   private async getStashRailContent(
     rail: HomeRail,
   ): Promise<HomeRailContentDto> {
-    const integration = await this.prisma.integrationConfig.findUnique({
-      where: { type: 'STASH' },
-    });
-    const baseUrl = integration?.baseUrl?.trim();
-    if (
-      !integration ||
-      !integration.enabled ||
-      integration.status !== 'CONFIGURED' ||
-      !baseUrl
-    ) {
-      return {
-        items: [],
-        message:
-          'Configure and enable your Stash integration to populate this rail.',
-      };
-    }
-
     const config = this.normalizeSceneRailConfig(
       rail.source,
       rail.config,
@@ -339,37 +322,31 @@ export class HomeService {
     ) as HomeRailStashSceneConfigDto;
 
     try {
-      const feed = await this.stashAdapter.getLocalSceneFeed(
-        {
-          baseUrl,
-          apiKey: integration.apiKey,
-        },
-        {
-          page: 1,
-          perPage: config.limit,
-          sort: this.toStashFeedSort(config.sort),
-          direction: config.direction,
-          titleQuery: config.titleQuery,
-          tagIds: config.tagIds,
-          tagMode: config.tagMode,
-          studioIds: config.studioIds,
-          favoritePerformersOnly: config.favoritePerformersOnly,
-          favoriteStudiosOnly: config.favoriteStudiosOnly,
-          favoriteTagsOnly: config.favoriteTagsOnly,
-        },
+      const feed = await this.libraryService.getScenesFeed(
+        1,
+        config.limit,
+        config.sort,
+        config.direction,
+        config.titleQuery ?? undefined,
+        config.tagIds,
+        config.tagIds.length > 0 ? (config.tagMode ?? 'OR') : undefined,
+        config.studioIds,
+        config.favoritePerformersOnly,
+        config.favoriteStudiosOnly,
+        config.favoriteTagsOnly,
       );
 
       return {
-        items: feed.items.map((item) => this.toStashRailItem(item)),
+        items: feed.items.map((item) => this.toLocalLibraryRailItem(item)),
         message: null,
       };
     } catch (error) {
       this.logger.warn(
-        `Failed to load Stash Home rail ${rail.id}. ${(error as Error)?.message ?? 'Unknown error.'}`,
+        `Failed to load indexed Home library rail ${rail.id}. ${(error as Error)?.message ?? 'Unknown error.'}`,
       );
       return {
         items: [],
-        message: 'Unable to load scenes from your Stash library right now.',
+        message: 'Unable to load indexed local-library scenes right now.',
       };
     }
   }
@@ -541,24 +518,18 @@ export class HomeService {
     };
   }
 
-  private toStashRailItem(item: StashLocalSceneFeedItem): HomeRailItemDto {
-    const sceneScreenshotUrl = item.imageUrl
-      ? this.buildStashSceneScreenshotProxyUrl(item.id)
-      : null;
-    const studioLogoUrl =
-      item.studioImageUrl && item.studioId
-        ? this.buildStashStudioLogoProxyUrl(item.studioId)
-        : null;
-
+  private toLocalLibraryRailItem(
+    item: LibrarySceneFeedItemDto,
+  ): HomeRailItemDto {
     return {
       id: item.id,
       title: item.title,
       description: item.description,
-      imageUrl: sceneScreenshotUrl,
-      cardImageUrl: sceneScreenshotUrl,
+      imageUrl: item.imageUrl,
+      cardImageUrl: item.cardImageUrl,
       studioId: item.studioId,
       studio: item.studio,
-      studioImageUrl: studioLogoUrl,
+      studioImageUrl: item.studioImageUrl,
       releaseDate: item.releaseDate,
       duration: item.duration,
       type: 'SCENE',
@@ -598,29 +569,6 @@ export class HomeService {
         isSceneStatusRequestable(effectiveStatus),
       viewUrl: null,
     };
-  }
-
-  private buildStashSceneScreenshotProxyUrl(sceneId: string): string {
-    return `/api/media/stash/scenes/${encodeURIComponent(sceneId)}/screenshot`;
-  }
-
-  private buildStashStudioLogoProxyUrl(studioId: string): string {
-    return `/api/media/stash/studios/${encodeURIComponent(studioId)}/logo`;
-  }
-
-  private toStashFeedSort(
-    sort: HomeRailStashSceneConfigDto['sort'],
-  ): 'CREATED_AT' | 'UPDATED_AT' | 'TITLE' {
-    switch (sort) {
-      case 'TITLE':
-        return 'TITLE';
-      case 'UPDATED_AT':
-        return 'UPDATED_AT';
-      case 'CREATED_AT':
-        return 'CREATED_AT';
-      default:
-        return 'CREATED_AT';
-    }
   }
 
   private normalizeSceneRailConfig(
@@ -1142,15 +1090,6 @@ export class HomeService {
     return value !== null && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
-  }
-
-  private toTagOptionDto(tag: StashLocalTagOption): SceneTagOptionDto {
-    return {
-      id: tag.id,
-      name: tag.name,
-      description: null,
-      aliases: [],
-    };
   }
 
   private async getRequiredStashConfig(): Promise<{
