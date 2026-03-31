@@ -87,7 +87,9 @@ model SceneIndexSummary {
 
 model LibrarySceneIndex {
   stashSceneId         String    @id
+  /// Active discovery-provider catalog id derived during projection sync.
   linkedStashId        String?
+  /// Provider-qualified external refs preserved from local Stash stash_ids.
   linkedCatalogRefs    String[]  @default([])
   title                String
   description          String?

@@ -549,7 +549,7 @@ describe('StashAdapter', () => {
       items: [
         {
           id: '411',
-          linkedStashId: 'stash-411',
+          activeCatalogSceneId: 'stash-411',
           linkedCatalogRefs: ['STASHDB|stash-411', 'FANSDB|fans-411'],
           title: 'Fresh Library Scene',
           description: 'Already local.',
@@ -587,6 +587,73 @@ describe('StashAdapter', () => {
     expect(String(body.query)).toContain('tags');
     expect(String(body.query)).toContain('created_at');
     expect(String(body.query)).toContain('updated_at');
+  });
+
+  it('selects the active-provider catalog id without discarding other provider refs', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            findScenes: {
+              count: 1,
+              scenes: [
+                {
+                  id: '411',
+                  title: 'Fresh Library Scene',
+                  details: 'Already local.',
+                  date: '2026-03-24',
+                  created_at: '2026-03-23T11:00:00.000Z',
+                  updated_at: '2026-03-24T12:00:00.000Z',
+                  stash_ids: [
+                    {
+                      endpoint: 'https://stashdb.org/graphql',
+                      stash_id: 'stash-411',
+                    },
+                    {
+                      endpoint: 'https://fansdb.cc/graphql',
+                      stash_id: 'fans-411',
+                    },
+                  ],
+                  studio: null,
+                  performers: [],
+                  tags: [],
+                  files: [],
+                  paths: {
+                    screenshot: 'http://stash.local/images/411.jpg',
+                  },
+                },
+              ],
+            },
+          },
+        }),
+    } as Response);
+
+    await expect(
+      adapter.getLocalLibraryScenePage(
+        {
+          baseUrl: 'http://stash.local',
+          apiKey: 'secret',
+        },
+        {
+          page: 1,
+          perPage: 100,
+        },
+        'FANSDB',
+      ),
+    ).resolves.toEqual({
+      total: 1,
+      page: 1,
+      perPage: 100,
+      hasMore: false,
+      items: [
+        expect.objectContaining({
+          id: '411',
+          activeCatalogSceneId: 'fans-411',
+          linkedCatalogRefs: ['STASHDB|stash-411', 'FANSDB|fans-411'],
+        }),
+      ],
+    });
   });
 
   it('supports updated_at and title local scene feed sorts', async () => {

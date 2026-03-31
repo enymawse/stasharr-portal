@@ -209,7 +209,7 @@ export class LibrarySceneQueryService {
 
     return {
       id: row.stashSceneId,
-      linkedStashId: row.linkedStashId,
+      activeCatalogSceneId: row.linkedStashId,
       title: row.title,
       description: row.description,
       imageUrl: screenshotUrl,

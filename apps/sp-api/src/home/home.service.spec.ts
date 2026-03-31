@@ -974,7 +974,7 @@ describe('HomeService', () => {
         type: 'SCENE',
         source: 'STASH',
         viewUrl: 'http://stash.local/scenes/411',
-        linkedStashId: null,
+        activeCatalogSceneId: null,
       },
     ]);
 
@@ -1036,7 +1036,7 @@ describe('HomeService', () => {
         type: 'SCENE',
         source: 'STASH',
         viewUrl: 'http://stash.local/scenes/512',
-        linkedStashId: null,
+        activeCatalogSceneId: null,
       },
     ]);
 

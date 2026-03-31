@@ -249,10 +249,10 @@
 
               <div class="media-flags">
                 <span class="library-badge">In Library</span>
-                @if (item.linkedStashId) {
+                @if (item.activeCatalogSceneId) {
                   <a
                     class="catalog-link"
-                    [routerLink]="['/scene', item.linkedStashId]"
+                    [routerLink]="['/scene', item.activeCatalogSceneId]"
                     [queryParams]="{ returnTo: currentRouteUrl() }"
                   >
                     Catalog

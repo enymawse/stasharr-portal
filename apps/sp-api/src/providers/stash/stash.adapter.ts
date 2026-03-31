@@ -77,7 +77,7 @@ export interface StashLocalSceneIdentityPage {
 
 export interface StashLocalLibrarySceneItem {
   id: string;
-  linkedStashId: string | null;
+  activeCatalogSceneId: string | null;
   linkedCatalogRefs: string[];
   title: string;
   description: string | null;
@@ -830,7 +830,7 @@ export class StashAdapter {
 
     return {
       id,
-      linkedStashId: activeCatalogProviderKey
+      activeCatalogSceneId: activeCatalogProviderKey
         ? findCatalogExternalIdForProvider(
             linkedCatalogRefs,
             activeCatalogProviderKey,

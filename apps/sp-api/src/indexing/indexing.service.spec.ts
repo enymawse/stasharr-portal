@@ -556,6 +556,12 @@ describe('IndexingService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    configuredWhisparrIntegration.baseUrl = 'http://whisparr.local';
+    configuredWhisparrIntegration.apiKey = 'wh-key';
+    configuredStashIntegration.baseUrl = 'http://stash.local';
+    configuredStashIntegration.apiKey = 'stash-key';
+    configuredStashdbIntegration.baseUrl = 'http://stashdb.local';
+    configuredStashdbIntegration.apiKey = 'stashdb-key';
     runWithLeaseMock.mockImplementation(
       async (_config: unknown, handler: () => Promise<unknown>) => handler(),
     );
@@ -756,7 +762,7 @@ describe('IndexingService', () => {
         items: [
           {
             id: 'local-1',
-            linkedStashId: 'scene-1',
+            activeCatalogSceneId: 'scene-1',
             linkedCatalogRefs: ['STASHDB|scene-1', 'FANSDB|scene-1'],
             title: 'Local Scene One',
             description: 'Already local.',
@@ -779,7 +785,7 @@ describe('IndexingService', () => {
           },
           {
             id: 'local-2',
-            linkedStashId: null,
+            activeCatalogSceneId: null,
             linkedCatalogRefs: ['FANSDB|scene-2'],
             title: 'Local Scene Two',
             description: null,
@@ -810,7 +816,7 @@ describe('IndexingService', () => {
         items: [
           {
             id: 'local-3',
-            linkedStashId: null,
+            activeCatalogSceneId: null,
             linkedCatalogRefs: [],
             title: 'Unlinked Local Scene',
             description: null,
@@ -885,6 +891,89 @@ describe('IndexingService', () => {
     );
     expect(sceneIndexStore.get('scene-2')).toBeUndefined();
     expect(sceneIndexStore.get('scene-stale')).toEqual(
+      expect.objectContaining({
+        stashAvailable: false,
+        computedLifecycle: 'NOT_REQUESTED',
+      }),
+    );
+  });
+
+  it('does not treat an inactive-provider raw id as locally available during library projection', async () => {
+    configuredStashdbIntegration.baseUrl = 'https://fansdb.cc/graphql';
+
+    const { prisma, sceneIndexStore, librarySceneIndexStore } =
+      createPrismaMock({
+        sceneIndexRows: [
+          buildSceneIndexRow({
+            stashId: 'shared-123',
+            stashAvailable: true,
+            computedLifecycle: 'AVAILABLE',
+            lifecycleSortOrder: 90,
+          }),
+        ],
+      });
+
+    getLocalLibraryScenePageMock.mockResolvedValue({
+      total: 1,
+      page: 1,
+      perPage: 100,
+      hasMore: false,
+      items: [
+        {
+          id: 'local-1',
+          activeCatalogSceneId: null,
+          linkedCatalogRefs: ['STASHDB|shared-123'],
+          title: 'Local Scene One',
+          description: 'Only linked to StashDB.',
+          imageUrl: 'http://stash.local/images/local-1.jpg',
+          studioId: null,
+          studio: null,
+          studioImageUrl: null,
+          performerIds: [],
+          performerNames: [],
+          tagIds: [],
+          tagNames: [],
+          releaseDate: null,
+          duration: null,
+          viewUrl: 'http://stash.local/scenes/local-1',
+          createdAt: null,
+          updatedAt: null,
+          hasFavoritePerformer: false,
+          favoriteStudio: false,
+          hasFavoriteTag: false,
+        },
+      ],
+    });
+
+    const service = new IndexingService(
+      prisma,
+      integrationsService,
+      whisparrAdapter,
+      stashAdapter,
+      stashdbAdapter,
+      syncStateService,
+    );
+
+    await service.syncStashAvailability('test');
+
+    expect(getLocalLibraryScenePageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseUrl: 'http://stash.local',
+      }),
+      {
+        page: 1,
+        perPage: 100,
+      },
+      'FANSDB',
+    );
+    expect(librarySceneIndexStore.get('local-1')).toEqual(
+      expect.objectContaining({
+        stashSceneId: 'local-1',
+        linkedStashId: null,
+        linkedCatalogRefs: ['STASHDB|shared-123'],
+      }),
+    );
+    expect(sceneIndexStore.get('shared-123')).toEqual(
       expect.objectContaining({
         stashAvailable: false,
         computedLifecycle: 'NOT_REQUESTED',

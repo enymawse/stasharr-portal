@@ -1154,7 +1154,7 @@ export class IndexingService {
     }
 
     const syncStartedAt = new Date();
-    const availableStashIds = new Set<string>();
+    const availableActiveCatalogSceneIds = new Set<string>();
     let page = 1;
     let localSceneCount = 0;
     let projectionWrites = 0;
@@ -1175,8 +1175,8 @@ export class IndexingService {
       );
 
       for (const item of snapshotPage.items) {
-        if (item.linkedStashId) {
-          availableStashIds.add(item.linkedStashId);
+        if (item.activeCatalogSceneId) {
+          availableActiveCatalogSceneIds.add(item.activeCatalogSceneId);
         }
       }
 
@@ -1195,7 +1195,10 @@ export class IndexingService {
           },
         },
       }),
-      this.applyLibraryAvailabilitySnapshot(availableStashIds, syncStartedAt),
+      this.applyLibraryAvailabilitySnapshot(
+        availableActiveCatalogSceneIds,
+        syncStartedAt,
+      ),
     ]);
 
     this.logger.debug(
@@ -1203,7 +1206,7 @@ export class IndexingService {
         reason,
         activeCatalogProviderKey,
         localSceneCount,
-        indexedAvailableIds: availableStashIds.size,
+        indexedAvailableIds: availableActiveCatalogSceneIds.size,
         projectionWrites,
         deletedRows: deletedRows.count,
         availabilityWrites,
@@ -2173,7 +2176,7 @@ export class IndexingService {
           },
           create: {
             stashSceneId: item.id,
-            linkedStashId: item.linkedStashId,
+            linkedStashId: item.activeCatalogSceneId,
             linkedCatalogRefs: item.linkedCatalogRefs,
             title: item.title,
             description: item.description,
@@ -2196,7 +2199,7 @@ export class IndexingService {
             lastSyncedAt: syncedAt,
           },
           update: {
-            linkedStashId: item.linkedStashId,
+            linkedStashId: item.activeCatalogSceneId,
             linkedCatalogRefs: item.linkedCatalogRefs,
             title: item.title,
             description: item.description,

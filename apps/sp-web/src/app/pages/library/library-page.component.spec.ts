@@ -8,7 +8,7 @@ import { LibraryPageComponent } from './library-page.component';
 function buildScene(overrides: Partial<LibrarySceneItem> = {}): LibrarySceneItem {
   return {
     id: '411',
-    linkedStashId: 'stash-411',
+    activeCatalogSceneId: 'stash-411',
     title: 'Fresh Local Scene',
     description: 'Already in the library.',
     imageUrl: '/api/media/stash/scenes/411/screenshot',
@@ -199,10 +199,10 @@ describe('LibraryPageComponent', () => {
     const { fixture } = await renderPage(
       {},
       buildFeedResponse([
-        buildScene({ id: '411', linkedStashId: 'stash-411' }),
+        buildScene({ id: '411', activeCatalogSceneId: 'stash-411' }),
         buildScene({
           id: '412',
-          linkedStashId: null,
+          activeCatalogSceneId: null,
           viewUrl: 'http://stash.local/scenes/412',
         }),
       ]),

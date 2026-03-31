@@ -66,7 +66,7 @@ describe('LibraryService', () => {
     expect(result.items).toEqual([
       {
         id: '411',
-        linkedStashId: 'stash-411',
+        activeCatalogSceneId: 'stash-411',
         title: 'Fresh Local Scene',
         description: 'Already indexed locally.',
         imageUrl: '/api/media/stash/scenes/411/screenshot',
@@ -112,7 +112,7 @@ describe('LibraryService', () => {
     expect(result).toEqual([
       {
         id: '411',
-        linkedStashId: 'stash-411',
+        activeCatalogSceneId: 'stash-411',
         title: 'Fresh Local Scene',
         description: 'Already indexed locally.',
         imageUrl: '/api/media/stash/scenes/411/screenshot',
@@ -159,6 +159,25 @@ describe('LibraryService', () => {
       take: 12,
     });
     expect(librarySceneIndexCountMock).not.toHaveBeenCalled();
+  });
+
+  it('does not expose a catalog link id when the projection lacks an active-provider match', async () => {
+    librarySceneIndexFindManyMock.mockResolvedValue([
+      buildLibraryRow({
+        linkedStashId: null,
+        linkedCatalogRefs: ['FANSDB|stash-411'],
+      }),
+    ]);
+    librarySceneIndexCountMock.mockResolvedValue(1);
+
+    const result = await service.getScenesFeed(1, 1);
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        id: '411',
+        activeCatalogSceneId: null,
+      }),
+    ]);
   });
 
   it('applies query, tag, studio, and sort filters in the database query', async () => {

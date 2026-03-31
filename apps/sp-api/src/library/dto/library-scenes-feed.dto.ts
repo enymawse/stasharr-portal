@@ -1,6 +1,6 @@
 export class LibrarySceneFeedItemDto {
   id!: string;
-  linkedStashId!: string | null;
+  activeCatalogSceneId!: string | null;
   title!: string;
   description!: string | null;
   imageUrl!: string | null;

@@ -19,7 +19,7 @@ export interface LibraryStudioOption {
 
 export interface LibrarySceneItem {
   id: string;
-  linkedStashId: string | null;
+  activeCatalogSceneId: string | null;
   title: string;
   description: string | null;
   imageUrl: string | null;
