@@ -322,8 +322,7 @@ export class HomeService {
     ) as HomeRailStashSceneConfigDto;
 
     try {
-      const feed = await this.libraryService.getScenesFeed(
-        1,
+      const items = await this.libraryService.getScenesPreview(
         config.limit,
         config.sort,
         config.direction,
@@ -337,7 +336,7 @@ export class HomeService {
       );
 
       return {
-        items: feed.items.map((item) => this.toLocalLibraryRailItem(item)),
+        items: items.map((item) => this.toLocalLibraryRailItem(item)),
         message: null,
       };
     } catch (error) {

@@ -1,4 +1,5 @@
 import { PrismaService } from '../prisma/prisma.service';
+import { LibrarySceneQueryService } from './library-scene-query.service';
 import { LibraryService } from './library.service';
 
 function buildLibraryRow(overrides: Record<string, unknown> = {}) {
@@ -48,7 +49,10 @@ describe('LibraryService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new LibraryService(prismaService);
+    service = new LibraryService(
+      prismaService,
+      new LibrarySceneQueryService(prismaService),
+    );
     librarySceneIndexFindManyMock.mockResolvedValue([buildLibraryRow()]);
     librarySceneIndexCountMock.mockResolvedValue(3);
     queryRawMock.mockResolvedValue([]);
@@ -89,6 +93,72 @@ describe('LibraryService', () => {
         take: 2,
       }),
     );
+  });
+
+  it('loads a preview-sized projection slice without counting the full result set', async () => {
+    const result = await service.getScenesPreview(
+      12,
+      'CREATED_AT',
+      'DESC',
+      'archive',
+      [' tag-1 ', 'tag-1'],
+      'AND',
+      [' studio-1 ', 'studio-1'],
+      true,
+      false,
+      true,
+    );
+
+    expect(result).toEqual([
+      {
+        id: '411',
+        linkedStashId: 'stash-411',
+        title: 'Fresh Local Scene',
+        description: 'Already indexed locally.',
+        imageUrl: '/api/media/stash/scenes/411/screenshot',
+        cardImageUrl: '/api/media/stash/scenes/411/screenshot',
+        studioId: 'studio-1',
+        studio: 'Archive',
+        studioImageUrl: '/api/media/stash/studios/studio-1/logo',
+        releaseDate: '2026-03-24',
+        duration: 1800,
+        type: 'SCENE',
+        source: 'STASH',
+        viewUrl: 'http://stash.local/scenes/411',
+      },
+    ]);
+    expect(librarySceneIndexFindManyMock).toHaveBeenCalledWith({
+      where: {
+        AND: [
+          {
+            OR: [
+              { title: { contains: 'archive', mode: 'insensitive' } },
+              { description: { contains: 'archive', mode: 'insensitive' } },
+              { studioName: { contains: 'archive', mode: 'insensitive' } },
+            ],
+          },
+          {
+            tagIds: {
+              hasEvery: ['tag-1'],
+            },
+          },
+          {
+            studioId: {
+              in: ['studio-1'],
+            },
+          },
+          { hasFavoritePerformer: true },
+          { hasFavoriteTag: true },
+        ],
+      },
+      orderBy: [
+        { localCreatedAt: 'desc' },
+        { title: 'asc' },
+        { stashSceneId: 'asc' },
+      ],
+      take: 12,
+    });
+    expect(librarySceneIndexCountMock).not.toHaveBeenCalled();
   });
 
   it('applies query, tag, studio, and sort filters in the database query', async () => {
