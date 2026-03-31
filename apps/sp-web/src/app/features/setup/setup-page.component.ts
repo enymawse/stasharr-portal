@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { finalize, forkJoin, map, switchMap } from 'rxjs';
+import { finalize, forkJoin, switchMap } from 'rxjs';
 import { ButtonDirective } from 'primeng/button';
 import { Message } from 'primeng/message';
 import { ProgressSpinner } from 'primeng/progressspinner';
@@ -9,6 +9,8 @@ import {
   IntegrationResponse,
   IntegrationType,
   UpdateIntegrationPayload,
+  integrationLabel,
+  isCatalogProviderType,
 } from '../../core/api/integrations.types';
 import { IntegrationsService } from '../../core/api/integrations.service';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
@@ -42,12 +44,14 @@ export class SetupPageComponent implements OnInit {
     'STASH',
     'WHISPARR',
     'STASHDB',
+    'FANSDB',
   ];
 
   protected readonly forms: Record<IntegrationType, IntegrationForm> = {
     STASH: this.createIntegrationForm(),
     WHISPARR: this.createIntegrationForm(),
     STASHDB: this.createIntegrationForm(),
+    FANSDB: this.createIntegrationForm(),
   };
 
   private readonly integrations = signal<
@@ -56,26 +60,19 @@ export class SetupPageComponent implements OnInit {
     STASH: null,
     WHISPARR: null,
     STASHDB: null,
+    FANSDB: null,
   });
 
   private readonly saveState = signal<Record<IntegrationType, SaveState>>({
     STASH: this.defaultSaveState(),
     WHISPARR: this.defaultSaveState(),
     STASHDB: this.defaultSaveState(),
+    FANSDB: this.defaultSaveState(),
   });
 
-  protected readonly isSetupComplete = computed(() => {
-    const setupStatus = this.status();
-    if (!setupStatus) {
-      return false;
-    }
-
-    return (
-      setupStatus.required.stash &&
-      setupStatus.required.whisparr &&
-      setupStatus.required.stashdb
-    );
-  });
+  protected readonly isSetupComplete = computed(
+    () => this.status()?.setupComplete ?? false,
+  );
 
   ngOnInit(): void {
     this.loadSetupData();
@@ -86,18 +83,46 @@ export class SetupPageComponent implements OnInit {
   }
 
   protected labelFor(type: IntegrationType): string {
-    switch (type) {
-      case 'STASH':
-        return 'Stash';
-      case 'WHISPARR':
-        return 'Whisparr';
-      case 'STASHDB':
-        return 'StashDB';
-    }
+    return integrationLabel(type);
   }
 
-  protected isRequired(type: IntegrationType): boolean {
-    return type === 'STASH' || type === 'WHISPARR' || type === 'STASHDB';
+  protected isCatalogProvider(type: IntegrationType): boolean {
+    return isCatalogProviderType(type);
+  }
+
+  protected isActiveCatalogProvider(type: IntegrationType): boolean {
+    return this.status()?.activeCatalogProvider === type;
+  }
+
+  protected integrationMeta(type: IntegrationType): string {
+    if (this.isCatalogProvider(type)) {
+      return `${this.isActiveCatalogProvider(type) ? 'Active Catalog Provider' : 'Catalog Provider'} | Status: ${this.statusText(type)}`;
+    }
+
+    return `Required Service | Status: ${this.statusText(type)}`;
+  }
+
+  protected setupSummary(): string {
+    const activeCatalogProvider = this.status()?.activeCatalogProvider;
+    if (this.isSetupComplete()) {
+      return `Setup complete: Stash, Whisparr, and ${activeCatalogProvider ? this.labelFor(activeCatalogProvider) : 'your active catalog provider'} are configured.`;
+    }
+
+    if (activeCatalogProvider) {
+      return `Setup incomplete: finish configuring Stash, Whisparr, and the active catalog provider ${this.labelFor(activeCatalogProvider)}.`;
+    }
+
+    return 'Setup incomplete: configure Stash, Whisparr, and enable one catalog provider to continue.';
+  }
+
+  protected catalogProviderHelp(type: IntegrationType): string | null {
+    if (!this.isCatalogProvider(type)) {
+      return null;
+    }
+
+    return this.isActiveCatalogProvider(type)
+      ? `${this.labelFor(type)} currently drives /scenes, scene detail, performers, studios, and request metadata.`
+      : `Enable and save ${this.labelFor(type)} to make it the active discovery source.`;
   }
 
   protected statusText(type: IntegrationType): string {
@@ -139,25 +164,20 @@ export class SetupPageComponent implements OnInit {
     this.integrationsService
       .updateIntegration(type, payload)
       .pipe(
-        switchMap((integration) =>
-          this.setupService
-            .getStatus()
-            .pipe(map((setupStatus) => ({ integration, setupStatus }))),
+        switchMap(() =>
+          forkJoin({
+            setupStatus: this.setupService.getStatus(),
+            integrations: this.integrationsService.getIntegrations(),
+          }),
         ),
         finalize(() => {
           this.patchSaveState(type, { saving: false });
         }),
       )
       .subscribe({
-        next: ({ integration, setupStatus }) => {
+        next: ({ setupStatus, integrations }) => {
           this.status.set(setupStatus);
-          this.integrations.update((current) => ({
-            ...current,
-            [type]: integration,
-          }));
-          this.forms[type].patchValue({
-            apiKey: '',
-          });
+          this.applyIntegrations(integrations);
           this.notifications.success(`${this.labelFor(type)} saved successfully`);
           this.patchSaveState(type, {
             success: `${this.labelFor(type)} saved successfully.`,
@@ -211,6 +231,7 @@ export class SetupPageComponent implements OnInit {
       STASH: null,
       WHISPARR: null,
       STASHDB: null,
+      FANSDB: null,
     };
 
     for (const integration of integrations) {
@@ -225,7 +246,7 @@ export class SetupPageComponent implements OnInit {
         name: integration?.name ?? '',
         baseUrl: integration?.baseUrl ?? '',
         apiKey: '',
-        enabled: integration?.enabled ?? true,
+        enabled: this.defaultEnabledValue(type, integration),
       });
     }
   }
@@ -237,6 +258,17 @@ export class SetupPageComponent implements OnInit {
       apiKey: new FormControl('', { nonNullable: true }),
       enabled: new FormControl(true, { nonNullable: true }),
     });
+  }
+
+  private defaultEnabledValue(
+    type: IntegrationType,
+    integration: IntegrationResponse | null,
+  ): boolean {
+    if (integration) {
+      return integration.enabled;
+    }
+
+    return this.isCatalogProvider(type) ? false : true;
   }
 
   private normalizeInput(value: string): string | undefined {

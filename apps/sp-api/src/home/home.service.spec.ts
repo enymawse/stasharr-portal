@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 import { LibraryService } from '../library/library.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { SceneStatusService } from '../scene-status/scene-status.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
@@ -144,6 +145,9 @@ describe('HomeService', () => {
   const sceneStatusService = {
     resolveForScenes: sceneStatusResolveForScenesMock,
   } as unknown as SceneStatusService;
+  const catalogProviderService = {
+    getActiveCatalogProvider: jest.fn(),
+  } as unknown as CatalogProviderService;
 
   let service: HomeService;
   let hybridScenesService: HybridScenesService;
@@ -164,10 +168,20 @@ describe('HomeService', () => {
     librarySearchTagsMock.mockResolvedValue([]);
     librarySearchStudiosMock.mockResolvedValue([]);
     sceneStatusResolveForScenesMock.mockResolvedValue(new Map());
+    catalogProviderService.getActiveCatalogProvider = jest
+      .fn()
+      .mockResolvedValue({
+        integrationType: 'STASHDB',
+        providerKey: 'STASHDB',
+        label: 'StashDB',
+        baseUrl: 'http://stashdb.local/graphql',
+        apiKey: 'stashdb-secret',
+      });
     hybridScenesService = new HybridScenesService(stashAdapter, stashdbAdapter);
     service = new HomeService(
       prismaService,
       libraryService,
+      catalogProviderService,
       sceneStatusService,
       hybridScenesService,
     );
@@ -1147,25 +1161,13 @@ describe('HomeService', () => {
         },
       }),
     );
-    integrationFindUniqueMock.mockImplementation(({ where: { type } }) =>
-      Promise.resolve(
-        type === 'STASHDB'
-          ? {
-              type: 'STASHDB',
-              enabled: true,
-              status: 'CONFIGURED',
-              baseUrl: 'http://stashdb.local/graphql',
-              apiKey: 'stashdb-secret',
-            }
-          : {
-              type: 'STASH',
-              enabled: true,
-              status: 'CONFIGURED',
-              baseUrl: 'http://stash.local',
-              apiKey: 'stash-secret',
-            },
-      ),
-    );
+    integrationFindUniqueMock.mockResolvedValue({
+      type: 'STASH',
+      enabled: true,
+      status: 'CONFIGURED',
+      baseUrl: 'http://stash.local',
+      apiKey: 'stash-secret',
+    });
     stashdbGetScenesBySortMock.mockResolvedValue({
       total: 3,
       scenes: [
@@ -1290,25 +1292,13 @@ describe('HomeService', () => {
         },
       }),
     );
-    integrationFindUniqueMock.mockImplementation(({ where: { type } }) =>
-      Promise.resolve(
-        type === 'STASHDB'
-          ? {
-              type: 'STASHDB',
-              enabled: true,
-              status: 'CONFIGURED',
-              baseUrl: 'http://stashdb.local/graphql',
-              apiKey: 'stashdb-secret',
-            }
-          : {
-              type: 'STASH',
-              enabled: true,
-              status: 'CONFIGURED',
-              baseUrl: 'http://stash.local',
-              apiKey: 'stash-secret',
-            },
-      ),
-    );
+    integrationFindUniqueMock.mockResolvedValue({
+      type: 'STASH',
+      enabled: true,
+      status: 'CONFIGURED',
+      baseUrl: 'http://stash.local',
+      apiKey: 'stash-secret',
+    });
     stashdbGetScenesBySortMock
       .mockResolvedValueOnce({
         total: 18,
@@ -1428,27 +1418,26 @@ describe('HomeService', () => {
         id: 'custom-hybrid-4',
       }),
     );
-    integrationFindUniqueMock.mockResolvedValue(null);
+    catalogProviderService.getActiveCatalogProvider = jest
+      .fn()
+      .mockRejectedValue(new Error('catalog unavailable'));
 
     await expect(service.getRailContent('custom-hybrid-4')).resolves.toEqual({
       items: [],
       message:
-        'Configure and enable your StashDB integration to populate this hybrid rail.',
+        'Configure and enable an active catalog provider to populate this hybrid rail.',
     });
 
-    integrationFindUniqueMock.mockImplementation(({ where: { type } }) =>
-      Promise.resolve(
-        type === 'STASHDB'
-          ? {
-              type: 'STASHDB',
-              enabled: true,
-              status: 'CONFIGURED',
-              baseUrl: 'http://stashdb.local/graphql',
-              apiKey: 'stashdb-secret',
-            }
-          : null,
-      ),
-    );
+    catalogProviderService.getActiveCatalogProvider = jest
+      .fn()
+      .mockResolvedValue({
+        integrationType: 'STASHDB',
+        providerKey: 'STASHDB',
+        label: 'StashDB',
+        baseUrl: 'http://stashdb.local/graphql',
+        apiKey: 'stashdb-secret',
+      });
+    integrationFindUniqueMock.mockResolvedValue(null);
 
     await expect(service.getRailContent('custom-hybrid-4')).resolves.toEqual({
       items: [],

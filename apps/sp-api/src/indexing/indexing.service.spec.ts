@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
@@ -510,6 +511,9 @@ describe('IndexingService', () => {
   const integrationsService = {
     findOne: findOneMock,
   } as unknown as IntegrationsService;
+  const catalogProviderService = {
+    getActiveCatalogProviderOrNull: jest.fn(),
+  } as unknown as CatalogProviderService;
 
   const whisparrAdapter = {
     getMovieSnapshot: getMovieSnapshotMock,
@@ -574,12 +578,27 @@ describe('IndexingService', () => {
         return configuredStashIntegration;
       }
 
-      if (type === IntegrationType.STASHDB) {
-        return configuredStashdbIntegration;
-      }
-
       throw new Error(`Unexpected integration type: ${type}`);
     });
+    catalogProviderService.getActiveCatalogProviderOrNull = jest
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve({
+          integrationType: configuredStashdbIntegration.baseUrl.includes(
+            'fansdb',
+          )
+            ? 'FANSDB'
+            : 'STASHDB',
+          providerKey: configuredStashdbIntegration.baseUrl.includes('fansdb')
+            ? 'FANSDB'
+            : 'STASHDB',
+          label: configuredStashdbIntegration.baseUrl.includes('fansdb')
+            ? 'FansDB'
+            : 'StashDB',
+          baseUrl: configuredStashdbIntegration.baseUrl,
+          apiKey: configuredStashdbIntegration.apiKey,
+        }),
+      );
     getMovieSnapshotMock.mockResolvedValue([]);
     getQueueSnapshotMock.mockResolvedValue([]);
     findMovieByStashIdMock.mockResolvedValue(null);
@@ -630,6 +649,7 @@ describe('IndexingService', () => {
     const service = new IndexingService(
       prisma,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashAdapter,
       stashdbAdapter,
@@ -680,6 +700,7 @@ describe('IndexingService', () => {
     const service = new IndexingService(
       prisma,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashAdapter,
       stashdbAdapter,
@@ -718,6 +739,7 @@ describe('IndexingService', () => {
     const service = new IndexingService(
       prisma,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashAdapter,
       stashdbAdapter,
@@ -843,6 +865,7 @@ describe('IndexingService', () => {
     const service = new IndexingService(
       prisma,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashAdapter,
       stashdbAdapter,
@@ -948,6 +971,7 @@ describe('IndexingService', () => {
     const service = new IndexingService(
       prisma,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashAdapter,
       stashdbAdapter,
@@ -1022,6 +1046,7 @@ describe('IndexingService', () => {
     const service = new IndexingService(
       prisma,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashAdapter,
       stashdbAdapter,
@@ -1063,6 +1088,7 @@ describe('IndexingService', () => {
     const service = new IndexingService(
       prisma,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashAdapter,
       stashdbAdapter,
@@ -1098,6 +1124,7 @@ describe('IndexingService', () => {
     const service = new IndexingService(
       prisma,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashAdapter,
       stashdbAdapter,
@@ -1141,6 +1168,7 @@ describe('IndexingService', () => {
     const service = new IndexingService(
       prisma,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashAdapter,
       stashdbAdapter,
@@ -1224,6 +1252,7 @@ describe('IndexingService', () => {
     const service = new IndexingService(
       prisma,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashAdapter,
       stashdbAdapter,
@@ -1281,6 +1310,7 @@ describe('IndexingService', () => {
     const service = new IndexingService(
       prisma,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashAdapter,
       stashdbAdapter,
@@ -1346,6 +1376,7 @@ describe('IndexingService', () => {
     const service = new IndexingService(
       prisma,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashAdapter,
       stashdbAdapter,
@@ -1387,6 +1418,7 @@ describe('IndexingService', () => {
     const service = new IndexingService(
       prisma,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashAdapter,
       stashdbAdapter,

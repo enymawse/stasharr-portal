@@ -7,12 +7,14 @@ import {
 import { IndexingService } from '../indexing/indexing.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
 import { RequestsService } from './requests.service';
 
 describe('RequestsService', () => {
   const findOneMock = jest.fn();
+  const getActiveCatalogProviderMock = jest.fn();
   const findMovieByStashIdMock = jest.fn();
   const getRootFoldersMock = jest.fn();
   const getQualityProfilesMock = jest.fn();
@@ -31,6 +33,9 @@ describe('RequestsService', () => {
   const integrationsService = {
     findOne: findOneMock,
   } as unknown as IntegrationsService;
+  const catalogProviderService = {
+    getActiveCatalogProvider: getActiveCatalogProviderMock,
+  } as unknown as CatalogProviderService;
 
   const whisparrAdapter = {
     findMovieByStashId: findMovieByStashIdMock,
@@ -58,8 +63,9 @@ describe('RequestsService', () => {
   };
 
   const configuredStashdbIntegration = {
-    enabled: true,
-    status: IntegrationStatus.CONFIGURED,
+    integrationType: 'STASHDB',
+    providerKey: 'STASHDB',
+    label: 'StashDB',
     baseUrl: 'http://stashdb.local',
     apiKey: 'stashdb-key',
   };
@@ -72,6 +78,7 @@ describe('RequestsService', () => {
     service = new RequestsService(
       indexingService,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       stashdbAdapter,
       prismaService,
@@ -82,12 +89,9 @@ describe('RequestsService', () => {
         return configuredWhisparrIntegration;
       }
 
-      if (type === IntegrationType.STASHDB) {
-        return configuredStashdbIntegration;
-      }
-
       throw new Error('Unexpected integration type');
     });
+    getActiveCatalogProviderMock.mockResolvedValue(configuredStashdbIntegration);
 
     getSceneByIdMock.mockImplementation((stashId: string) =>
       Promise.resolve({
@@ -296,18 +300,34 @@ describe('RequestsService', () => {
   });
 
   it('throws when STASHDB integration has no baseUrl', async () => {
-    findOneMock.mockImplementation((type: IntegrationType) => {
-      if (type === IntegrationType.STASHDB) {
-        return {
-          ...configuredStashdbIntegration,
-          baseUrl: '   ',
-        };
-      }
-      return configuredWhisparrIntegration;
-    });
+    getActiveCatalogProviderMock.mockRejectedValue(
+      new BadRequestException('StashDB integration is missing a base URL.'),
+    );
 
     await expect(service.getRequestOptions('scene-1')).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+
+  it('uses the active FANSDB provider for request metadata lookups', async () => {
+    getRootFoldersMock.mockResolvedValue([
+      { id: 2, path: '/media/b', accessible: true },
+    ]);
+    getQualityProfilesMock.mockResolvedValue([{ id: 10, name: 'Default' }]);
+    getTagsMock.mockResolvedValue([]);
+    getActiveCatalogProviderMock.mockResolvedValue({
+      integrationType: 'FANSDB',
+      providerKey: 'FANSDB',
+      label: 'FansDB',
+      baseUrl: 'http://fansdb.local/graphql',
+      apiKey: 'fansdb-key',
+    });
+
+    await service.getRequestOptions('scene-1');
+
+    expect(getSceneByIdMock).toHaveBeenCalledWith('scene-1', {
+      baseUrl: 'http://fansdb.local/graphql',
+      apiKey: 'fansdb-key',
+    });
   });
 });

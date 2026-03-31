@@ -38,7 +38,9 @@ describe('setup route guards', () => {
     setupService.getStatus.mockReturnValue(
       of({
         setupComplete: false,
-        required: { stash: false, stashdb: false, whisparr: false },
+        required: { stash: false, catalog: false, whisparr: false },
+        activeCatalogProvider: null,
+        catalogProviders: { STASHDB: false, FANSDB: false },
       }),
     );
 
@@ -51,7 +53,9 @@ describe('setup route guards', () => {
     setupService.getStatus.mockReturnValue(
       of({
         setupComplete: true,
-        required: { stash: true, stashdb: true, whisparr: true },
+        required: { stash: true, catalog: true, whisparr: true },
+        activeCatalogProvider: 'FANSDB',
+        catalogProviders: { STASHDB: true, FANSDB: true },
       }),
     );
 
@@ -64,7 +68,9 @@ describe('setup route guards', () => {
     setupService.getStatus.mockReturnValue(
       of({
         setupComplete: true,
-        required: { stash: true, stashdb: true, whisparr: true },
+        required: { stash: true, catalog: true, whisparr: true },
+        activeCatalogProvider: 'STASHDB',
+        catalogProviders: { STASHDB: true, FANSDB: false },
       }),
     );
 

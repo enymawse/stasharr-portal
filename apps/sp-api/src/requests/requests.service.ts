@@ -13,6 +13,7 @@ import {
 import { IndexingService } from '../indexing/indexing.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
 import { RequestOptionsDto } from './dto/request-options.dto';
@@ -24,6 +25,7 @@ export class RequestsService {
   constructor(
     private readonly indexingService: IndexingService,
     private readonly integrationsService: IntegrationsService,
+    private readonly catalogProviderService: CatalogProviderService,
     private readonly whisparrAdapter: WhisparrAdapter,
     private readonly stashdbAdapter: StashdbAdapter,
     private readonly prisma: PrismaService,
@@ -36,11 +38,11 @@ export class RequestsService {
     }
 
     const whisparrConfig = await this.getWhisparrConfig();
-    const stashdbConfig = await this.getStashdbConfig();
+    const catalogConfig = await this.getActiveCatalogConfig();
 
     const scene = await this.stashdbAdapter.getSceneById(
       normalizedStashId,
-      stashdbConfig,
+      catalogConfig,
     );
 
     const [rootFolders, qualityProfiles, tags] = await Promise.all([
@@ -87,11 +89,11 @@ export class RequestsService {
     }
 
     const whisparrConfig = await this.getWhisparrConfig();
-    const stashdbConfig = await this.getStashdbConfig();
+    const catalogConfig = await this.getActiveCatalogConfig();
 
     const scene = await this.stashdbAdapter.getSceneById(
       normalizedStashId,
-      stashdbConfig,
+      catalogConfig,
     );
     const title = scene.title.trim();
     const studio = scene.studioName?.trim() ?? '';
@@ -276,30 +278,16 @@ export class RequestsService {
     };
   }
 
-  private async getStashdbConfig(): Promise<{
+  private async getActiveCatalogConfig(): Promise<{
     baseUrl: string;
     apiKey: string | null;
   }> {
-    const integration = await this.getIntegration(IntegrationType.STASHDB);
-
-    if (!integration.enabled) {
-      throw new ConflictException('STASHDB integration is disabled.');
-    }
-
-    if (integration.status !== IntegrationStatus.CONFIGURED) {
-      throw new ConflictException('STASHDB integration is not configured.');
-    }
-
-    const baseUrl = integration.baseUrl?.trim();
-    if (!baseUrl) {
-      throw new BadRequestException(
-        'STASHDB integration is missing a base URL.',
-      );
-    }
+    const catalogProvider =
+      await this.catalogProviderService.getActiveCatalogProvider();
 
     return {
-      baseUrl,
-      apiKey: integration.apiKey,
+      baseUrl: catalogProvider.baseUrl,
+      apiKey: catalogProvider.apiKey,
     };
   }
 

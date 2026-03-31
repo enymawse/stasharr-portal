@@ -1,5 +1,5 @@
 export class IntegrationResponseDto {
-  type!: 'STASHDB' | 'STASH' | 'WHISPARR';
+  type!: 'STASHDB' | 'FANSDB' | 'STASH' | 'WHISPARR';
   enabled!: boolean;
   status!: 'NOT_CONFIGURED' | 'CONFIGURED' | 'ERROR';
   name!: string | null;

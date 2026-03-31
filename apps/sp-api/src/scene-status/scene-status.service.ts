@@ -9,8 +9,8 @@ import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   type CatalogProviderKey,
-  resolveCatalogProviderKey,
 } from '../providers/catalog/catalog-provider.util';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import {
   WhisparrAdapter,
@@ -46,6 +46,7 @@ export class SceneStatusService {
     private readonly indexingService: IndexingService,
     private readonly prisma: PrismaService,
     private readonly integrationsService: IntegrationsService,
+    private readonly catalogProviderService: CatalogProviderService,
     private readonly stashAdapter: StashAdapter,
     private readonly whisparrAdapter: WhisparrAdapter,
   ) {}
@@ -746,22 +747,9 @@ export class SceneStatusService {
   }
 
   private async getActiveCatalogProviderKey(): Promise<CatalogProviderKey | null> {
-    try {
-      const integration = await this.integrationsService.findOne(
-        IntegrationType.STASHDB,
-      );
-
-      if (
-        !integration.enabled ||
-        integration.status !== IntegrationStatus.CONFIGURED
-      ) {
-        return null;
-      }
-
-      return resolveCatalogProviderKey(integration.baseUrl);
-    } catch {
-      return null;
-    }
+    const catalogProvider =
+      await this.catalogProviderService.getActiveCatalogProviderOrNull();
+    return catalogProvider?.providerKey ?? null;
   }
 
   private safeJson(value: unknown): string {

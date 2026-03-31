@@ -7,6 +7,7 @@ import { Message } from 'primeng/message';
 import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
+import { integrationLabel } from '../../core/api/integrations.types';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import {
   SceneDetails,
@@ -18,7 +19,7 @@ import { SceneRequestModalComponent } from '../../shared/scene-request-modal/sce
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
 interface SceneLifecycleStep {
-  system: 'StashDB' | 'Whisparr' | 'Stash';
+  system: string;
   title: string;
   detail: string;
   tone: 'complete' | 'active' | 'pending';
@@ -188,6 +189,8 @@ export class ScenePageComponent implements OnInit, OnDestroy {
   }
 
   protected lifecycleSummary(scene: SceneDetails): string {
+    const providerLabel = integrationLabel(scene.source);
+
     switch (scene.status.state) {
       case 'REQUESTED':
         return 'Requested in Whisparr and waiting for acquisition to begin.';
@@ -201,16 +204,18 @@ export class ScenePageComponent implements OnInit, OnDestroy {
         return 'The last known acquisition attempt failed in Whisparr. Resolve or retry this download in Whisparr.';
       case 'NOT_REQUESTED':
       default:
-        return 'Discovered in StashDB and not yet sent into your local acquisition pipeline.';
+        return `Discovered in ${providerLabel} and not yet sent into your local acquisition pipeline.`;
     }
   }
 
   protected lifecycleSteps(scene: SceneDetails): SceneLifecycleStep[] {
+    const providerLabel = integrationLabel(scene.source);
+
     return [
       {
-        system: 'StashDB',
+        system: providerLabel,
         title: 'Discovered',
-        detail: 'Metadata, credits, and source links on this page come from StashDB.',
+        detail: `Metadata, credits, and source links on this page come from ${providerLabel}.`,
         tone: 'complete',
       },
       this.whisparrLifecycleStep(scene),

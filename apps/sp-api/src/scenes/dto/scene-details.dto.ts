@@ -1,4 +1,5 @@
 import { SceneStatusDto } from '../../scene-status/dto/scene-status.dto';
+import { type CatalogProviderKey } from '../../providers/catalog/catalog-provider.util';
 
 export class SceneImageDto {
   id!: string;
@@ -62,7 +63,7 @@ export class SceneDetailsDto {
   tags!: SceneTagDto[];
   performers!: ScenePerformerDto[];
   sourceUrls!: SceneUrlDto[];
-  source!: 'STASHDB';
+  source!: CatalogProviderKey;
   status!: SceneStatusDto;
   stash!: SceneStashAvailabilityDto | null;
   whisparr!: SceneWhisparrAvailabilityDto | null;

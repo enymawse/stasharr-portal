@@ -6,6 +6,7 @@ import {
   SceneTagOption,
   SortDirection,
 } from './discover.types';
+import { CatalogProviderType } from './integrations.types';
 
 export type HomeRailKey =
   | 'FAVORITE_STUDIOS'
@@ -13,6 +14,7 @@ export type HomeRailKey =
   | 'RECENTLY_ADDED_LIBRARY';
 export type HomeRailKind = 'BUILTIN' | 'CUSTOM';
 export type HomeRailSource = 'STASHDB' | 'STASH' | 'HYBRID';
+export type HomeRailItemSource = HomeRailSource | CatalogProviderType;
 export type HomeRailContentType = 'SCENES';
 export type HomeStashSceneSort = 'CREATED_AT' | 'UPDATED_AT' | 'TITLE';
 export type HomeHybridLibraryAvailability = 'IN_LIBRARY' | 'MISSING_FROM_LIBRARY';
@@ -92,7 +94,7 @@ export interface HomeRailItem {
   releaseDate: string | null;
   duration: number | null;
   type: 'SCENE';
-  source: HomeRailSource;
+  source: HomeRailItemSource;
   status: SceneStatus;
   requestable: boolean;
   viewUrl: string | null;

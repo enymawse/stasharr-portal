@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { finalize, forkJoin } from 'rxjs';
+import { finalize, forkJoin, switchMap } from 'rxjs';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonDirective } from 'primeng/button';
 import { Message } from 'primeng/message';
@@ -13,9 +13,12 @@ import { IntegrationsService } from '../../core/api/integrations.service';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import { IntegrationFormFieldsComponent } from '../../shared/integration-form-fields/integration-form-fields.component';
 import {
+  CatalogProviderType,
   IntegrationResponse,
   IntegrationType,
   UpdateIntegrationPayload,
+  integrationLabel,
+  isCatalogProviderType,
 } from '../../core/api/integrations.types';
 
 type ServiceTab = IntegrationType;
@@ -53,12 +56,18 @@ export class SettingsPageComponent implements OnInit {
   protected readonly activeTab = signal<SettingsTab>('STASH');
   protected readonly resettingAll = signal(false);
 
-  protected readonly serviceTabs: ServiceTab[] = ['STASH', 'WHISPARR', 'STASHDB'];
+  protected readonly serviceTabs: ServiceTab[] = [
+    'STASH',
+    'WHISPARR',
+    'STASHDB',
+    'FANSDB',
+  ];
 
   protected readonly forms: Record<IntegrationType, IntegrationForm> = {
     STASH: this.createIntegrationForm(),
     WHISPARR: this.createIntegrationForm(),
     STASHDB: this.createIntegrationForm(),
+    FANSDB: this.createIntegrationForm(),
   };
 
   protected readonly integrations = signal<
@@ -67,24 +76,28 @@ export class SettingsPageComponent implements OnInit {
     STASH: null,
     WHISPARR: null,
     STASHDB: null,
+    FANSDB: null,
   });
 
   protected readonly saveState = signal<Record<IntegrationType, ActionState>>({
     STASH: this.defaultActionState(),
     WHISPARR: this.defaultActionState(),
     STASHDB: this.defaultActionState(),
+    FANSDB: this.defaultActionState(),
   });
 
   protected readonly testState = signal<Record<IntegrationType, ActionState>>({
     STASH: this.defaultActionState(),
     WHISPARR: this.defaultActionState(),
     STASHDB: this.defaultActionState(),
+    FANSDB: this.defaultActionState(),
   });
 
   protected readonly resetState = signal<Record<IntegrationType, ActionState>>({
     STASH: this.defaultActionState(),
     WHISPARR: this.defaultActionState(),
     STASHDB: this.defaultActionState(),
+    FANSDB: this.defaultActionState(),
   });
 
   ngOnInit(): void {
@@ -118,14 +131,36 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected labelFor(type: IntegrationType): string {
-    switch (type) {
-      case 'STASH':
-        return 'Stash';
-      case 'WHISPARR':
-        return 'Whisparr';
-      case 'STASHDB':
-        return 'StashDB';
+    return integrationLabel(type);
+  }
+
+  protected isCatalogProvider(type: IntegrationType): boolean {
+    return isCatalogProviderType(type);
+  }
+
+  protected isActiveCatalogProvider(type: IntegrationType): boolean {
+    return this.isCatalogProvider(type) && this.activeCatalogProvider() === type;
+  }
+
+  protected catalogProviderHelp(type: IntegrationType): string | null {
+    if (!this.isCatalogProvider(type)) {
+      return null;
     }
+
+    if (this.isActiveCatalogProvider(type)) {
+      return `${this.labelFor(type)} is the current active discovery provider. Saving another enabled catalog provider will deactivate this one.`;
+    }
+
+    const enabledInForm = this.forms[type].controls.enabled.value;
+    if (this.configured(type)) {
+      return enabledInForm
+        ? `Save changes to switch discovery to ${this.labelFor(type)}.`
+        : `Enable ${this.labelFor(type)} and save to make it the active discovery source.`;
+    }
+
+    return enabledInForm
+      ? `Finish configuring ${this.labelFor(type)} and save to make it the active discovery source.`
+      : `Configure ${this.labelFor(type)}, enable it, and save to make it the active discovery source.`;
   }
 
   protected formFor(type: IntegrationType): IntegrationForm {
@@ -185,7 +220,7 @@ export class SettingsPageComponent implements OnInit {
     this.confirmationService.confirm({
       key: 'app-destructive',
       header: 'Reset All Integrations?',
-      message: 'Resetting all integrations clears configuration for Stash, Whisparr, and StashDB.',
+      message: 'Resetting all integrations clears configuration for Stash, Whisparr, StashDB, and FansDB.',
       icon: 'pi pi-exclamation-triangle',
       rejectLabel: 'Cancel',
       rejectButtonStyleClass: 'p-button-text',
@@ -209,14 +244,14 @@ export class SettingsPageComponent implements OnInit {
     this.integrationsService
       .updateIntegration(type, payload)
       .pipe(
+        switchMap(() => this.integrationsService.getIntegrations()),
         finalize(() => {
           this.patchActionState(this.saveState, type, { running: false });
         }),
       )
       .subscribe({
-        next: (integration) => {
-          this.updateIntegration(type, integration);
-          this.forms[type].patchValue({ apiKey: '' });
+        next: (integrations) => {
+          this.applyIntegrations(integrations);
           this.notifications.success(`${this.labelFor(type)} settings saved`);
           this.patchActionState(this.saveState, type, {
             success: `${this.labelFor(type)} settings saved.`,
@@ -406,6 +441,7 @@ export class SettingsPageComponent implements OnInit {
       STASH: null,
       WHISPARR: null,
       STASHDB: null,
+      FANSDB: null,
     };
 
     for (const integration of integrations) {
@@ -420,9 +456,36 @@ export class SettingsPageComponent implements OnInit {
         name: integration?.name ?? '',
         baseUrl: integration?.baseUrl ?? '',
         apiKey: '',
-        enabled: integration?.enabled ?? true,
+        enabled: this.defaultEnabledValue(type, integration),
       });
     }
+  }
+
+  private activeCatalogProvider(): CatalogProviderType | null {
+    const integrations = this.integrations();
+    for (const type of ['STASHDB', 'FANSDB'] as const) {
+      const integration = integrations[type];
+      if (
+        integration?.enabled &&
+        integration.status === 'CONFIGURED' &&
+        !!integration.baseUrl?.trim()
+      ) {
+        return type;
+      }
+    }
+
+    return null;
+  }
+
+  private defaultEnabledValue(
+    type: IntegrationType,
+    integration: IntegrationResponse | null,
+  ): boolean {
+    if (integration) {
+      return integration.enabled;
+    }
+
+    return this.isCatalogProvider(type) ? false : true;
   }
 
   private updateIntegration(type: IntegrationType, integration: IntegrationResponse): void {

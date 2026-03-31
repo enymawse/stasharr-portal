@@ -16,6 +16,7 @@ import {
 import { LibrarySceneFeedItemDto } from '../library/dto/library-scenes-feed.dto';
 import { LibraryService } from '../library/library.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { type StashdbScene } from '../providers/stashdb/stashdb.adapter';
 import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import { PerformerStudioOptionDto } from '../performers/dto/performer-studio-option.dto';
@@ -139,6 +140,7 @@ export class HomeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly libraryService: LibraryService,
+    private readonly catalogProviderService: CatalogProviderService,
     private readonly sceneStatusService: SceneStatusService,
     private readonly hybridScenesService: HybridScenesService,
   ) {}
@@ -357,12 +359,12 @@ export class HomeService {
     let stashConfig: { baseUrl: string; apiKey?: string | null };
 
     try {
-      stashdbConfig = await this.getRequiredStashdbConfig();
+      stashdbConfig = await this.getRequiredCatalogConfig();
     } catch {
       return {
         items: [],
         message:
-          'Configure and enable your StashDB integration to populate this hybrid rail.',
+          'Configure and enable an active catalog provider to populate this hybrid rail.',
       };
     }
 
@@ -1122,36 +1124,16 @@ export class HomeService {
     };
   }
 
-  private async getRequiredStashdbConfig(): Promise<{
+  private async getRequiredCatalogConfig(): Promise<{
     baseUrl: string;
     apiKey?: string | null;
   }> {
-    const integration = await this.prisma.integrationConfig.findUnique({
-      where: { type: 'STASHDB' },
-    });
-
-    if (!integration) {
-      throw new ConflictException('STASHDB integration is not configured.');
-    }
-
-    if (!integration.enabled) {
-      throw new ConflictException('STASHDB integration is disabled.');
-    }
-
-    if (integration.status !== 'CONFIGURED') {
-      throw new ConflictException('STASHDB integration is not configured.');
-    }
-
-    const baseUrl = integration.baseUrl?.trim();
-    if (!baseUrl) {
-      throw new BadRequestException(
-        'STASHDB integration is missing a base URL.',
-      );
-    }
+    const catalogProvider =
+      await this.catalogProviderService.getActiveCatalogProvider();
 
     return {
-      baseUrl,
-      apiKey: integration.apiKey,
+      baseUrl: catalogProvider.baseUrl,
+      apiKey: catalogProvider.apiKey,
     };
   }
 }

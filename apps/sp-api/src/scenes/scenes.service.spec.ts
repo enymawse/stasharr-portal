@@ -1,5 +1,6 @@
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import {
   StashdbAdapter,
@@ -13,6 +14,9 @@ describe('ScenesService', () => {
   const integrationsService = {
     findOne: jest.fn(),
   } as unknown as IntegrationsService;
+  const catalogProviderService = {
+    getActiveCatalogProvider: jest.fn(),
+  } as unknown as CatalogProviderService;
 
   const stashdbAdapter = {
     getSceneById: jest.fn(),
@@ -78,6 +82,7 @@ describe('ScenesService', () => {
     jest.clearAllMocks();
     service = new ScenesService(
       integrationsService,
+      catalogProviderService,
       stashdbAdapter,
       sceneStatusService,
       stashAdapter,
@@ -87,10 +92,6 @@ describe('ScenesService', () => {
     integrationsService.findOne = jest
       .fn()
       .mockImplementation((type: IntegrationType) => {
-        if (type === IntegrationType.STASHDB) {
-          return stashdbIntegration;
-        }
-
         if (type === IntegrationType.STASH) {
           return stashIntegration;
         }
@@ -100,6 +101,15 @@ describe('ScenesService', () => {
         }
 
         throw new Error('Unexpected integration type');
+      });
+    catalogProviderService.getActiveCatalogProvider = jest
+      .fn()
+      .mockResolvedValue({
+        integrationType: 'STASHDB',
+        providerKey: 'STASHDB',
+        label: 'StashDB',
+        baseUrl: stashdbIntegration.baseUrl,
+        apiKey: stashdbIntegration.apiKey,
       });
 
     stashdbAdapter.getSceneById = jest.fn().mockResolvedValue(sceneDetails);
@@ -223,6 +233,49 @@ describe('ScenesService', () => {
       studioIds: [],
     });
     expect(stashAdapter.findScenesByStashId).not.toHaveBeenCalled();
+  });
+
+  it('uses the active FANSDB provider for discovery feed and scene detail source', async () => {
+    catalogProviderService.getActiveCatalogProvider = jest
+      .fn()
+      .mockResolvedValue({
+        integrationType: 'FANSDB',
+        providerKey: 'FANSDB',
+        label: 'FansDB',
+        baseUrl: 'http://fansdb.local/graphql',
+        apiKey: 'fansdb-key',
+      });
+
+    await expect(service.getScenesFeed()).resolves.toMatchObject({
+      items: [expect.objectContaining({ source: 'FANSDB' })],
+    });
+    await expect(service.getSceneById('stashdb-scene-1')).resolves.toMatchObject({
+      source: 'FANSDB',
+    });
+
+    expect(stashdbAdapter.getScenesBySort).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseUrl: 'http://fansdb.local/graphql',
+        apiKey: 'fansdb-key',
+      }),
+    );
+    expect(stashdbAdapter.getSceneById).toHaveBeenCalledWith(
+      'stashdb-scene-1',
+      {
+        baseUrl: 'http://fansdb.local/graphql',
+        apiKey: 'fansdb-key',
+      },
+    );
+    expect(stashAdapter.findScenesByStashId).toHaveBeenCalledWith(
+      'stashdb-scene-1',
+      {
+        baseUrl: stashIntegration.baseUrl,
+        apiKey: stashIntegration.apiKey,
+      },
+      {
+        providerKey: 'FANSDB',
+      },
+    );
   });
 
   it('forwards non-default sort to stashdb adapter', async () => {
@@ -414,8 +467,8 @@ describe('ScenesService', () => {
     integrationsService.findOne = jest
       .fn()
       .mockImplementation((type: IntegrationType) => {
-        if (type === IntegrationType.STASHDB) {
-          return stashdbIntegration;
+        if (type === IntegrationType.WHISPARR) {
+          return whisparrIntegration;
         }
 
         throw new Error('stash unavailable');

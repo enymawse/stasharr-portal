@@ -1,4 +1,24 @@
-export type IntegrationType = 'STASH' | 'WHISPARR' | 'STASHDB';
+export type CatalogProviderType = 'STASHDB' | 'FANSDB';
+export type IntegrationType = 'STASH' | 'WHISPARR' | CatalogProviderType;
+
+export function isCatalogProviderType(
+  type: IntegrationType,
+): type is CatalogProviderType {
+  return type === 'STASHDB' || type === 'FANSDB';
+}
+
+export function integrationLabel(type: IntegrationType): string {
+  switch (type) {
+    case 'FANSDB':
+      return 'FansDB';
+    case 'STASHDB':
+      return 'StashDB';
+    case 'STASH':
+      return 'Stash';
+    case 'WHISPARR':
+      return 'Whisparr';
+  }
+}
 
 export interface IntegrationResponse {
   type: IntegrationType;

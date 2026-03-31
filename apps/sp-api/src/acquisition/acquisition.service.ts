@@ -16,6 +16,7 @@ import {
 import { IndexingService } from '../indexing/indexing.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
 import {
@@ -43,6 +44,7 @@ export class AcquisitionService {
   constructor(
     private readonly indexingService: IndexingService,
     private readonly integrationsService: IntegrationsService,
+    private readonly catalogProviderService: CatalogProviderService,
     private readonly whisparrAdapter: WhisparrAdapter,
     private readonly prisma: PrismaService,
   ) {}
@@ -54,7 +56,8 @@ export class AcquisitionService {
   ): Promise<AcquisitionScenesFeedDto> {
     const startedAt = Date.now();
     const where = this.buildWhereClause(lifecycle);
-    const [rows, summary, whisparrConfig] = await Promise.all([
+    const [rows, summary, whisparrConfig, catalogProviderType] =
+      await Promise.all([
       this.prisma.sceneIndex.findMany({
         where,
         orderBy: [
@@ -79,6 +82,7 @@ export class AcquisitionService {
       }),
       this.indexingService.getSceneIndexSummary(),
       this.getWhisparrConfig(),
+      this.catalogProviderService.getSelectedCatalogProviderType(),
     ]);
     const countsByLifecycle = this.toCountsByLifecycle(summary);
     const total =
@@ -114,7 +118,11 @@ export class AcquisitionService {
       hasMore: page * perPage < total,
       countsByLifecycle,
       items: rows.map((row) =>
-        this.toAcquisitionItem(row, whisparrConfig?.baseUrl ?? null),
+        this.toAcquisitionItem(
+          row,
+          whisparrConfig?.baseUrl ?? null,
+          catalogProviderType ?? 'STASHDB',
+        ),
       ),
     };
   }
@@ -177,11 +185,12 @@ export class AcquisitionService {
   private toAcquisitionItem(
     row: SceneIndex,
     whisparrBaseUrl: string | null,
+    source: 'STASHDB' | 'FANSDB',
   ): AcquisitionSceneItemDto {
     const title = row.title?.trim() || row.stashId;
     const description =
       row.description ??
-      (row.title ? null : 'Scene metadata is unavailable in StashDB.');
+      (row.title ? null : 'Scene metadata is unavailable from the active catalog provider.');
 
     return {
       id: row.stashId,
@@ -195,7 +204,7 @@ export class AcquisitionService {
       releaseDate: row.releaseDate,
       duration: row.duration,
       type: 'SCENE',
-      source: 'STASHDB',
+      source,
       status: this.indexingService.toSceneStatus(row),
       whisparrViewUrl:
         whisparrBaseUrl && row.whisparrMovieId !== null

@@ -1,13 +1,12 @@
 import { NotFoundException } from '@nestjs/common';
-import { IntegrationStatus, IntegrationType } from '@prisma/client';
-import { IntegrationsService } from '../integrations/integrations.service';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { StudiosService } from './studios.service';
 
 describe('StudiosService', () => {
-  const integrationsService = {
-    findOne: jest.fn(),
-  } as unknown as IntegrationsService;
+  const catalogProviderService = {
+    getActiveCatalogProvider: jest.fn(),
+  } as unknown as CatalogProviderService;
 
   const stashdbAdapter = {
     getStudiosFeed: jest.fn(),
@@ -15,8 +14,9 @@ describe('StudiosService', () => {
   } as unknown as StashdbAdapter;
 
   const stashdbIntegration = {
-    enabled: true,
-    status: IntegrationStatus.CONFIGURED,
+    integrationType: 'STASHDB',
+    providerKey: 'STASHDB',
+    label: 'StashDB',
     baseUrl: 'http://stashdb.local/graphql',
     apiKey: 'stashdb-key',
   };
@@ -25,17 +25,11 @@ describe('StudiosService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new StudiosService(integrationsService, stashdbAdapter);
+    service = new StudiosService(catalogProviderService, stashdbAdapter);
 
-    integrationsService.findOne = jest
+    catalogProviderService.getActiveCatalogProvider = jest
       .fn()
-      .mockImplementation((type: IntegrationType) => {
-        if (type === IntegrationType.STASHDB) {
-          return stashdbIntegration;
-        }
-
-        throw new Error('Unexpected integration type');
-      });
+      .mockResolvedValue(stashdbIntegration);
 
     stashdbAdapter.getStudiosFeed = jest.fn().mockResolvedValue({
       total: 1,
@@ -163,6 +157,27 @@ describe('StudiosService', () => {
       direction: 'DESC',
       favoritesOnly: false,
     });
+  });
+
+  it('uses the active FANSDB provider for studio discovery', async () => {
+    catalogProviderService.getActiveCatalogProvider = jest
+      .fn()
+      .mockResolvedValue({
+        integrationType: 'FANSDB',
+        providerKey: 'FANSDB',
+        label: 'FansDB',
+        baseUrl: 'http://fansdb.local/graphql',
+        apiKey: 'fansdb-key',
+      });
+
+    await service.getStudiosFeed();
+
+    expect(stashdbAdapter.getStudiosFeed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseUrl: 'http://fansdb.local/graphql',
+        apiKey: 'fansdb-key',
+      }),
+    );
   });
 
   it('returns normalized studio details by id', async () => {

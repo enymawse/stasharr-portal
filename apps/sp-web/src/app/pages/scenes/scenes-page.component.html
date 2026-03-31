@@ -1,7 +1,7 @@
 <main>
   <header>
     <h1>Scenes</h1>
-    <p>Browse the StashDB catalog and keep lightweight acquisition status badges in view.</p>
+    <p>Browse the active catalog provider and keep lightweight acquisition status badges in view.</p>
     @if (!loading() && !error()) {
       <p class="state">{{ scenesTotalLabel() }}</p>
     }
@@ -9,7 +9,7 @@
 
   <section class="controls-shell" aria-label="Scenes controls">
     <div class="controls-header">
-      <span class="controls-title">StashDB Discovery</span>
+      <span class="controls-title">Catalog Discovery</span>
       <div class="controls-actions">
         <button
           type="button"
@@ -125,7 +125,7 @@
       </div>
 
       <label class="control-field">
-        <span>StashDB Favorites</span>
+        <span>Catalog Favorites</span>
         <p-select
           inputId="scenes-favorites"
           [ngModel]="selectedFavorites()"

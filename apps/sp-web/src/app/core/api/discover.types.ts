@@ -1,3 +1,5 @@
+import { CatalogProviderType } from './integrations.types';
+
 export type SceneStatusState =
   | 'NOT_REQUESTED'
   | 'REQUESTED'
@@ -26,7 +28,7 @@ export interface DiscoverItem {
   releaseDate: string | null;
   duration: number | null;
   type: 'SCENE';
-  source: 'STASHDB';
+  source: CatalogProviderType;
   status: SceneStatus;
 }
 
@@ -125,7 +127,7 @@ export interface SceneDetails {
   tags: SceneTag[];
   performers: ScenePerformer[];
   sourceUrls: SceneUrl[];
-  source: 'STASHDB';
+  source: CatalogProviderType;
   status: SceneStatus;
   stash: SceneStashAvailability | null;
   whisparr: SceneWhisparrAvailability | null;

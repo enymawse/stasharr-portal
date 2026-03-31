@@ -18,11 +18,11 @@
   } @else {
     @if (isSetupComplete()) {
       <p-message severity="success" styleClass="app-banner-message">
-        Setup complete: Stash, Whisparr, and StashDB are configured.
+        {{ setupSummary() }}
       </p-message>
     } @else {
       <p-message severity="warn" styleClass="app-banner-message">
-        Setup incomplete: configure Stash, Whisparr, and StashDB to continue.
+        {{ setupSummary() }}
       </p-message>
     }
 
@@ -30,9 +30,10 @@
       @for (type of integrationTypes; track type) {
         <article class="card">
           <h2>{{ labelFor(type) }}</h2>
-          <p class="meta">
-            {{ isRequired(type) ? 'Required' : 'Optional' }} | Status: {{ statusText(type) }}
-          </p>
+          <p class="meta">{{ integrationMeta(type) }}</p>
+          @if (catalogProviderHelp(type); as helpText) {
+            <p class="meta">{{ helpText }}</p>
+          }
 
           <form [formGroup]="formFor(type)" (ngSubmit)="saveIntegration(type)">
             <app-integration-form-fields

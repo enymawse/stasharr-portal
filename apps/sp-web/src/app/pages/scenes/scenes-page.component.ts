@@ -345,7 +345,7 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected scenesResultsNote(): string {
-    return 'Discovery filters come from StashDB. Lifecycle badges show where each scene sits in the Whisparr to Stash pipeline.';
+    return 'Discovery filters come from the active catalog provider. Lifecycle badges show where each scene sits in the Whisparr to Stash pipeline.';
   }
 
   protected emptyStateMessage(): string {

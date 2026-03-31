@@ -128,7 +128,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
     { value: 'TITLE', label: 'Title' },
   ];
   protected static readonly SOURCE_OPTIONS: Array<{ value: HomeRailSource; label: string }> = [
-    { value: 'STASHDB', label: 'StashDB' },
+    { value: 'STASHDB', label: 'Catalog' },
     { value: 'STASH', label: 'Stash' },
     { value: 'HYBRID', label: 'Hybrid' },
   ];
@@ -841,7 +841,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
       return 'Hybrid';
     }
 
-    return 'StashDB';
+    return 'Catalog';
   }
 
   protected isStashRail(
@@ -903,7 +903,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
   }
 
   protected isInternalSceneRoute(item: HomeRailItem): boolean {
-    return item.source === 'STASHDB';
+    return item.source === 'STASHDB' || item.source === 'FANSDB';
   }
 
   private loadRailContent(rails: HomeRailConfig[]) {
@@ -1509,7 +1509,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
         (option) => option.value === (config.stashdbFavorites ?? 'NONE'),
       )?.label ?? 'No Favorites Filter';
 
-    return `StashDB ${label}`;
+    return `Catalog ${label}`;
   }
 
   private stashLocalFavoritesLabelForRail(rail: HomeRailConfig): string | null {

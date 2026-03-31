@@ -7,6 +7,7 @@ import { IntegrationsService } from './integrations.service';
 
 describe('IntegrationsService', () => {
   const upsert = jest.fn<Promise<unknown>, [Record<string, unknown>]>();
+  const updateMany = jest.fn<Promise<unknown>, [Record<string, unknown>]>();
   const findUnique = jest.fn();
   const transaction = jest.fn();
   const stashTestConnection = jest.fn();
@@ -16,6 +17,7 @@ describe('IntegrationsService', () => {
   const prisma = {
     integrationConfig: {
       upsert,
+      updateMany,
       findUnique,
     },
     $transaction: transaction,
@@ -84,6 +86,7 @@ describe('IntegrationsService', () => {
     transaction.mockResolvedValue([
       { type: IntegrationType.WHISPARR },
       { type: IntegrationType.STASH },
+      { type: IntegrationType.FANSDB },
       { type: IntegrationType.STASHDB },
     ]);
 
@@ -91,10 +94,53 @@ describe('IntegrationsService', () => {
 
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(result.map((integration) => integration.type)).toEqual([
+      IntegrationType.FANSDB,
       IntegrationType.STASH,
       IntegrationType.STASHDB,
       IntegrationType.WHISPARR,
     ]);
+  });
+
+  it('disables other catalog providers when enabling one catalog integration', async () => {
+    upsert.mockResolvedValue({
+      type: IntegrationType.FANSDB,
+      enabled: true,
+    });
+    updateMany.mockResolvedValue({ count: 1 });
+    transaction.mockImplementation(async (operations: Promise<unknown>[]) =>
+      Promise.all(operations),
+    );
+
+    await expect(
+      service.upsert(IntegrationType.FANSDB, {
+        enabled: true,
+        baseUrl: 'http://fansdb.local/graphql',
+      }),
+    ).resolves.toMatchObject({
+      type: IntegrationType.FANSDB,
+      enabled: true,
+    });
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: {
+        type: {
+          in: [IntegrationType.STASHDB],
+        },
+      },
+      data: {
+        enabled: false,
+      },
+    });
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { type: IntegrationType.FANSDB },
+        update: expect.objectContaining({
+          enabled: true,
+          baseUrl: 'http://fansdb.local/graphql',
+          status: IntegrationStatus.CONFIGURED,
+        }),
+      }),
+    );
   });
 
   it('tests stash integration and stores success metadata', async () => {

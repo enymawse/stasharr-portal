@@ -6,6 +6,7 @@ import {
 import { IndexingService } from '../indexing/indexing.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
 import { AcquisitionService } from './acquisition.service';
 
@@ -45,6 +46,7 @@ function buildIndexedRow(overrides: Record<string, unknown> = {}) {
 
 describe('AcquisitionService', () => {
   const findOneMock = jest.fn();
+  const getSelectedCatalogProviderTypeMock = jest.fn();
   const buildSceneViewUrlMock = jest.fn();
   const requestMetadataHydrationForStashIdsMock = jest.fn();
   const toSceneStatusMock = jest.fn();
@@ -61,6 +63,9 @@ describe('AcquisitionService', () => {
   const integrationsService = {
     findOne: findOneMock,
   } as unknown as IntegrationsService;
+  const catalogProviderService = {
+    getSelectedCatalogProviderType: getSelectedCatalogProviderTypeMock,
+  } as unknown as CatalogProviderService;
 
   const whisparrAdapter = {
     buildSceneViewUrl: buildSceneViewUrlMock,
@@ -87,6 +92,7 @@ describe('AcquisitionService', () => {
     service = new AcquisitionService(
       indexingService,
       integrationsService,
+      catalogProviderService,
       whisparrAdapter,
       prismaService,
     );
@@ -106,6 +112,7 @@ describe('AcquisitionService', () => {
 
       throw new Error(`Unexpected integration type: ${type}`);
     });
+    getSelectedCatalogProviderTypeMock.mockResolvedValue('STASHDB');
     getSceneIndexSummaryMock.mockResolvedValue({
       indexedScenes: 10,
       acquisitionTrackedScenes: 4,
@@ -156,6 +163,7 @@ describe('AcquisitionService', () => {
     expect(result.items[0]?.whisparrViewUrl).toBe(
       'http://whisparr.local/movie/40',
     );
+    expect(result.items[0]?.source).toBe('STASHDB');
     expect(sceneIndexFindManyMock).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -242,5 +250,13 @@ describe('AcquisitionService', () => {
       'acquisition-page',
     );
     expect(result.items[0]?.title).toBe('scene-missing-metadata');
+  });
+
+  it('marks acquisition scenes with the active FANSDB provider source', async () => {
+    getSelectedCatalogProviderTypeMock.mockResolvedValue('FANSDB');
+
+    const result = await service.getScenesFeed(1, 2);
+
+    expect(result.items.every((item) => item.source === 'FANSDB')).toBe(true);
   });
 });

@@ -5,7 +5,7 @@
         <p class="eyebrow">Home</p>
         <h1>Your rails, now driven by saved scene filters.</h1>
         <p class="lede">
-          Keep the built-in favorites rails, mix in your local library, add custom StashDB scene
+          Keep the built-in favorites rails, mix in your local library, add custom catalog scene
           rails, and shape Home into a personal browsing screen instead of a fixed landing page.
         </p>
         <div class="hero-actions">
@@ -55,7 +55,7 @@
         <div class="editor-head">
           <div>
             <p class="eyebrow">Customize Home</p>
-            <h2>Reorder built-ins and add custom StashDB, Stash, or Hybrid scene rails</h2>
+            <h2>Reorder built-ins and add custom Catalog, Stash, or Hybrid scene rails</h2>
           </div>
           <div class="editor-actions">
             <button type="button" class="state-button secondary" (click)="cancelEditor()">
@@ -246,7 +246,7 @@
               @if (editingRailId()) {
                 <p class="editor-note source-note">
                   Source is fixed after creation. Create a new rail if you want to switch between
-                  StashDB, Stash, and Hybrid.
+                  Catalog, Stash, and Hybrid.
                 </p>
               }
 
@@ -358,7 +358,7 @@
                 </label>
               } @else if (form.source === 'HYBRID') {
                 <label class="control-field">
-                  <span>StashDB Favorites</span>
+                  <span>Catalog Favorites</span>
                   <p-select
                     inputId="home-rail-hybrid-favorites"
                     [ngModel]="form.stashdbFavorites"
@@ -579,9 +579,10 @@
                 </div>
 
                 <p class="editor-note source-note">
-                  Hybrid rails discover scenes from StashDB, then filter them by whether they exist
-                  in your local Stash library. StashDB favorites drive discovery; Stash local
-                  favorites are applied as a separate overlay after library matching.
+                  Hybrid rails discover scenes from the active catalog provider, then filter them
+                  by whether they exist in your local Stash library. Catalog favorites drive
+                  discovery; Stash local favorites are applied as a separate overlay after library
+                  matching.
                 </p>
               }
             }

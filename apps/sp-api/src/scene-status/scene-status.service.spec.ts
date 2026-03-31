@@ -6,6 +6,7 @@ import {
 import { IndexingService } from '../indexing/indexing.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
 import { SceneStatusService } from './scene-status.service';
@@ -38,6 +39,9 @@ describe('SceneStatusService', () => {
   const integrationsService = {
     findOne: findOneMock,
   } as unknown as IntegrationsService;
+  const catalogProviderService = {
+    getActiveCatalogProviderOrNull: jest.fn(),
+  } as unknown as CatalogProviderService;
 
   const stashAdapter = {
     findScenesByStashId: findScenesByStashIdMock,
@@ -77,6 +81,7 @@ describe('SceneStatusService', () => {
       indexingService,
       prisma,
       integrationsService,
+      catalogProviderService,
       stashAdapter,
       whisparrAdapter,
     );
@@ -90,12 +95,17 @@ describe('SceneStatusService', () => {
         return Promise.resolve(configuredStashIntegration);
       }
 
-      if (type === IntegrationType.STASHDB) {
-        return Promise.resolve(configuredStashdbIntegration);
-      }
-
       return Promise.reject(new Error(`Unexpected integration type: ${type}`));
     });
+    catalogProviderService.getActiveCatalogProviderOrNull = jest
+      .fn()
+      .mockResolvedValue({
+        integrationType: 'STASHDB',
+        providerKey: 'STASHDB',
+        label: 'StashDB',
+        baseUrl: configuredStashdbIntegration.baseUrl,
+        apiKey: configuredStashdbIntegration.apiKey,
+      });
     requestDelegate.findUnique.mockResolvedValue(null);
     requestDelegate.findMany.mockResolvedValue([]);
     findScenesByStashIdMock.mockResolvedValue([]);

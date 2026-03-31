@@ -1,11 +1,5 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { IntegrationStatus, IntegrationType } from '@prisma/client';
-import { IntegrationsService } from '../integrations/integrations.service';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { StashdbSortDirection } from '../providers/stashdb/stashdb.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { StudioDetailsDto } from './dto/studio-details.dto';
@@ -20,7 +14,7 @@ export class StudiosService {
   private static readonly DEFAULT_DIRECTION: StashdbSortDirection = 'ASC';
 
   constructor(
-    private readonly integrationsService: IntegrationsService,
+    private readonly catalogProviderService: CatalogProviderService,
     private readonly stashdbAdapter: StashdbAdapter,
   ) {}
 
@@ -34,7 +28,7 @@ export class StudiosService {
       favoritesOnly?: boolean;
     },
   ): Promise<StudioFeedResponseDto> {
-    const config = await this.getStashdbConfig();
+    const config = await this.getActiveCatalogConfig();
 
     const studios = await this.stashdbAdapter.getStudiosFeed({
       baseUrl: config.baseUrl,
@@ -71,7 +65,7 @@ export class StudiosService {
       throw new BadRequestException('Studio id is required.');
     }
 
-    const config = await this.getStashdbConfig();
+    const config = await this.getActiveCatalogConfig();
     const studio = await this.stashdbAdapter.getStudioById(
       normalizedStudioId,
       config,
@@ -93,44 +87,16 @@ export class StudiosService {
     };
   }
 
-  private async getStashdbConfig(): Promise<{
+  private async getActiveCatalogConfig(): Promise<{
     baseUrl: string;
     apiKey: string | null;
   }> {
-    const integration = await this.getStashdbIntegration();
-
-    if (!integration.enabled) {
-      throw new ConflictException('STASHDB integration is disabled.');
-    }
-
-    if (integration.status !== IntegrationStatus.CONFIGURED) {
-      throw new ConflictException('STASHDB integration is not configured.');
-    }
-
-    const baseUrl = integration.baseUrl?.trim();
-    if (!baseUrl) {
-      throw new BadRequestException(
-        'STASHDB integration is missing a base URL.',
-      );
-    }
+    const catalogProvider =
+      await this.catalogProviderService.getActiveCatalogProvider();
 
     return {
-      baseUrl,
-      apiKey: integration.apiKey,
+      baseUrl: catalogProvider.baseUrl,
+      apiKey: catalogProvider.apiKey,
     };
-  }
-
-  private async getStashdbIntegration() {
-    try {
-      return await this.integrationsService.findOne(IntegrationType.STASHDB);
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw new ConflictException(
-          'STASHDB integration has not been created yet.',
-        );
-      }
-
-      throw error;
-    }
   }
 }

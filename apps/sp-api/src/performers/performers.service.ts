@@ -3,12 +3,9 @@ import {
 } from '../discover/dto/discover-item.dto';
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
-import { IntegrationStatus, IntegrationType } from '@prisma/client';
-import { IntegrationsService } from '../integrations/integrations.service';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
 import { SceneStatusService } from '../scene-status/scene-status.service';
@@ -34,7 +31,7 @@ export class PerformersService {
   private static readonly DEFAULT_SCENES_SORT_DIRECTION: PerformerScenesSortDirection = 'DESC';
 
   constructor(
-    private readonly integrationsService: IntegrationsService,
+    private readonly catalogProviderService: CatalogProviderService,
     private readonly stashdbAdapter: StashdbAdapter,
     private readonly sceneStatusService: SceneStatusService,
   ) {}
@@ -50,25 +47,12 @@ export class PerformersService {
       favoritesOnly?: boolean;
     },
   ): Promise<PerformerFeedResponseDto> {
-    const integration = await this.getStashdbIntegration();
-
-    if (!integration.enabled) {
-      throw new ConflictException('STASHDB integration is disabled.');
-    }
-
-    if (integration.status !== IntegrationStatus.CONFIGURED) {
-      throw new ConflictException('STASHDB integration is not configured.');
-    }
-
-    if (!integration.baseUrl) {
-      throw new BadRequestException(
-        'STASHDB integration is missing a base URL.',
-      );
-    }
+    const catalogProvider =
+      await this.catalogProviderService.getActiveCatalogProvider();
 
     const performers = await this.stashdbAdapter.getPerformersFeed({
-      baseUrl: integration.baseUrl,
-      apiKey: integration.apiKey,
+      baseUrl: catalogProvider.baseUrl,
+      apiKey: catalogProvider.apiKey,
       page,
       perPage,
       name: filters?.name,
@@ -104,7 +88,7 @@ export class PerformersService {
       throw new BadRequestException('Performer id is required.');
     }
 
-    const config = await this.getStashdbConfig();
+    const config = await this.getActiveCatalogConfig();
     const performer = await this.stashdbAdapter.getPerformerById(
       normalizedPerformerId,
       config,
@@ -159,9 +143,11 @@ export class PerformersService {
       throw new BadRequestException('Performer id is required.');
     }
 
-    const config = await this.getStashdbConfig();
+    const catalogProvider =
+      await this.catalogProviderService.getActiveCatalogProvider();
     const scenes = await this.stashdbAdapter.getScenesForPerformer({
-      ...config,
+      baseUrl: catalogProvider.baseUrl,
+      apiKey: catalogProvider.apiKey,
       performerId: normalizedPerformerId,
       page,
       perPage,
@@ -194,7 +180,7 @@ export class PerformersService {
         releaseDate: scene.releaseDate ?? scene.productionDate ?? scene.date,
         duration: scene.duration,
         type: 'SCENE',
-        source: 'STASHDB',
+        source: catalogProvider.integrationType,
         status: statuses.get(scene.id) ?? { state: 'NOT_REQUESTED' },
       })),
     };
@@ -206,7 +192,7 @@ export class PerformersService {
       return [];
     }
 
-    const config = await this.getStashdbConfig();
+    const config = await this.getActiveCatalogConfig();
     return this.stashdbAdapter.searchStudios(normalizedQuery, config);
   }
 
@@ -219,7 +205,7 @@ export class PerformersService {
       throw new BadRequestException('Performer id is required.');
     }
 
-    const config = await this.getStashdbConfig();
+    const config = await this.getActiveCatalogConfig();
     return this.stashdbAdapter.favoritePerformer(
       normalizedPerformerId,
       favorite,
@@ -227,48 +213,20 @@ export class PerformersService {
     );
   }
 
-  private async getStashdbConfig(): Promise<{
+  private async getActiveCatalogConfig(): Promise<{
     baseUrl: string;
     apiKey: string | null;
   }> {
-    const integration = await this.getStashdbIntegration();
-
-    if (!integration.enabled) {
-      throw new ConflictException('STASHDB integration is disabled.');
-    }
-
-    if (integration.status !== IntegrationStatus.CONFIGURED) {
-      throw new ConflictException('STASHDB integration is not configured.');
-    }
-
-    const baseUrl = integration.baseUrl?.trim();
-    if (!baseUrl) {
-      throw new BadRequestException(
-        'STASHDB integration is missing a base URL.',
-      );
-    }
+    const catalogProvider =
+      await this.catalogProviderService.getActiveCatalogProvider();
 
     return {
-      baseUrl,
-      apiKey: integration.apiKey,
+      baseUrl: catalogProvider.baseUrl,
+      apiKey: catalogProvider.apiKey,
     };
   }
 
   private normalizeIds(ids: string[]): string[] {
     return [...new Set(ids.map((id) => id.trim()).filter((id) => id.length > 0))];
-  }
-
-  private async getStashdbIntegration() {
-    try {
-      return await this.integrationsService.findOne(IntegrationType.STASHDB);
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw new ConflictException(
-          'STASHDB integration has not been created yet.',
-        );
-      }
-
-      throw error;
-    }
   }
 }

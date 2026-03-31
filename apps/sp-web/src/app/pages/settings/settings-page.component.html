@@ -52,6 +52,9 @@
                 <h2>{{ labelFor(type) }}</h2>
                 <p class="status">Status: {{ statusText(type) }}</p>
               </div>
+              @if (catalogProviderHelp(type); as helpText) {
+                <p class="status">{{ helpText }}</p>
+              }
 
               <form [formGroup]="formFor(type)" (ngSubmit)="saveIntegration(type)">
                 <app-integration-form-fields
@@ -166,7 +169,7 @@
 
     <section class="global-danger">
       <h2>Global Danger Zone</h2>
-      <p>Resetting all integrations clears configuration for Stash, Whisparr, and StashDB.</p>
+      <p>Resetting all integrations clears configuration for Stash, Whisparr, StashDB, and FansDB.</p>
 
       <button pButton type="button" class="danger" (click)="requestResetAll()">
         Reset all integrations

@@ -17,6 +17,7 @@ import {
   WhisparrAdapter,
   WhisparrAdapterBaseConfig,
 } from '../providers/whisparr/whisparr.adapter';
+import { isCatalogProviderIntegrationType } from '../providers/catalog/catalog-provider.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
 
@@ -42,7 +43,7 @@ export class IntegrationsService {
     const configured =
       !!dto.baseUrl?.trim() || !!dto.apiKey?.trim() || !!dto.name?.trim();
 
-    return this.prisma.integrationConfig.upsert({
+    const upsertArgs = {
       where: { type },
       update: {
         enabled: dto.enabled,
@@ -65,7 +66,29 @@ export class IntegrationsService {
           ? IntegrationStatus.CONFIGURED
           : IntegrationStatus.NOT_CONFIGURED,
       },
-    });
+    } satisfies Prisma.IntegrationConfigUpsertArgs;
+
+    if (isCatalogProviderIntegrationType(type) && dto.enabled === true) {
+      const [, integration] = await this.prisma.$transaction([
+        this.prisma.integrationConfig.updateMany({
+          where: {
+            type: {
+              in: Object.values(IntegrationType).filter(
+                (candidate) => candidate !== type && isCatalogProviderIntegrationType(candidate),
+              ),
+            },
+          },
+          data: {
+            enabled: false,
+          },
+        }),
+        this.prisma.integrationConfig.upsert(upsertArgs),
+      ]);
+
+      return integration;
+    }
+
+    return this.prisma.integrationConfig.upsert(upsertArgs);
   }
 
   async findOne(type: IntegrationType): Promise<IntegrationConfig> {
@@ -92,6 +115,7 @@ export class IntegrationsService {
           await this.stashAdapter.testConnection(config);
           break;
         case IntegrationType.STASHDB:
+        case IntegrationType.FANSDB:
           await this.stashdbAdapter.testConnection(config);
           break;
         case IntegrationType.WHISPARR:

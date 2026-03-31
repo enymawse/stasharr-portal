@@ -196,6 +196,7 @@ enum HomeRailContentType {
 
 enum IntegrationType {
   STASHDB
+  FANSDB
   STASH
   WHISPARR
 }

@@ -13,8 +13,8 @@ import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   type CatalogProviderKey,
-  resolveCatalogProviderKey,
 } from '../providers/catalog/catalog-provider.util';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import {
   StashAdapter,
   type StashLocalLibrarySceneItem,
@@ -160,6 +160,7 @@ export class IndexingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly integrationsService: IntegrationsService,
+    private readonly catalogProviderService: CatalogProviderService,
     private readonly whisparrAdapter: WhisparrAdapter,
     private readonly stashAdapter: StashAdapter,
     private readonly stashdbAdapter: StashdbAdapter,
@@ -1349,7 +1350,7 @@ export class IndexingService {
     reason: string,
     stashIds: string[],
   ): Promise<void> {
-    const config = await this.getStashdbConfig();
+    const config = await this.getActiveCatalogConfig();
     if (!config) {
       return;
     }
@@ -2571,41 +2572,25 @@ export class IndexingService {
   }
 
   private async getActiveCatalogProviderKey(): Promise<CatalogProviderKey | null> {
-    const config = await this.getStashdbConfig();
-    if (!config) {
-      return null;
-    }
-
-    return resolveCatalogProviderKey(config.baseUrl);
+    const catalogProvider =
+      await this.catalogProviderService.getActiveCatalogProviderOrNull();
+    return catalogProvider?.providerKey ?? null;
   }
 
-  private async getStashdbConfig(): Promise<{
+  private async getActiveCatalogConfig(): Promise<{
     baseUrl: string;
     apiKey: string | null;
   } | null> {
-    try {
-      const integration = await this.integrationsService.findOne(
-        IntegrationType.STASHDB,
-      );
-      if (
-        !integration.enabled ||
-        integration.status !== IntegrationStatus.CONFIGURED
-      ) {
-        return null;
-      }
-
-      const baseUrl = integration.baseUrl?.trim();
-      if (!baseUrl) {
-        return null;
-      }
-
-      return {
-        baseUrl,
-        apiKey: integration.apiKey,
-      };
-    } catch {
+    const catalogProvider =
+      await this.catalogProviderService.getActiveCatalogProviderOrNull();
+    if (!catalogProvider) {
       return null;
     }
+
+    return {
+      baseUrl: catalogProvider.baseUrl,
+      apiKey: catalogProvider.apiKey,
+    };
   }
 
   private safeJson(value: unknown): string {

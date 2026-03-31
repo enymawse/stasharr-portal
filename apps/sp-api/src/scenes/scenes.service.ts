@@ -1,15 +1,8 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
-import {
-  type CatalogProviderKey,
-  resolveCatalogProviderKey,
-} from '../providers/catalog/catalog-provider.util';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
+import { type CatalogProviderKey } from '../providers/catalog/catalog-provider.util';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { withStashImageSize } from '../providers/stashdb/stashdb-image-url.util';
@@ -40,6 +33,7 @@ export class ScenesService {
 
   constructor(
     private readonly integrationsService: IntegrationsService,
+    private readonly catalogProviderService: CatalogProviderService,
     private readonly stashdbAdapter: StashdbAdapter,
     private readonly sceneStatusService: SceneStatusService,
     private readonly stashAdapter: StashAdapter,
@@ -56,11 +50,13 @@ export class ScenesService {
     favorites?: SceneFavoritesFilter,
     studioIds: string[] = [],
   ): Promise<ScenesFeedResponseDto> {
-    const stashdbConfig = await this.getStashdbConfig();
+    const catalogProvider =
+      await this.catalogProviderService.getActiveCatalogProvider();
     const normalizedTagIds = this.normalizeTagIds(tagIds);
     const normalizedStudioIds = this.normalizeStudioIds(studioIds);
     const scenes = await this.stashdbAdapter.getScenesBySort({
-      ...stashdbConfig,
+      baseUrl: catalogProvider.baseUrl,
+      apiKey: catalogProvider.apiKey,
       page,
       perPage,
       sort,
@@ -88,6 +84,7 @@ export class ScenesService {
         const status = statuses.get(scene.id) ?? { state: 'NOT_REQUESTED' };
         return this.toScenesFeedItem(
           scene,
+          catalogProvider.integrationType,
           status,
           isSceneStatusRequestable(status),
         );
@@ -101,25 +98,12 @@ export class ScenesService {
       return [];
     }
 
-    const integration = await this.getStashdbIntegration();
-
-    if (!integration.enabled) {
-      throw new ConflictException('STASHDB integration is disabled.');
-    }
-
-    if (integration.status !== IntegrationStatus.CONFIGURED) {
-      throw new ConflictException('STASHDB integration is not configured.');
-    }
-
-    if (!integration.baseUrl) {
-      throw new BadRequestException(
-        'STASHDB integration is missing a base URL.',
-      );
-    }
+    const catalogProvider =
+      await this.catalogProviderService.getActiveCatalogProvider();
 
     return this.stashdbAdapter.searchTags({
-      baseUrl: integration.baseUrl,
-      apiKey: integration.apiKey,
+      baseUrl: catalogProvider.baseUrl,
+      apiKey: catalogProvider.apiKey,
       query: normalizedQuery,
     });
   }
@@ -130,30 +114,17 @@ export class ScenesService {
       throw new BadRequestException('Scene stashId is required.');
     }
 
-    const integration = await this.getStashdbIntegration();
-
-    if (!integration.enabled) {
-      throw new ConflictException('STASHDB integration is disabled.');
-    }
-
-    if (integration.status !== IntegrationStatus.CONFIGURED) {
-      throw new ConflictException('STASHDB integration is not configured.');
-    }
-
-    if (!integration.baseUrl) {
-      throw new BadRequestException(
-        'STASHDB integration is missing a base URL.',
-      );
-    }
+    const catalogProvider =
+      await this.catalogProviderService.getActiveCatalogProvider();
 
     const scene = await this.stashdbAdapter.getSceneById(sceneId, {
-      baseUrl: integration.baseUrl,
-      apiKey: integration.apiKey,
+      baseUrl: catalogProvider.baseUrl,
+      apiKey: catalogProvider.apiKey,
     });
     const status = await this.sceneStatusService.resolveForScene(scene.id);
     const stash = await this.resolveStashAvailability(
       scene.id,
-      resolveCatalogProviderKey(integration.baseUrl),
+      catalogProvider.providerKey,
     );
     const whisparr = await this.resolveWhisparrAvailability(scene.id);
 
@@ -176,7 +147,7 @@ export class ScenesService {
         cardImageUrl: withStashImageSize(performer.imageUrl, 300),
       })),
       sourceUrls: scene.sourceUrls,
-      source: 'STASHDB',
+      source: catalogProvider.integrationType,
       status,
       stash,
       whisparr,
@@ -192,11 +163,15 @@ export class ScenesService {
       throw new BadRequestException('Studio id is required.');
     }
 
-    const config = await this.getStashdbConfig();
+    const catalogProvider =
+      await this.catalogProviderService.getActiveCatalogProvider();
     return this.stashdbAdapter.favoriteStudio(
       normalizedStudioId,
       favorite,
-      config,
+      {
+        baseUrl: catalogProvider.baseUrl,
+        apiKey: catalogProvider.apiKey,
+      },
     );
   }
 
@@ -246,47 +221,6 @@ export class ScenesService {
     }
   }
 
-  private async getStashdbIntegration() {
-    try {
-      return await this.integrationsService.findOne(IntegrationType.STASHDB);
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw new ConflictException(
-          'STASHDB integration has not been created yet.',
-        );
-      }
-
-      throw error;
-    }
-  }
-
-  private async getStashdbConfig(): Promise<{
-    baseUrl: string;
-    apiKey: string | null;
-  }> {
-    const integration = await this.getStashdbIntegration();
-
-    if (!integration.enabled) {
-      throw new ConflictException('STASHDB integration is disabled.');
-    }
-
-    if (integration.status !== IntegrationStatus.CONFIGURED) {
-      throw new ConflictException('STASHDB integration is not configured.');
-    }
-
-    const baseUrl = integration.baseUrl?.trim();
-    if (!baseUrl) {
-      throw new BadRequestException(
-        'STASHDB integration is missing a base URL.',
-      );
-    }
-
-    return {
-      baseUrl,
-      apiKey: integration.apiKey,
-    };
-  }
-
   private toScenesFeedItem(
     scene: {
       id: string;
@@ -301,6 +235,7 @@ export class ScenesService {
       date: string | null;
       duration: number | null;
     },
+    source: 'STASHDB' | 'FANSDB',
     status: SceneStatusDto,
     requestable: boolean,
   ) {
@@ -316,7 +251,7 @@ export class ScenesService {
       releaseDate: scene.releaseDate ?? scene.productionDate ?? scene.date,
       duration: scene.duration,
       type: 'SCENE' as const,
-      source: 'STASHDB' as const,
+      source,
       status,
       requestable,
     };

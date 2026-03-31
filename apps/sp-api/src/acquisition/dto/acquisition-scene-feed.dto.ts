@@ -1,4 +1,5 @@
 import { SceneStatusDto } from '../../scene-status/dto/scene-status.dto';
+import { type CatalogProviderKey } from '../../providers/catalog/catalog-provider.util';
 
 export class AcquisitionCountsByLifecycleDto {
   REQUESTED!: number;
@@ -19,7 +20,7 @@ export class AcquisitionSceneItemDto {
   releaseDate!: string | null;
   duration!: number | null;
   type!: 'SCENE';
-  source!: 'STASHDB';
+  source!: CatalogProviderKey;
   status!: SceneStatusDto;
   whisparrViewUrl!: string | null;
 }

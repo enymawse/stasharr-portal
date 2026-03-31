@@ -1,6 +1,7 @@
 export const CATALOG_PROVIDER_KEYS = ['STASHDB', 'FANSDB'] as const;
 
 export type CatalogProviderKey = (typeof CATALOG_PROVIDER_KEYS)[number];
+export type CatalogProviderIntegrationType = CatalogProviderKey;
 
 const PROVIDER_PATTERNS: Record<CatalogProviderKey, readonly string[]> = {
   STASHDB: ['stashdb.org', 'stashdb'],
@@ -37,6 +38,32 @@ export function resolveCatalogProviderKey(
   }
 
   return null;
+}
+
+export function isCatalogProviderIntegrationType(
+  value: string | null | undefined,
+): value is CatalogProviderIntegrationType {
+  return CATALOG_PROVIDER_KEYS.includes(
+    (value ?? '').trim().toUpperCase() as CatalogProviderIntegrationType,
+  );
+}
+
+export function catalogProviderKeyFromIntegrationType(
+  type: CatalogProviderIntegrationType,
+): CatalogProviderKey {
+  return type;
+}
+
+export function getCatalogProviderLabel(
+  providerKey: CatalogProviderKey | null | undefined,
+): string {
+  switch (providerKey) {
+    case 'FANSDB':
+      return 'FansDB';
+    case 'STASHDB':
+    default:
+      return 'StashDB';
+  }
 }
 
 export function buildCatalogSceneRef(
