@@ -64,9 +64,7 @@ export class SetupPageComponent implements OnInit {
     FANSDB: this.createIntegrationForm(),
   };
 
-  private readonly integrations = signal<
-    Record<IntegrationType, IntegrationResponse | null>
-  >({
+  private readonly integrations = signal<Record<IntegrationType, IntegrationResponse | null>>({
     STASH: null,
     WHISPARR: null,
     STASHDB: null,
@@ -80,9 +78,7 @@ export class SetupPageComponent implements OnInit {
     FANSDB: this.defaultSaveState(),
   });
 
-  protected readonly isSetupComplete = computed(
-    () => this.status()?.setupComplete ?? false,
-  );
+  protected readonly isSetupComplete = computed(() => this.status()?.setupComplete ?? false);
 
   ngOnInit(): void {
     this.loadSetupData();
@@ -108,6 +104,10 @@ export class SetupPageComponent implements OnInit {
     return this.status()?.catalogProvider ?? null;
   }
 
+  protected catalogProviderReady(): boolean {
+    return this.status()?.required.catalog ?? false;
+  }
+
   protected integrationMeta(type: IntegrationType): string {
     if (this.isCatalogProvider(type)) {
       return `${this.catalogProvider() === type ? 'Instance Catalog Provider' : 'Catalog Provider Option'} | Status: ${this.statusText(type)}`;
@@ -123,6 +123,10 @@ export class SetupPageComponent implements OnInit {
     }
 
     if (catalogProvider) {
+      if (!this.catalogProviderReady()) {
+        return `Setup in progress: this Stasharr instance is locked to ${this.labelFor(catalogProvider)}, but that catalog integration needs repair before setup can finish. Repair it below or reset catalog setup to choose a different provider.`;
+      }
+
       return `Setup in progress: this Stasharr instance is configured for ${this.labelFor(catalogProvider)}. Finish Stash and Whisparr, or reset catalog setup to choose a different provider.`;
     }
 
@@ -135,6 +139,10 @@ export class SetupPageComponent implements OnInit {
     }
 
     if (this.catalogProvider() === type) {
+      if (!this.catalogProviderReady()) {
+        return `${this.labelFor(type)} remains locked in as this instance's catalog provider even while unhealthy. Repair it below or reset catalog setup before choosing a different provider.`;
+      }
+
       return `${this.labelFor(type)} is locked in as this instance's catalog provider. /scenes, performers, studios, requests, and indexing will use it.`;
     }
 

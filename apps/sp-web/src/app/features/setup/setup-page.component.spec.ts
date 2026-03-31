@@ -31,10 +31,7 @@ describe('SetupPageComponent', () => {
     TestBed.resetTestingModule();
   });
 
-  async function renderPage(
-    status: SetupStatusResponse,
-    integrations: IntegrationResponse[],
-  ) {
+  async function renderPage(status: SetupStatusResponse, integrations: IntegrationResponse[]) {
     const setupService = {
       getStatus: vi.fn().mockReturnValue(of(status)),
     };
@@ -141,6 +138,34 @@ describe('SetupPageComponent', () => {
     );
     expect(component.catalogProviderHelp('FANSDB')).toBe(
       "FansDB is locked in as this instance's catalog provider. /scenes, performers, studios, requests, and indexing will use it.",
+    );
+  });
+
+  it('keeps setup locked to the chosen provider when it is unhealthy', async () => {
+    const { component } = await renderPage(
+      {
+        setupComplete: false,
+        required: { stash: true, catalog: false, whisparr: true },
+        catalogProvider: 'FANSDB',
+      },
+      [
+        buildIntegration({ type: 'STASH' }),
+        buildIntegration({ type: 'WHISPARR' }),
+        buildIntegration({
+          type: 'FANSDB',
+          status: 'ERROR',
+          baseUrl: 'http://fansdb.local/graphql',
+          lastErrorMessage: 'bad credentials',
+        }),
+      ],
+    );
+
+    expect(component.visibleCatalogProviderTypes()).toEqual(['FANSDB']);
+    expect(component.setupSummary()).toBe(
+      'Setup in progress: this Stasharr instance is locked to FansDB, but that catalog integration needs repair before setup can finish. Repair it below or reset catalog setup to choose a different provider.',
+    );
+    expect(component.catalogProviderHelp('FANSDB')).toBe(
+      "FansDB remains locked in as this instance's catalog provider even while unhealthy. Repair it below or reset catalog setup before choosing a different provider.",
     );
   });
 });

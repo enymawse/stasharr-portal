@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
-import {
-  configuredCatalogProviderTypeFromIntegrations,
-  type CatalogProviderIntegrationType,
-} from '../providers/catalog/catalog-provider.util';
+import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
+import { type CatalogProviderIntegrationType } from '../providers/catalog/catalog-provider.util';
 
 export interface SetupStatusResponse {
   setupComplete: boolean;
@@ -18,10 +16,18 @@ export interface SetupStatusResponse {
 
 @Injectable()
 export class SetupService {
-  constructor(private readonly integrationsService: IntegrationsService) {}
+  constructor(
+    private readonly integrationsService: IntegrationsService,
+    private readonly catalogProviderService: CatalogProviderService,
+  ) {}
 
   async getStatus(): Promise<SetupStatusResponse> {
-    const integrations = await this.integrationsService.findAll();
+    const [integrations, catalogProvider, configuredCatalogProvider] =
+      await Promise.all([
+        this.integrationsService.findAll(),
+        this.catalogProviderService.getInstanceCatalogProviderType(),
+        this.catalogProviderService.getConfiguredCatalogProviderType(),
+      ]);
 
     const isConfigured = (type: IntegrationType): boolean =>
       integrations.some(
@@ -29,18 +35,12 @@ export class SetupService {
           integration.type === type &&
           integration.status === IntegrationStatus.CONFIGURED,
       );
-    const catalogProvider = configuredCatalogProviderTypeFromIntegrations(
-      integrations.map((integration) => ({
-        type: integration.type,
-        enabled: integration.enabled,
-        status: integration.status,
-        baseUrl: integration.baseUrl,
-      })),
-    );
 
     const required = {
       stash: isConfigured(IntegrationType.STASH),
-      catalog: catalogProvider !== null,
+      catalog:
+        catalogProvider !== null &&
+        configuredCatalogProvider === catalogProvider,
       whisparr: isConfigured(IntegrationType.WHISPARR),
     };
 

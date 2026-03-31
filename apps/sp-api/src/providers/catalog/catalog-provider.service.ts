@@ -1,11 +1,16 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { IntegrationStatus, IntegrationType } from '@prisma/client';
 import { IntegrationsService } from '../../integrations/integrations.service';
 import {
   type CatalogProviderIntegrationType,
   type CatalogProviderKey,
   catalogProviderKeyFromIntegrationType,
-  configuredCatalogProviderTypeFromIntegrations,
+  instanceCatalogProviderTypeFromIntegrations,
+  isCatalogProviderReady,
   getCatalogProviderLabel,
 } from './catalog-provider.util';
 
@@ -21,16 +26,34 @@ export interface ConfiguredCatalogProvider {
 export class CatalogProviderService {
   constructor(private readonly integrationsService: IntegrationsService) {}
 
-  async getConfiguredCatalogProviderType(): Promise<CatalogProviderIntegrationType | null> {
+  async getInstanceCatalogProviderType(): Promise<CatalogProviderIntegrationType | null> {
     const integrations = await this.integrationsService.findAll();
-    return configuredCatalogProviderTypeFromIntegrations(
+    return instanceCatalogProviderTypeFromIntegrations(
       integrations.map((integration) => ({
         type: integration.type,
         enabled: integration.enabled,
         status: integration.status,
         baseUrl: integration.baseUrl,
+        config: integration.config,
       })),
     );
+  }
+
+  async getConfiguredCatalogProviderType(): Promise<CatalogProviderIntegrationType | null> {
+    const selectedType = await this.getInstanceCatalogProviderType();
+    if (!selectedType) {
+      return null;
+    }
+
+    try {
+      const integration = await this.integrationsService.findOne(
+        selectedType as IntegrationType,
+      );
+
+      return isCatalogProviderReady(integration) ? selectedType : null;
+    } catch {
+      return null;
+    }
   }
 
   async getConfiguredCatalogProviderOrNull(): Promise<ConfiguredCatalogProvider | null> {
@@ -66,10 +89,10 @@ export class CatalogProviderService {
   }
 
   async getConfiguredCatalogProvider(): Promise<ConfiguredCatalogProvider> {
-    const selectedType = await this.getConfiguredCatalogProviderType();
+    const selectedType = await this.getInstanceCatalogProviderType();
     if (!selectedType) {
       throw new ConflictException(
-        'No catalog provider is configured for this Stasharr instance.',
+        'No catalog provider has been chosen for this Stasharr instance.',
       );
     }
 
@@ -77,12 +100,12 @@ export class CatalogProviderService {
       selectedType as IntegrationType,
     );
     const label = getCatalogProviderLabel(selectedType);
+    const baseUrl = integration.baseUrl?.trim();
 
     if (integration.status !== IntegrationStatus.CONFIGURED) {
       throw new ConflictException(`${label} catalog provider is not configured.`);
     }
 
-    const baseUrl = integration.baseUrl?.trim();
     if (!baseUrl) {
       throw new BadRequestException(
         `${label} catalog provider is missing a base URL.`,

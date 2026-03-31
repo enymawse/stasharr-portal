@@ -2,6 +2,7 @@ import { IntegrationStatus, IntegrationType, Prisma } from '@prisma/client';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
+import { buildCatalogProviderSelectionConfig } from '../providers/catalog/catalog-provider.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { IntegrationsService } from './integrations.service';
 
@@ -110,12 +111,14 @@ describe('IntegrationsService', () => {
         enabled: true,
         status: IntegrationStatus.CONFIGURED,
         baseUrl: 'http://fansdb.old/graphql',
+        config: buildCatalogProviderSelectionConfig(),
       },
       {
         type: IntegrationType.STASHDB,
         enabled: false,
         status: IntegrationStatus.CONFIGURED,
         baseUrl: 'http://stashdb.old/graphql',
+        config: null,
       },
     ]);
     upsert.mockResolvedValue({
@@ -160,6 +163,7 @@ describe('IntegrationsService', () => {
         update: expect.objectContaining({
           enabled: true,
           baseUrl: 'http://fansdb.local/graphql',
+          config: buildCatalogProviderSelectionConfig(),
           status: IntegrationStatus.CONFIGURED,
         }),
       }),
@@ -173,6 +177,7 @@ describe('IntegrationsService', () => {
         enabled: true,
         status: IntegrationStatus.CONFIGURED,
         baseUrl: 'http://fansdb.local/graphql',
+        config: buildCatalogProviderSelectionConfig(),
       },
     ]);
 
@@ -237,6 +242,29 @@ describe('IntegrationsService', () => {
     expect(stashUpsertCall.update.lastHealthyAt).toBeInstanceOf(Date);
     expect(stashUpsertCall.update.lastErrorAt).toBeNull();
     expect(stashUpsertCall.update.lastErrorMessage).toBeNull();
+  });
+
+  it('rejects testing a different catalog provider until catalog setup is reset', async () => {
+    findMany.mockResolvedValue([
+      {
+        type: IntegrationType.FANSDB,
+        enabled: true,
+        status: IntegrationStatus.ERROR,
+        baseUrl: 'http://fansdb.local/graphql',
+        config: buildCatalogProviderSelectionConfig(),
+      },
+    ]);
+
+    await expect(
+      service.testIntegration(IntegrationType.STASHDB, {
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
+    ).rejects.toThrow(
+      'This Stasharr instance is configured for FansDB. Reset catalog setup before configuring StashDB.',
+    );
+
+    expect(stashdbTestConnection).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
   });
 
   it('stores error metadata when integration test fails', async () => {

@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { finalize, forkJoin, switchMap } from 'rxjs';
+import { finalize, forkJoin, map, switchMap } from 'rxjs';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonDirective } from 'primeng/button';
 import { Message } from 'primeng/message';
@@ -11,6 +11,8 @@ import { Tab, TabList, TabPanel, TabPanels, Tabs } from 'primeng/tabs';
 import { HealthService } from '../../core/api/health.service';
 import { HealthStatusResponse } from '../../core/api/health.types';
 import { IntegrationsService } from '../../core/api/integrations.service';
+import { SetupService } from '../../core/api/setup.service';
+import { SetupStatusResponse } from '../../core/api/setup.types';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import { IntegrationFormFieldsComponent } from '../../shared/integration-form-fields/integration-form-fields.component';
 import {
@@ -20,7 +22,6 @@ import {
   UpdateIntegrationPayload,
   integrationLabel,
   isCatalogProviderType,
-  resolveConfiguredCatalogProviderType,
 } from '../../core/api/integrations.types';
 
 type ServiceTab = IntegrationType;
@@ -46,6 +47,7 @@ type SettingsTab = ServiceTab | 'ABOUT';
 })
 export class SettingsPageComponent implements OnInit {
   private readonly integrationsService = inject(IntegrationsService);
+  private readonly setupService = inject(SetupService);
   private readonly healthService = inject(HealthService);
   private readonly confirmationService = inject(ConfirmationService);
   private readonly notifications = inject(AppNotificationsService);
@@ -54,23 +56,17 @@ export class SettingsPageComponent implements OnInit {
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
   protected readonly health = signal<HealthStatusResponse | null>(null);
+  protected readonly setupStatus = signal<SetupStatusResponse | null>(null);
   protected readonly healthError = signal<string | null>(null);
   protected readonly refreshingHealth = signal(false);
   protected readonly activeTab = signal<SettingsTab>('STASH');
   protected readonly resettingAll = signal(false);
 
-  private readonly allServiceTypes: IntegrationType[] = [
-    'STASH',
-    'WHISPARR',
-    'STASHDB',
-    'FANSDB',
-  ];
+  private readonly allServiceTypes: IntegrationType[] = ['STASH', 'WHISPARR', 'STASHDB', 'FANSDB'];
 
   protected readonly serviceTabs = computed<ServiceTab[]>(() => {
-    const catalogProvider = this.configuredCatalogProvider();
-    return catalogProvider
-      ? ['STASH', 'WHISPARR', catalogProvider]
-      : ['STASH', 'WHISPARR'];
+    const catalogProvider = this.catalogProvider();
+    return catalogProvider ? ['STASH', 'WHISPARR', catalogProvider] : ['STASH', 'WHISPARR'];
   });
 
   protected readonly forms: Record<IntegrationType, IntegrationForm> = {
@@ -80,9 +76,7 @@ export class SettingsPageComponent implements OnInit {
     FANSDB: this.createIntegrationForm(),
   };
 
-  protected readonly integrations = signal<
-    Record<IntegrationType, IntegrationResponse | null>
-  >({
+  protected readonly integrations = signal<Record<IntegrationType, IntegrationResponse | null>>({
     STASH: null,
     WHISPARR: null,
     STASHDB: null,
@@ -119,10 +113,7 @@ export class SettingsPageComponent implements OnInit {
       return;
     }
 
-    if (
-      nextValue === 'ABOUT' ||
-      this.serviceTabs().includes(nextValue as IntegrationType)
-    ) {
+    if (nextValue === 'ABOUT' || this.serviceTabs().includes(nextValue as IntegrationType)) {
       this.activeTab.set(nextValue as SettingsTab);
     }
   }
@@ -144,13 +135,17 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected configuredCatalogProviderLabel(): string | null {
-    const catalogProvider = this.configuredCatalogProvider();
+    const catalogProvider = this.catalogProvider();
     return catalogProvider ? this.labelFor(catalogProvider) : null;
   }
 
   protected catalogProviderSummary(): string {
     const label = this.configuredCatalogProviderLabel();
     if (label) {
+      if (!this.catalogProviderReady()) {
+        return `This Stasharr instance is locked to ${label}, but that catalog integration needs repair. Repair its settings below or reset catalog setup to choose a different provider.`;
+      }
+
       return `This Stasharr instance is configured for ${label}. To use a different catalog provider, reset catalog setup and re-run setup.`;
     }
 
@@ -158,9 +153,13 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected catalogProviderHelp(type: IntegrationType): string | null {
-    const configuredCatalogProvider = this.configuredCatalogProvider();
-    if (!this.isCatalogProvider(type) || configuredCatalogProvider !== type) {
+    const catalogProvider = this.catalogProvider();
+    if (!this.isCatalogProvider(type) || catalogProvider !== type) {
       return null;
+    }
+
+    if (!this.catalogProviderReady()) {
+      return `${this.labelFor(type)} remains this instance's catalog provider even while unhealthy. Repair it here, or reset catalog setup before changing provider type.`;
     }
 
     return `${this.labelFor(type)} is the catalog provider configured for this Stasharr instance. Reset catalog setup before changing provider type.`;
@@ -253,13 +252,19 @@ export class SettingsPageComponent implements OnInit {
     this.integrationsService
       .updateIntegration(type, payload)
       .pipe(
-        switchMap(() => this.integrationsService.getIntegrations()),
+        switchMap(() =>
+          forkJoin({
+            integrations: this.integrationsService.getIntegrations(),
+            setupStatus: this.setupService.getStatus(),
+          }),
+        ),
         finalize(() => {
           this.patchActionState(this.saveState, type, { running: false });
         }),
       )
       .subscribe({
-        next: (integrations) => {
+        next: ({ integrations, setupStatus }) => {
+          this.setupStatus.set(setupStatus);
           this.applyIntegrations(integrations);
           this.notifications.success(`${this.labelFor(type)} settings saved`);
           this.patchActionState(this.saveState, type, {
@@ -292,12 +297,21 @@ export class SettingsPageComponent implements OnInit {
     this.integrationsService
       .testIntegration(type, payload)
       .pipe(
+        switchMap((integration) =>
+          this.setupService.getStatus().pipe(
+            map((setupStatus) => ({
+              integration,
+              setupStatus,
+            })),
+          ),
+        ),
         finalize(() => {
           this.patchActionState(this.testState, type, { running: false });
         }),
       )
       .subscribe({
-        next: (integration) => {
+        next: ({ integration, setupStatus }) => {
+          this.setupStatus.set(setupStatus);
           this.updateIntegration(type, integration);
           this.notifications.success(`${this.labelFor(type)} test passed`);
           this.patchActionState(this.testState, type, {
@@ -306,10 +320,7 @@ export class SettingsPageComponent implements OnInit {
           });
         },
         error: (error: unknown) => {
-          const message = this.describeMutationError(
-            error,
-            `${this.labelFor(type)} test failed.`,
-          );
+          const message = this.describeMutationError(error, `${this.labelFor(type)} test failed.`);
           this.notifications.error(message);
           this.patchActionState(this.testState, type, {
             success: null,
@@ -329,13 +340,19 @@ export class SettingsPageComponent implements OnInit {
     this.integrationsService
       .resetIntegration(type)
       .pipe(
-        switchMap(() => this.integrationsService.getIntegrations()),
+        switchMap(() =>
+          forkJoin({
+            integrations: this.integrationsService.getIntegrations(),
+            setupStatus: this.setupService.getStatus(),
+          }),
+        ),
         finalize(() => {
           this.patchActionState(this.resetState, type, { running: false });
         }),
       )
       .subscribe({
-        next: (integrations) => {
+        next: ({ integrations, setupStatus }) => {
+          this.setupStatus.set(setupStatus);
           this.applyIntegrations(integrations);
           if (this.isCatalogProvider(type)) {
             this.notifications.info('Catalog setup was reset');
@@ -371,12 +388,21 @@ export class SettingsPageComponent implements OnInit {
     this.integrationsService
       .resetAllIntegrations()
       .pipe(
+        switchMap((integrations) =>
+          this.setupService.getStatus().pipe(
+            map((setupStatus) => ({
+              integrations,
+              setupStatus,
+            })),
+          ),
+        ),
         finalize(() => {
           this.resettingAll.set(false);
         }),
       )
       .subscribe({
-        next: (integrations) => {
+        next: ({ integrations, setupStatus }) => {
+          this.setupStatus.set(setupStatus);
           this.applyIntegrations(integrations);
           this.notifications.info('All integrations were reset to not configured');
           this.activeTab.set('STASH');
@@ -397,6 +423,7 @@ export class SettingsPageComponent implements OnInit {
     forkJoin({
       integrations: this.integrationsService.getIntegrations(),
       health: this.healthService.getStatus(),
+      setupStatus: this.setupService.getStatus(),
     })
       .pipe(
         finalize(() => {
@@ -404,7 +431,8 @@ export class SettingsPageComponent implements OnInit {
         }),
       )
       .subscribe({
-        next: ({ integrations, health }) => {
+        next: ({ integrations, health, setupStatus }) => {
+          this.setupStatus.set(setupStatus);
           this.applyIntegrations(integrations);
           this.health.set(health);
         },
@@ -431,6 +459,7 @@ export class SettingsPageComponent implements OnInit {
     forkJoin({
       integrations: this.integrationsService.getIntegrations(),
       health: this.healthService.getStatus(),
+      setupStatus: this.setupService.getStatus(),
     })
       .pipe(
         finalize(() => {
@@ -438,7 +467,8 @@ export class SettingsPageComponent implements OnInit {
         }),
       )
       .subscribe({
-        next: ({ integrations, health }) => {
+        next: ({ integrations, health, setupStatus }) => {
+          this.setupStatus.set(setupStatus);
           this.applyIntegrations(integrations);
           this.health.set(health);
         },
@@ -489,10 +519,7 @@ export class SettingsPageComponent implements OnInit {
     }
 
     const activeTab = this.activeTab();
-    if (
-      activeTab !== 'ABOUT' &&
-      !this.serviceTabs().includes(activeTab as IntegrationType)
-    ) {
+    if (activeTab !== 'ABOUT' && !this.serviceTabs().includes(activeTab as IntegrationType)) {
       this.activeTab.set('STASH');
     }
   }
@@ -515,12 +542,12 @@ export class SettingsPageComponent implements OnInit {
     }));
   }
 
-  private configuredCatalogProvider(): CatalogProviderType | null {
-    return resolveConfiguredCatalogProviderType(
-      Object.values(this.integrations()).filter(
-        (integration): integration is IntegrationResponse => integration !== null,
-      ),
-    );
+  private catalogProvider(): CatalogProviderType | null {
+    return this.setupStatus()?.catalogProvider ?? null;
+  }
+
+  private catalogProviderReady(): boolean {
+    return this.setupStatus()?.required.catalog ?? false;
   }
 
   private createIntegrationForm(): IntegrationForm {

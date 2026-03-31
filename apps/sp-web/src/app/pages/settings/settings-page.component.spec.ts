@@ -8,6 +8,8 @@ import { HealthService } from '../../core/api/health.service';
 import { HealthStatusResponse } from '../../core/api/health.types';
 import { IntegrationsService } from '../../core/api/integrations.service';
 import { IntegrationResponse } from '../../core/api/integrations.types';
+import { SetupService } from '../../core/api/setup.service';
+import { SetupStatusResponse } from '../../core/api/setup.types';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import { SettingsPageComponent } from './settings-page.component';
 
@@ -55,13 +57,16 @@ describe('SettingsPageComponent', () => {
     globalThis.ResizeObserver = originalResizeObserver;
   });
 
-  async function renderPage(integrations: IntegrationResponse[]) {
+  async function renderPage(integrations: IntegrationResponse[], setupStatus: SetupStatusResponse) {
     const integrationsService = {
       getIntegrations: vi.fn().mockReturnValue(of(integrations)),
       updateIntegration: vi.fn(),
       testIntegration: vi.fn(),
       resetIntegration: vi.fn(),
       resetAllIntegrations: vi.fn(),
+    };
+    const setupService = {
+      getStatus: vi.fn().mockReturnValue(of(setupStatus)),
     };
     const healthService = {
       getStatus: vi.fn().mockReturnValue(of(buildHealthStatus())),
@@ -74,6 +79,10 @@ describe('SettingsPageComponent', () => {
         {
           provide: IntegrationsService,
           useValue: integrationsService,
+        },
+        {
+          provide: SetupService,
+          useValue: setupService,
         },
         {
           provide: HealthService,
@@ -105,20 +114,27 @@ describe('SettingsPageComponent', () => {
   }
 
   it('shows only the configured catalog provider tab and reset guidance after setup', async () => {
-    const { component } = await renderPage([
-      buildIntegration({ type: 'STASH' }),
-      buildIntegration({ type: 'WHISPARR' }),
-      buildIntegration({
-        type: 'STASHDB',
-        enabled: true,
-        baseUrl: 'http://stashdb.local/graphql',
-      }),
-      buildIntegration({
-        type: 'FANSDB',
-        enabled: false,
-        baseUrl: 'http://fansdb.local/graphql',
-      }),
-    ]);
+    const { component } = await renderPage(
+      [
+        buildIntegration({ type: 'STASH' }),
+        buildIntegration({ type: 'WHISPARR' }),
+        buildIntegration({
+          type: 'STASHDB',
+          enabled: true,
+          baseUrl: 'http://stashdb.local/graphql',
+        }),
+        buildIntegration({
+          type: 'FANSDB',
+          enabled: false,
+          baseUrl: 'http://fansdb.local/graphql',
+        }),
+      ],
+      {
+        setupComplete: true,
+        required: { stash: true, catalog: true, whisparr: true },
+        catalogProvider: 'STASHDB',
+      },
+    );
 
     expect(component.serviceTabs()).toEqual(['STASH', 'WHISPARR', 'STASHDB']);
     expect(component.catalogProviderSummary()).toBe(
@@ -131,25 +147,65 @@ describe('SettingsPageComponent', () => {
   });
 
   it('hides catalog tabs when no provider is configured and points the user back to setup', async () => {
-    const { component } = await renderPage([
-      buildIntegration({ type: 'STASH' }),
-      buildIntegration({ type: 'WHISPARR' }),
-      buildIntegration({
-        type: 'STASHDB',
-        status: 'NOT_CONFIGURED',
-        baseUrl: null,
-      }),
-      buildIntegration({
-        type: 'FANSDB',
-        status: 'NOT_CONFIGURED',
-        baseUrl: null,
-      }),
-    ]);
+    const { component } = await renderPage(
+      [
+        buildIntegration({ type: 'STASH' }),
+        buildIntegration({ type: 'WHISPARR' }),
+        buildIntegration({
+          type: 'STASHDB',
+          status: 'NOT_CONFIGURED',
+          baseUrl: null,
+        }),
+        buildIntegration({
+          type: 'FANSDB',
+          status: 'NOT_CONFIGURED',
+          baseUrl: null,
+        }),
+      ],
+      {
+        setupComplete: false,
+        required: { stash: true, catalog: false, whisparr: true },
+        catalogProvider: null,
+      },
+    );
 
     expect(component.serviceTabs()).toEqual(['STASH', 'WHISPARR']);
     expect(component.configuredCatalogProviderLabel()).toBeNull();
     expect(component.catalogProviderSummary()).toBe(
       'No catalog provider is configured right now. Return to setup to choose StashDB or FansDB for this instance.',
+    );
+  });
+
+  it('keeps the chosen catalog provider tab visible when that provider is unhealthy', async () => {
+    const { component } = await renderPage(
+      [
+        buildIntegration({ type: 'STASH' }),
+        buildIntegration({ type: 'WHISPARR' }),
+        buildIntegration({
+          type: 'FANSDB',
+          status: 'ERROR',
+          baseUrl: 'http://fansdb.local/graphql',
+          lastErrorMessage: 'bad credentials',
+        }),
+        buildIntegration({
+          type: 'STASHDB',
+          status: 'NOT_CONFIGURED',
+          baseUrl: null,
+        }),
+      ],
+      {
+        setupComplete: false,
+        required: { stash: true, catalog: false, whisparr: true },
+        catalogProvider: 'FANSDB',
+      },
+    );
+
+    expect(component.serviceTabs()).toEqual(['STASH', 'WHISPARR', 'FANSDB']);
+    expect(component.catalogProviderSummary()).toBe(
+      'This Stasharr instance is locked to FansDB, but that catalog integration needs repair. Repair its settings below or reset catalog setup to choose a different provider.',
+    );
+    expect(component.catalogProviderHelp('FANSDB')).toBe(
+      "FansDB remains this instance's catalog provider even while unhealthy. Repair it here, or reset catalog setup before changing provider type.",
     );
   });
 });

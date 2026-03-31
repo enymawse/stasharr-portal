@@ -1,16 +1,8 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  GuardResult,
-  Router,
-  UrlTree,
-  provideRouter,
-} from '@angular/router';
+import { GuardResult, Router, UrlTree, provideRouter } from '@angular/router';
 import { firstValueFrom, isObservable, of, throwError } from 'rxjs';
 import { SetupService } from '../api/setup.service';
-import {
-  requireSetupCompleteGuard,
-  setupOnlyWhenIncompleteGuard,
-} from './setup-route.guard';
+import { requireSetupCompleteGuard, setupOnlyWhenIncompleteGuard } from './setup-route.guard';
 
 describe('setup route guards', () => {
   let router: Router;
@@ -62,6 +54,20 @@ describe('setup route guards', () => {
     expect(result).toBe(true);
   });
 
+  it('allows settings routes while setup is incomplete so the user can repair integrations', async () => {
+    setupService.getStatus.mockReturnValue(
+      of({
+        setupComplete: false,
+        required: { stash: true, catalog: false, whisparr: true },
+        catalogProvider: 'FANSDB',
+      }),
+    );
+
+    const result = await runGuard(requireSetupCompleteGuard, '/settings');
+
+    expect(result).toBe(true);
+  });
+
   it('redirects /setup to /scenes when setup is complete', async () => {
     setupService.getStatus.mockReturnValue(
       of({
@@ -77,9 +83,7 @@ describe('setup route guards', () => {
   });
 
   it('allows /setup when setup status check fails', async () => {
-    setupService.getStatus.mockReturnValue(
-      throwError(() => new Error('status unavailable')),
-    );
+    setupService.getStatus.mockReturnValue(throwError(() => new Error('status unavailable')));
 
     const result = await runGuard(setupOnlyWhenIncompleteGuard);
 
@@ -89,8 +93,9 @@ describe('setup route guards', () => {
 
 async function runGuard(
   guard: typeof requireSetupCompleteGuard,
+  url = '/scenes',
 ): Promise<GuardResult> {
-  const result = TestBed.runInInjectionContext(() => guard({} as never, {} as never));
+  const result = TestBed.runInInjectionContext(() => guard({} as never, { url } as never));
 
   if (isObservable(result)) {
     return firstValueFrom(result);

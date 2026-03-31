@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   IntegrationConfig,
   IntegrationStatus,
@@ -20,8 +24,9 @@ import {
 import {
   CATALOG_PROVIDER_KEYS,
   type CatalogProviderIntegrationType,
-  configuredCatalogProviderTypeFromIntegrations,
+  buildCatalogProviderSelectionConfig,
   getCatalogProviderLabel,
+  instanceCatalogProviderTypeFromIntegrations,
   isCatalogProviderIntegrationType,
 } from '../providers/catalog/catalog-provider.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -55,32 +60,40 @@ export class IntegrationsService {
       : !!normalizedBaseUrl || !!normalizedApiKey || !!normalizedName;
 
     if (isCatalogProvider) {
-      await this.assertCatalogProviderUpdateAllowed(type, configured);
+      await this.assertCatalogProviderSaveAllowed(type, configured);
     }
 
+    const selectionConfig =
+      isCatalogProvider && configured
+        ? this.catalogProviderSelectionConfig()
+        : undefined;
+    const updateData = {
+      enabled: isCatalogProvider ? true : dto.enabled,
+      name: normalizedName,
+      baseUrl: normalizedBaseUrl,
+      apiKey: normalizedApiKey,
+      status: configured
+        ? IntegrationStatus.CONFIGURED
+        : IntegrationStatus.NOT_CONFIGURED,
+      lastErrorAt: null,
+      lastErrorMessage: null,
+      ...(selectionConfig ? { config: selectionConfig } : {}),
+    } satisfies Prisma.IntegrationConfigUpdateInput;
+    const createData = {
+      type,
+      enabled: isCatalogProvider ? true : (dto.enabled ?? true),
+      name: normalizedName,
+      baseUrl: normalizedBaseUrl,
+      apiKey: normalizedApiKey,
+      status: configured
+        ? IntegrationStatus.CONFIGURED
+        : IntegrationStatus.NOT_CONFIGURED,
+      ...(selectionConfig ? { config: selectionConfig } : {}),
+    } satisfies Prisma.IntegrationConfigCreateInput;
     const upsertArgs = {
       where: { type },
-      update: {
-        enabled: isCatalogProvider ? true : dto.enabled,
-        name: normalizedName,
-        baseUrl: normalizedBaseUrl,
-        apiKey: normalizedApiKey,
-        status: configured
-          ? IntegrationStatus.CONFIGURED
-          : IntegrationStatus.NOT_CONFIGURED,
-        lastErrorAt: null,
-        lastErrorMessage: null,
-      },
-      create: {
-        type,
-        enabled: isCatalogProvider ? true : dto.enabled ?? true,
-        name: normalizedName,
-        baseUrl: normalizedBaseUrl,
-        apiKey: normalizedApiKey,
-        status: configured
-          ? IntegrationStatus.CONFIGURED
-          : IntegrationStatus.NOT_CONFIGURED,
-      },
+      update: updateData,
+      create: createData,
     } satisfies Prisma.IntegrationConfigUpsertArgs;
 
     if (isCatalogProvider && configured) {
@@ -118,6 +131,14 @@ export class IntegrationsService {
     type: IntegrationType,
     dto: UpdateIntegrationDto,
   ): Promise<IntegrationConfig> {
+    const selectedCatalogProviderType = isCatalogProviderIntegrationType(type)
+      ? await this.assertCatalogProviderMutationAllowed(type)
+      : null;
+    const selectionConfig =
+      selectedCatalogProviderType === type
+        ? this.catalogProviderSelectionConfig()
+        : undefined;
+
     try {
       const config = await this.resolveTestConfig(type, dto);
 
@@ -142,12 +163,14 @@ export class IntegrationsService {
           lastHealthyAt: now,
           lastErrorAt: null,
           lastErrorMessage: null,
+          ...(selectionConfig ? { config: selectionConfig } : {}),
         },
         create: {
           type,
           enabled: true,
           status: IntegrationStatus.CONFIGURED,
           lastHealthyAt: now,
+          ...(selectionConfig ? { config: selectionConfig } : {}),
           lastErrorAt: null,
           lastErrorMessage: null,
         },
@@ -160,11 +183,13 @@ export class IntegrationsService {
           status: IntegrationStatus.ERROR,
           lastErrorAt: new Date(),
           lastErrorMessage: message,
+          ...(selectionConfig ? { config: selectionConfig } : {}),
         },
         create: {
           type,
           enabled: true,
           status: IntegrationStatus.ERROR,
+          ...(selectionConfig ? { config: selectionConfig } : {}),
           lastErrorAt: new Date(),
           lastErrorMessage: message,
         },
@@ -240,21 +265,12 @@ export class IntegrationsService {
     };
   }
 
-  private async assertCatalogProviderUpdateAllowed(
+  private async assertCatalogProviderSaveAllowed(
     type: CatalogProviderIntegrationType,
     nextConfigured: boolean,
   ): Promise<void> {
-    const catalogIntegrations = await this.prisma.integrationConfig.findMany({
-      where: {
-        type: {
-          in: [...CATALOG_PROVIDER_KEYS],
-        },
-      },
-      orderBy: { type: 'asc' },
-    });
-    const configuredType = configuredCatalogProviderTypeFromIntegrations(
-      catalogIntegrations,
-    );
+    const configuredType =
+      await this.assertCatalogProviderMutationAllowed(type);
 
     if (!configuredType) {
       return;
@@ -273,10 +289,30 @@ export class IntegrationsService {
     }
   }
 
+  private async assertCatalogProviderMutationAllowed(
+    type: CatalogProviderIntegrationType,
+  ): Promise<CatalogProviderIntegrationType | null> {
+    const configuredType = await this.getInstanceCatalogProviderType();
+
+    if (!configuredType) {
+      return null;
+    }
+
+    if (configuredType !== type) {
+      throw new ConflictException(
+        `This Stasharr instance is configured for ${getCatalogProviderLabel(configuredType)}. Reset catalog setup before configuring ${getCatalogProviderLabel(type)}.`,
+      );
+    }
+
+    return configuredType;
+  }
+
   private otherCatalogProviderTypes(
     type: CatalogProviderIntegrationType,
   ): CatalogProviderIntegrationType[] {
-    return CATALOG_PROVIDER_KEYS.filter((providerType) => providerType !== type);
+    return CATALOG_PROVIDER_KEYS.filter(
+      (providerType) => providerType !== type,
+    );
   }
 
   private async resolveTestConfig(
@@ -303,6 +339,23 @@ export class IntegrationsService {
       baseUrl,
       apiKey,
     };
+  }
+
+  private async getInstanceCatalogProviderType(): Promise<CatalogProviderIntegrationType | null> {
+    const catalogIntegrations = await this.prisma.integrationConfig.findMany({
+      where: {
+        type: {
+          in: [...CATALOG_PROVIDER_KEYS],
+        },
+      },
+      orderBy: { type: 'asc' },
+    });
+
+    return instanceCatalogProviderTypeFromIntegrations(catalogIntegrations);
+  }
+
+  private catalogProviderSelectionConfig(): Prisma.InputJsonValue {
+    return buildCatalogProviderSelectionConfig() as Prisma.InputJsonValue;
   }
 
   private normalizeInput(value: string | null | undefined): string | null {

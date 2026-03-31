@@ -1,6 +1,7 @@
 import { IntegrationStatus } from '@prisma/client';
 
 export const CATALOG_PROVIDER_KEYS = ['STASHDB', 'FANSDB'] as const;
+const CATALOG_PROVIDER_SELECTION_KEY = 'selectedForInstanceCatalogProvider';
 
 export type CatalogProviderKey = (typeof CATALOG_PROVIDER_KEYS)[number];
 export type CatalogProviderIntegrationType = CatalogProviderKey;
@@ -101,6 +102,59 @@ export function configuredCatalogProviderTypeFromIntegrations(
   }
 
   return configuredTypes[0];
+}
+
+export function instanceCatalogProviderTypeFromIntegrations(
+  integrations: ReadonlyArray<{
+    type: string;
+    enabled?: boolean | null;
+    status?: IntegrationStatus | null;
+    baseUrl?: string | null;
+    config?: unknown;
+  }>,
+): CatalogProviderIntegrationType | null {
+  const integrationsByType = new Map(
+    integrations.map((integration) => [integration.type, integration]),
+  );
+  const selectedTypes = CATALOG_PROVIDER_KEYS.filter((providerType) =>
+    isCatalogProviderSelected(integrationsByType.get(providerType)?.config),
+  );
+  const explicitlySelectedType = pickCatalogProviderType(
+    selectedTypes,
+    integrationsByType,
+  );
+
+  if (explicitlySelectedType) {
+    return explicitlySelectedType;
+  }
+
+  const legacySelectedTypes = CATALOG_PROVIDER_KEYS.filter((providerType) => {
+    const integration = integrationsByType.get(providerType);
+    return !!integration?.baseUrl?.trim();
+  });
+
+  return pickCatalogProviderType(legacySelectedTypes, integrationsByType);
+}
+
+export function isCatalogProviderReady(
+  integration:
+    | {
+        status?: IntegrationStatus | null;
+        baseUrl?: string | null;
+      }
+    | null
+    | undefined,
+): boolean {
+  return (
+    integration?.status === IntegrationStatus.CONFIGURED &&
+    !!integration.baseUrl?.trim()
+  );
+}
+
+export function buildCatalogProviderSelectionConfig(): Record<string, true> {
+  return {
+    [CATALOG_PROVIDER_SELECTION_KEY]: true,
+  };
 }
 
 export function buildCatalogSceneRef(
@@ -210,4 +264,54 @@ function normalizeValue(value: string | null | undefined): string | null {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function isCatalogProviderSelected(config: unknown): boolean {
+  if (!isPlainObject(config)) {
+    return false;
+  }
+
+  return config[CATALOG_PROVIDER_SELECTION_KEY] === true;
+}
+
+function pickCatalogProviderType(
+  candidateTypes: readonly CatalogProviderIntegrationType[],
+  integrationsByType: ReadonlyMap<
+    string,
+    {
+      enabled?: boolean | null;
+      status?: IntegrationStatus | null;
+      baseUrl?: string | null;
+    }
+  >,
+): CatalogProviderIntegrationType | null {
+  if (candidateTypes.length === 0) {
+    return null;
+  }
+
+  if (candidateTypes.length === 1) {
+    return candidateTypes[0];
+  }
+
+  const enabledCandidateTypes = candidateTypes.filter(
+    (providerType) => integrationsByType.get(providerType)?.enabled === true,
+  );
+
+  if (enabledCandidateTypes.length === 1) {
+    return enabledCandidateTypes[0];
+  }
+
+  const readyCandidateTypes = candidateTypes.filter((providerType) =>
+    isCatalogProviderReady(integrationsByType.get(providerType)),
+  );
+
+  if (readyCandidateTypes.length === 1) {
+    return readyCandidateTypes[0];
+  }
+
+  return candidateTypes[0];
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
