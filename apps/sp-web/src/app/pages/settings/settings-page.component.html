@@ -4,6 +4,14 @@
     <p>Configure services, run tests, and review status.</p>
   </header>
 
+  <section class="indexing-link-card">
+    <div>
+      <h2>Indexing & Sync</h2>
+      <p>Indexing keeps Acquisition, Library, and status overlays fresh.</p>
+    </div>
+    <a class="page-link" [routerLink]="['/settings/indexing']">Open indexing operations</a>
+  </section>
+
   @if (loading()) {
     <div class="app-blocking-loader" role="status" aria-live="polite">
       <p-progressspinner

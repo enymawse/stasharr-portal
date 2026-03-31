@@ -46,6 +46,16 @@ export const INDEXING_JOB_NAMES = {
   METADATA_BACKFILL: 'scene-index-metadata-backfill',
 } as const;
 
+const KNOWN_INDEXING_JOB_ORDER = [
+  INDEXING_JOB_NAMES.BOOTSTRAP,
+  INDEXING_JOB_NAMES.REQUEST_ROWS,
+  INDEXING_JOB_NAMES.WHISPARR_QUEUE,
+  INDEXING_JOB_NAMES.WHISPARR_MOVIES,
+  INDEXING_JOB_NAMES.LIBRARY_PROJECTION,
+  INDEXING_JOB_NAMES.STASH_AVAILABILITY,
+  INDEXING_JOB_NAMES.METADATA_BACKFILL,
+] as const;
+
 const ACQUISITION_LIFECYCLES: SceneLifecycle[] = [
   SceneLifecycle.REQUESTED,
   SceneLifecycle.DOWNLOADING,
@@ -519,8 +529,29 @@ export class IndexingService {
       this.getSceneIndexSummary(),
     ]);
     const jobByName = new Map(jobs.map((job) => [job.jobName, job]));
+    const knownJobNameSet = new Set<string>(KNOWN_INDEXING_JOB_ORDER);
     const metadataBacklogScenes =
       summary.metadataPendingCount + summary.metadataRetryableCount;
+    const orderedJobs = [
+      ...KNOWN_INDEXING_JOB_ORDER.map(
+        (jobName) =>
+          jobByName.get(jobName) ?? {
+            jobName,
+            status: SyncJobStatus.IDLE,
+            startedAt: null,
+            finishedAt: null,
+            leaseUntil: null,
+            cursor: null,
+            lastError: null,
+            lastSuccessAt: null,
+            lastDurationMs: null,
+            lastProcessedCount: null,
+            lastUpdatedCount: null,
+            lastRunReason: null,
+          },
+      ),
+      ...jobs.filter((job) => !knownJobNameSet.has(job.jobName)),
+    ];
 
     return {
       totals: {
@@ -551,7 +582,7 @@ export class IndexingService {
         lastIndexWriteAt: summary.lastIndexWriteAt?.toISOString() ?? null,
         acquisitionCountsSource: 'scene-index-summary',
       },
-      jobs: jobs.map((job) => ({
+      jobs: orderedJobs.map((job) => ({
         jobName: job.jobName,
         status: job.status,
         startedAt: job.startedAt?.toISOString() ?? null,

@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { finalize, forkJoin } from 'rxjs';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonDirective } from 'primeng/button';
@@ -24,6 +25,7 @@ type SettingsTab = ServiceTab | 'ABOUT';
   selector: 'app-settings-page',
   imports: [
     ReactiveFormsModule,
+    RouterLink,
     Tabs,
     TabList,
     Tab,

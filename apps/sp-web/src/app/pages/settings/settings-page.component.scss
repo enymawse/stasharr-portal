@@ -24,6 +24,31 @@ p {
   color: var(--text-muted);
 }
 
+.indexing-link-card {
+  border: 1px solid var(--border-subtle);
+  background:
+    radial-gradient(circle at top right, rgba(38, 132, 255, 0.12), transparent 36%),
+    linear-gradient(145deg, var(--surface-1), var(--surface-2));
+  border-radius: 14px;
+  padding: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+}
+
+.indexing-link-card p {
+  margin-top: 0.25rem;
+  color: var(--text-muted);
+}
+
+.page-link {
+  color: var(--focus-ring);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
 .tabs-shell {
   border: 1px solid var(--border-subtle);
   background: var(--surface-1);
@@ -162,6 +187,7 @@ form {
 }
 
 @media (max-width: 720px) {
+  .indexing-link-card,
   .panel-head {
     flex-direction: column;
     align-items: start;

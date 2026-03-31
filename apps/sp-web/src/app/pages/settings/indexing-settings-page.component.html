@@ -1,0 +1,239 @@
+<main>
+  <header class="page-head">
+    <div class="page-copy">
+      <p class="eyebrow">Settings</p>
+      <h1>Indexing & Sync</h1>
+      <p class="lede">Indexing keeps Acquisition, Library, and status overlays fresh.</p>
+      <p class="lede secondary">
+        Use manual sync when you want to refresh data immediately after external changes.
+      </p>
+    </div>
+
+    <a class="back-link" [routerLink]="['/settings']">Back to Settings</a>
+  </header>
+
+  @if (loading()) {
+    <div class="app-blocking-loader" role="status" aria-live="polite">
+      <p-progressspinner
+        styleClass="app-blocking-spinner"
+        strokeWidth="4"
+        [style]="{ width: '2.25rem', height: '2.25rem' }"
+      />
+      <p>Loading indexing status...</p>
+    </div>
+  } @else if (loadError()) {
+    <section class="state-shell">
+      <p-message severity="error" styleClass="state-message">{{ loadError() }}</p-message>
+      <button pButton type="button" (click)="retryLoad()">Retry</button>
+    </section>
+  } @else if (status(); as status) {
+    @if (actionSuccess()) {
+      <p-message severity="success" styleClass="state-message">{{ actionSuccess() }}</p-message>
+    }
+    @if (actionError()) {
+      <p-message severity="error" styleClass="state-message">{{ actionError() }}</p-message>
+    }
+
+    <section class="summary-grid">
+      <article
+        class="summary-card summary-card-hero"
+        [class.tone-good]="healthSummary().tone === 'good'"
+        [class.tone-warn]="healthSummary().tone === 'warn'"
+        [class.tone-info]="healthSummary().tone === 'info'"
+      >
+        <div class="summary-head">
+          <div>
+            <p class="eyebrow">Index Health</p>
+            <h2>{{ healthSummary().label }}</h2>
+          </div>
+
+          <button
+            pButton
+            type="button"
+            data-testid="refresh-status"
+            [disabled]="refreshing() || triggeringAction() !== null"
+            (click)="refreshStatus()"
+          >
+            {{ refreshing() ? 'Refreshing...' : 'Refresh status' }}
+          </button>
+        </div>
+
+        <p class="summary-copy">{{ healthSummary().description }}</p>
+
+        <div class="inline-stats">
+          <div class="inline-stat">
+            <span>Last index write</span>
+            <strong>{{ formatDateTime(status.freshness.lastIndexWriteAt) }}</strong>
+          </div>
+          <div class="inline-stat">
+            <span>Freshness window</span>
+            <strong>{{ formatDuration(status.freshness.indexStatusMaxAgeMs) }}</strong>
+          </div>
+          <div class="inline-stat">
+            <span>Tracked jobs</span>
+            <strong>{{ jobViews().length }}</strong>
+          </div>
+        </div>
+      </article>
+
+      <article class="summary-card">
+        <p class="eyebrow">Snapshot</p>
+        <div class="metric-grid">
+          <div class="metric-card">
+            <span>Indexed scenes</span>
+            <strong>{{ status.totals.indexedScenes.toLocaleString() }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Acquisition-tracked</span>
+            <strong>{{ status.totals.acquisitionTrackedScenes.toLocaleString() }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Metadata backlog</span>
+            <strong>{{ status.totals.metadataBacklogScenes.toLocaleString() }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Pending metadata</span>
+            <strong>{{ status.totals.metadataHydration.pending.toLocaleString() }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Retryable metadata</span>
+            <strong>{{ status.totals.metadataHydration.retryable.toLocaleString() }}</strong>
+          </div>
+          <div class="metric-card">
+            <span>Counts source</span>
+            <strong>{{ status.freshness.acquisitionCountsSource }}</strong>
+          </div>
+        </div>
+      </article>
+
+      <article class="summary-card">
+        <p class="eyebrow">Freshness Signals</p>
+        <div class="check-list">
+          @for (check of freshnessChecks(); track check.label) {
+            <div class="check-item" [class.ok]="check.ok" [class.warn]="!check.ok">
+              <span>{{ check.label }}</span>
+              <strong>{{ check.ok ? 'OK' : 'Stale' }}</strong>
+            </div>
+          }
+        </div>
+      </article>
+
+      <article class="summary-card action-card">
+        <p class="eyebrow">Manual Actions</p>
+        <h2>Refresh indexed state on demand</h2>
+        <p class="summary-copy">
+          Metadata backfill improves local card detail and images over time.
+        </p>
+
+        <button
+          pButton
+          type="button"
+          data-testid="sync-all"
+          [disabled]="isSyncAllDisabled()"
+          (click)="syncAll()"
+        >
+          {{ triggeringAction() === 'all' ? 'Syncing...' : 'Sync All' }}
+        </button>
+
+        <p class="action-hint">
+          Safe manual jobs: Whisparr Queue, Whisparr Movies, Library Projection, and Metadata
+          Backfill.
+        </p>
+      </article>
+    </section>
+
+    <section class="jobs-shell">
+      <div class="section-head">
+        <div>
+          <h2>Background Jobs</h2>
+          <p>See cadence, last outcome, timing, counts, and any stored error.</p>
+        </div>
+      </div>
+
+      <div class="jobs-list">
+        @for (job of jobViews(); track job.jobName) {
+          <article
+            class="job-card"
+            [attr.data-testid]="'job-' + job.jobName"
+            [class.is-running]="job.status === 'RUNNING'"
+            [class.is-failed]="job.status === 'FAILED'"
+          >
+            <div class="job-head">
+              <div class="job-copy">
+                <div class="job-title-row">
+                  <h3>{{ job.label }}</h3>
+                  <span
+                    class="status-pill"
+                    [class.status-idle]="job.status === 'IDLE'"
+                    [class.status-running]="job.status === 'RUNNING'"
+                    [class.status-succeeded]="job.status === 'SUCCEEDED'"
+                    [class.status-failed]="job.status === 'FAILED'"
+                  >
+                    {{ formatStatus(job.status) }}
+                  </span>
+                </div>
+                <p class="job-purpose">{{ job.purpose }}</p>
+              </div>
+
+              @if (job.triggerJob) {
+                <button
+                  pButton
+                  type="button"
+                  [attr.data-testid]="'trigger-' + job.jobName"
+                  [disabled]="isJobTriggerDisabled(job)"
+                  (click)="triggerJob(job)"
+                >
+                  {{ triggerLabel(job) }}
+                </button>
+              } @else {
+                <span class="job-passive">Automatic or internal</span>
+              }
+            </div>
+
+            <div class="job-meta-grid">
+              <div class="meta-item">
+                <span>Cadence</span>
+                <strong>{{ job.cadence }}</strong>
+              </div>
+              <div class="meta-item">
+                <span>Started</span>
+                <strong>{{ formatDateTime(job.startedAt, 'Not recorded') }}</strong>
+              </div>
+              <div class="meta-item">
+                <span>Last success</span>
+                <strong>{{ formatDateTime(job.lastSuccessAt) }}</strong>
+              </div>
+              <div class="meta-item">
+                <span>Last finish</span>
+                <strong>{{ formatDateTime(job.finishedAt) }}</strong>
+              </div>
+              <div class="meta-item">
+                <span>Duration</span>
+                <strong>{{ formatDuration(job.lastDurationMs) }}</strong>
+              </div>
+              <div class="meta-item">
+                <span>Processed</span>
+                <strong>{{ formatCount(job.processedCount) }}</strong>
+              </div>
+              <div class="meta-item">
+                <span>Updated</span>
+                <strong>{{ formatCount(job.updatedCount) }}</strong>
+              </div>
+              <div class="meta-item">
+                <span>Last reason</span>
+                <strong>{{ formatRunReason(job.lastRunReason) }}</strong>
+              </div>
+            </div>
+
+            @if (job.lastError) {
+              <div class="error-block">
+                <h4>Last Error</h4>
+                <p>{{ job.lastError }}</p>
+              </div>
+            }
+          </article>
+        }
+      </div>
+    </section>
+  }
+</main>

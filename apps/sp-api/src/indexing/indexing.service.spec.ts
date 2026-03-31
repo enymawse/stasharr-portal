@@ -1173,6 +1173,72 @@ describe('IndexingService', () => {
     );
   });
 
+  it('includes known indexing jobs with idle defaults before they have run', async () => {
+    const { prisma } = createPrismaMock({
+      sceneIndexSummaryRow: {
+        key: 'GLOBAL',
+        indexedScenes: 0,
+        acquisitionTrackedScenes: 0,
+        requestedCount: 0,
+        downloadingCount: 0,
+        importPendingCount: 0,
+        failedCount: 0,
+        metadataPendingCount: 0,
+        metadataRetryableCount: 0,
+        lastIndexWriteAt: null,
+      },
+    });
+
+    const service = new IndexingService(
+      prisma,
+      integrationsService,
+      whisparrAdapter,
+      stashAdapter,
+      stashdbAdapter,
+      syncStateService,
+    );
+
+    const status = await service.getSyncStatus();
+
+    expect(status.jobs).toEqual([
+      expect.objectContaining({
+        jobName: INDEXING_JOB_NAMES.BOOTSTRAP,
+        status: SyncJobStatus.IDLE,
+        lastSuccessAt: null,
+      }),
+      expect.objectContaining({
+        jobName: INDEXING_JOB_NAMES.REQUEST_ROWS,
+        status: SyncJobStatus.IDLE,
+        lastSuccessAt: null,
+      }),
+      expect.objectContaining({
+        jobName: INDEXING_JOB_NAMES.WHISPARR_QUEUE,
+        status: SyncJobStatus.IDLE,
+        lastSuccessAt: null,
+      }),
+      expect.objectContaining({
+        jobName: INDEXING_JOB_NAMES.WHISPARR_MOVIES,
+        status: SyncJobStatus.IDLE,
+        lastSuccessAt: null,
+      }),
+      expect.objectContaining({
+        jobName: INDEXING_JOB_NAMES.LIBRARY_PROJECTION,
+        status: SyncJobStatus.IDLE,
+        lastSuccessAt: null,
+      }),
+      expect.objectContaining({
+        jobName: INDEXING_JOB_NAMES.STASH_AVAILABILITY,
+        status: SyncJobStatus.IDLE,
+        lastSuccessAt: null,
+      }),
+      expect.objectContaining({
+        jobName: INDEXING_JOB_NAMES.METADATA_BACKFILL,
+        status: SyncJobStatus.IDLE,
+        lastSuccessAt: null,
+      }),
+    ]);
+  });
+
   it('runs metadata backfill on the accelerated 10-second cadence while metadata is missing', async () => {
     const { prisma } = createPrismaMock({
       sceneIndexRows: [

@@ -1,3 +1,5 @@
+import '@angular/compiler';
+import { describe, expect, it } from 'vitest';
 import { routes } from './app.routes';
 
 describe('app routes', () => {
@@ -15,6 +17,7 @@ describe('app routes', () => {
       'studios',
       'performer/:performerId',
       'studio/:studioId',
+      'settings/indexing',
       'settings',
       '',
     ]);

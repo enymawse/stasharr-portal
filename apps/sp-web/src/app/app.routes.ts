@@ -9,6 +9,7 @@ import { AcquisitionPageComponent } from './pages/acquisition/acquisition-page.c
 import { LibraryPageComponent } from './pages/library/library-page.component';
 import { ScenesPageComponent } from './pages/scenes/scenes-page.component';
 import { ScenePageComponent } from './pages/scene/scene-page.component';
+import { IndexingSettingsPageComponent } from './pages/settings/indexing-settings-page.component';
 import { SettingsPageComponent } from './pages/settings/settings-page.component';
 import { PerformersPageComponent } from './pages/performers/performers-page.component';
 import { PerformerPageComponent } from './pages/performer/performer-page.component';
@@ -62,6 +63,10 @@ export const routes: Routes = [
       {
         path: 'studio/:studioId',
         component: StudioPageComponent,
+      },
+      {
+        path: 'settings/indexing',
+        component: IndexingSettingsPageComponent,
       },
       {
         path: 'settings',
