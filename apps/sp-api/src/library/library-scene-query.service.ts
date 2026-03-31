@@ -11,6 +11,25 @@ import {
   LibraryTagMatchMode,
 } from './dto/library-scenes-query.dto';
 
+const librarySceneListSelect =
+  Prisma.validator<Prisma.LibrarySceneIndexSelect>()({
+    stashSceneId: true,
+    linkedStashId: true,
+    title: true,
+    description: true,
+    imageUrl: true,
+    studioId: true,
+    studioName: true,
+    studioImageUrl: true,
+    releaseDate: true,
+    duration: true,
+    viewUrl: true,
+  });
+
+type LibrarySceneListRow = Prisma.LibrarySceneIndexGetPayload<{
+  select: typeof librarySceneListSelect;
+}>;
+
 interface LibrarySceneQueryFilters {
   sort?: LibrarySceneSort;
   direction?: LibrarySortDirection;
@@ -50,6 +69,7 @@ export class LibrarySceneQueryService {
         orderBy,
         skip: (page - 1) * perPage,
         take: perPage,
+        select: librarySceneListSelect,
       }),
       this.prisma.librarySceneIndex.count({ where }),
     ]);
@@ -75,6 +95,7 @@ export class LibrarySceneQueryService {
         normalizedFilters.direction,
       ),
       take: limit,
+      select: librarySceneListSelect,
     });
 
     return rows.map((row) => this.toSceneFeedItem(row));
@@ -195,9 +216,7 @@ export class LibrarySceneQueryService {
   }
 
   private toSceneFeedItem(
-    row: Awaited<
-      ReturnType<PrismaService['librarySceneIndex']['findMany']>
-    >[number],
+    row: LibrarySceneListRow,
   ): LibrarySceneFeedItemDto {
     const screenshotUrl = row.imageUrl
       ? `/api/media/stash/scenes/${encodeURIComponent(row.stashSceneId)}/screenshot`

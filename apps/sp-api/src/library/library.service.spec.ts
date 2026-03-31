@@ -2,6 +2,20 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LibrarySceneQueryService } from './library-scene-query.service';
 import { LibraryService } from './library.service';
 
+const librarySceneListSelect = {
+  stashSceneId: true,
+  linkedStashId: true,
+  title: true,
+  description: true,
+  imageUrl: true,
+  studioId: true,
+  studioName: true,
+  studioImageUrl: true,
+  releaseDate: true,
+  duration: true,
+  viewUrl: true,
+};
+
 function buildLibraryRow(overrides: Record<string, unknown> = {}) {
   return {
     stashSceneId: '411',
@@ -89,6 +103,7 @@ describe('LibraryService', () => {
           { title: 'asc' },
           { stashSceneId: 'asc' },
         ],
+        select: librarySceneListSelect,
         skip: 0,
         take: 2,
       }),
@@ -156,6 +171,7 @@ describe('LibraryService', () => {
         { title: 'asc' },
         { stashSceneId: 'asc' },
       ],
+      select: librarySceneListSelect,
       take: 12,
     });
     expect(librarySceneIndexCountMock).not.toHaveBeenCalled();
@@ -257,6 +273,25 @@ describe('LibraryService', () => {
       { id: 'tag-2', name: 'Tag Two' },
     ]);
     expect(queryRawMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('prefilters tag option search before unnesting every tag row', async () => {
+    await service.searchTags('tag');
+
+    expect(queryRawMock).toHaveBeenCalledTimes(1);
+
+    const query = queryRawMock.mock.calls[0][0] as {
+      strings: string[];
+      values: unknown[];
+    };
+
+    expect(query.strings.join(' ')).toContain(
+      `library_scene_tag_names_search_text("tagNames") ILIKE`,
+    );
+    expect(query.strings.join(' ')).toContain(
+      `CROSS JOIN LATERAL unnest("tagIds", "tagNames")`,
+    );
+    expect(query.values).toEqual(['%tag%', '%tag%']);
   });
 
   it('returns indexed studio options from the local-library projection', async () => {

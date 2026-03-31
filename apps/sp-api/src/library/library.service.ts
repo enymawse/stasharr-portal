@@ -79,11 +79,12 @@ export class LibraryService {
     }
 
     return this.prisma.$queryRaw<LibraryTagOptionDto[]>(Prisma.sql`
-      SELECT DISTINCT tag_id AS id, tag_name AS name
-      FROM "LibrarySceneIndex",
-        unnest("tagIds", "tagNames") AS tag(tag_id, tag_name)
-      WHERE tag_name ILIKE ${`%${normalizedQuery}%`}
-      ORDER BY tag_name ASC
+      SELECT DISTINCT tag.tag_id AS id, tag.tag_name AS name
+      FROM "LibrarySceneIndex"
+      CROSS JOIN LATERAL unnest("tagIds", "tagNames") AS tag(tag_id, tag_name)
+      WHERE library_scene_tag_names_search_text("tagNames") ILIKE ${`%${normalizedQuery}%`}
+        AND tag.tag_name ILIKE ${`%${normalizedQuery}%`}
+      ORDER BY name ASC
       LIMIT 25
     `);
   }
@@ -100,7 +101,7 @@ export class LibraryService {
       WHERE "studioId" IS NOT NULL
         AND "studioName" IS NOT NULL
         AND "studioName" ILIKE ${`%${normalizedQuery}%`}
-      ORDER BY "studioName" ASC
+      ORDER BY name ASC
       LIMIT 25
     `);
   }
