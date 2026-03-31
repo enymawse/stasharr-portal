@@ -86,35 +86,39 @@ model SceneIndexSummary {
 }
 
 model LibrarySceneIndex {
-  stashSceneId          String   @id
-  linkedStashId         String?
-  linkedCatalogRefs     String[] @default([])
-  title                 String
-  description           String?
-  imageUrl              String?
-  studioId              String?
-  studioName            String?
-  studioImageUrl        String?
-  performerIds          String[] @default([])
-  performerNames        String[] @default([])
-  tagIds                String[] @default([])
-  tagNames              String[] @default([])
-  releaseDate           String?
-  duration              Int?
-  viewUrl               String
-  localCreatedAt        DateTime?
-  localUpdatedAt        DateTime?
-  hasFavoritePerformer  Boolean  @default(false)
-  favoriteStudio        Boolean  @default(false)
-  hasFavoriteTag        Boolean  @default(false)
-  lastSyncedAt          DateTime
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  stashSceneId         String    @id
+  linkedStashId        String?
+  linkedCatalogRefs    String[]  @default([])
+  title                String
+  description          String?
+  imageUrl             String?
+  studioId             String?
+  studioName           String?
+  studioImageUrl       String?
+  performerIds         String[]  @default([])
+  performerNames       String[]  @default([])
+  tagIds               String[]  @default([])
+  tagNames             String[]  @default([])
+  releaseDate          String?
+  duration             Int?
+  viewUrl              String
+  localCreatedAt       DateTime?
+  localUpdatedAt       DateTime?
+  hasFavoritePerformer Boolean   @default(false)
+  favoriteStudio       Boolean   @default(false)
+  hasFavoriteTag       Boolean   @default(false)
+  lastSyncedAt         DateTime
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@index([linkedStashId])
   @@index([studioId])
   @@index([studioName])
   @@index([title])
+  @@index([tagIds], type: Gin, map: "LibrarySceneIndex_tagIds_gin_idx")
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "LibrarySceneIndex_title_trgm_idx")
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "LibrarySceneIndex_description_trgm_idx")
+  @@index([studioName(ops: raw("gin_trgm_ops"))], type: Gin, map: "LibrarySceneIndex_studioName_trgm_idx")
   @@index([releaseDate])
   @@index([localCreatedAt])
   @@index([localUpdatedAt])

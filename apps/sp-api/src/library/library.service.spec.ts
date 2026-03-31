@@ -178,4 +178,43 @@ describe('LibraryService', () => {
     ]);
     expect(queryRawMock).toHaveBeenCalledTimes(1);
   });
+
+  it('deduplicates trimmed tag and studio filters while preserving OR matching', async () => {
+    await service.getScenesFeed(
+      1,
+      24,
+      'RELEASE_DATE',
+      'DESC',
+      undefined,
+      [' tag-1 ', 'tag-1', 'tag-2'],
+      'OR',
+      [' studio-1 ', 'studio-1', 'studio-2'],
+    );
+
+    expect(librarySceneIndexFindManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            {
+              tagIds: {
+                hasSome: ['tag-1', 'tag-2'],
+              },
+            },
+            {
+              studioId: {
+                in: ['studio-1', 'studio-2'],
+              },
+            },
+          ],
+        },
+      }),
+    );
+  });
+
+  it('skips tag and studio search queries when the query is blank', async () => {
+    await expect(service.searchTags('   ')).resolves.toEqual([]);
+    await expect(service.searchStudios('')).resolves.toEqual([]);
+
+    expect(queryRawMock).not.toHaveBeenCalled();
+  });
 });
