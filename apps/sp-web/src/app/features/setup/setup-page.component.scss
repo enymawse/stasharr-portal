@@ -20,32 +20,111 @@ main {
 
 header p {
   margin-top: 0.5rem;
+  max-width: 56rem;
 }
 
 h1,
 h2,
+h3,
 p {
   margin: 0;
+}
+
+.setup-overview {
+  margin-top: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 1rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 88%, transparent), var(--surface-1));
+}
+
+.overview-head,
+.card-head,
+.checklist-item-head {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.overview-lead {
+  margin-top: 0.45rem;
+  font-size: 1.02rem;
+}
+
+.progress-pill {
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  padding: 0.45rem 0.75rem;
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
+.progress-pill.is-complete {
+  border-color: color-mix(in srgb, var(--success-color, #2f855a) 48%, var(--border-strong));
+}
+
+.overview-summary {
+  margin-top: 0.9rem;
+  color: var(--text-secondary, var(--text-muted));
+}
+
+.checklist-grid {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.checklist-item {
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  padding: 0.85rem;
+  background: var(--surface-elevated);
 }
 
 .cards {
   margin-top: 1rem;
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-items: start;
 }
 
 .card {
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  border-radius: 14px;
   padding: 1rem;
   background: var(--surface-1);
 }
 
+.card-summary {
+  margin-top: 0.65rem;
+  font-size: 0.98rem;
+}
+
 .meta {
-  margin-top: 0.4rem;
+  margin-top: 0.55rem;
   color: var(--text-muted);
   font-size: 0.95rem;
+}
+
+.health-meta {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.32rem;
+  color: var(--text-muted);
+  font-size: 0.92rem;
 }
 
 form {
@@ -56,6 +135,45 @@ form {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.action-hint {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.state-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.is-ready {
+  border-color: color-mix(in srgb, var(--success-color, #2f855a) 48%, var(--border-strong));
+  background: color-mix(in srgb, var(--success-color, #2f855a) 14%, var(--surface-elevated));
+}
+
+.is-saved {
+  border-color: color-mix(in srgb, var(--warning-color, #b7791f) 48%, var(--border-strong));
+  background: color-mix(in srgb, var(--warning-color, #b7791f) 12%, var(--surface-elevated));
+}
+
+.is-error {
+  border-color: color-mix(in srgb, var(--error-color, #c53030) 52%, var(--border-strong));
+  background: color-mix(in srgb, var(--error-color, #c53030) 12%, var(--surface-elevated));
+}
+
+.is-pending {
+  border-color: var(--border-strong);
 }
 
 :host ::ng-deep .p-button {
@@ -70,4 +188,26 @@ form {
 :host ::ng-deep .p-button:disabled {
   cursor: default;
   opacity: 0.7;
+}
+
+:host ::ng-deep .inline-message {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  main {
+    padding: 1rem;
+  }
+
+  .overview-head,
+  .card-head,
+  .checklist-item-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .progress-pill,
+  .state-badge {
+    align-self: flex-start;
+  }
 }

@@ -2,7 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { finalize, forkJoin, map, switchMap } from 'rxjs';
+import { Observable, finalize, forkJoin, map, switchMap } from 'rxjs';
 import { ButtonDirective } from 'primeng/button';
 import { Message } from 'primeng/message';
 import { ProgressSpinner } from 'primeng/progressspinner';
@@ -66,7 +66,7 @@ export class SetupPageComponent implements OnInit {
     FANSDB: this.createIntegrationForm(),
   };
 
-  private readonly integrations = signal<Record<IntegrationType, IntegrationResponse | null>>({
+  protected readonly integrations = signal<Record<IntegrationType, IntegrationResponse | null>>({
     STASH: null,
     WHISPARR: null,
     STASHDB: null,
@@ -87,7 +87,25 @@ export class SetupPageComponent implements OnInit {
     FANSDB: this.defaultActionState(),
   });
 
+  protected readonly saveAndTestState = signal<Record<IntegrationType, ActionState>>({
+    STASH: this.defaultActionState(),
+    WHISPARR: this.defaultActionState(),
+    STASHDB: this.defaultActionState(),
+    FANSDB: this.defaultActionState(),
+  });
+
   protected readonly isSetupComplete = computed(() => this.status()?.setupComplete ?? false);
+  protected readonly checklistItems = computed<SetupChecklistItem[]>(() => [
+    this.catalogChecklistItem(),
+    this.requiredChecklistItem('STASH'),
+    this.requiredChecklistItem('WHISPARR'),
+  ]);
+  protected readonly readyCount = computed(
+    () => this.checklistItems().filter((item) => item.ready).length,
+  );
+  protected readonly progressSummary = computed(
+    () => `${this.readyCount()} of ${this.checklistItems().length} required services ready`,
+  );
 
   ngOnInit(): void {
     this.loadSetupData();
@@ -117,33 +135,29 @@ export class SetupPageComponent implements OnInit {
     return this.status()?.required.catalog ?? false;
   }
 
-  protected integrationMeta(type: IntegrationType): string {
-    if (this.isCatalogProvider(type)) {
-      return `${this.catalogProvider() === type ? 'Instance Catalog Provider' : 'Catalog Provider Option'} | Status: ${this.statusText(type)}`;
+  protected setupLead(): string {
+    if (this.isSetupComplete()) {
+      return 'Every required service has passed readiness checks.';
     }
 
-    return `Required Service | Status: ${this.statusText(type)}`;
+    return this.nextStepSummary();
   }
 
   protected setupSummary(): string {
     const catalogProvider = this.catalogProvider();
     if (this.isSetupComplete()) {
-      return `Setup complete: this Stasharr instance uses ${catalogProvider ? this.labelFor(catalogProvider) : 'its catalog provider'} with Stash and Whisparr configured.`;
+      return `This Stasharr instance uses ${catalogProvider ? this.labelFor(catalogProvider) : 'its catalog provider'} with Stash and Whisparr ready.`;
     }
 
-    if (catalogProvider) {
-      if (!this.catalogProviderReady()) {
-        if (this.catalogProviderNeedsRepair()) {
-          return `Setup in progress: this Stasharr instance is locked to ${this.labelFor(catalogProvider)}, but that catalog integration needs repair before setup can finish. Repair it below or reset catalog setup to choose a different provider.`;
-        }
-
-        return `Setup in progress: this Stasharr instance is locked to ${this.labelFor(catalogProvider)}, but that catalog integration still needs a successful test before setup can finish. Test or repair it below, or reset catalog setup to choose a different provider.`;
-      }
-
-      return `Setup in progress: this Stasharr instance is configured for ${this.labelFor(catalogProvider)}. Save and test Stash and Whisparr to finish setup, or reset catalog setup to choose a different provider.`;
+    if (!catalogProvider) {
+      return 'Choose the catalog provider for this Stasharr instance, then continue through the remaining required services.';
     }
 
-    return 'Setup in progress: choose the catalog provider for this Stasharr instance, then save and test Stash and Whisparr.';
+    if (!this.catalogProviderReady()) {
+      return `Catalog remains locked to ${this.labelFor(catalogProvider)} until it is healthy. Repair it below, or reset catalog setup only if you need a different provider.`;
+    }
+
+    return `${this.labelFor(catalogProvider)} is locked in as the catalog provider. Finish the remaining required services to complete setup.`;
   }
 
   protected catalogProviderHelp(type: IntegrationType): string | null {
@@ -154,33 +168,94 @@ export class SetupPageComponent implements OnInit {
     if (this.catalogProvider() === type) {
       if (!this.catalogProviderReady()) {
         if (this.catalogProviderNeedsRepair()) {
-          return `${this.labelFor(type)} remains locked in as this instance's catalog provider even while unhealthy. Repair it below or reset catalog setup before choosing a different provider.`;
+          return `${this.labelFor(type)} stays locked as this instance's catalog provider even while unhealthy. Repair it here and Save & Test again. Reset catalog setup only if you need to switch providers.`;
         }
 
-        return `${this.labelFor(type)} is locked in as this instance's catalog provider, but it has not passed a test yet. Test or repair it below, or reset catalog setup before choosing a different provider.`;
+        return `${this.labelFor(type)} is already chosen and locked for this instance. Save & Test it here to finish catalog setup. Reset catalog setup only if you need to switch providers.`;
       }
 
-      return `${this.labelFor(type)} is locked in as this instance's catalog provider. /scenes, performers, studios, requests, and indexing will use it.`;
+      return `${this.labelFor(type)} is locked in as this instance's catalog provider. Repair it here if it later becomes unhealthy. Reset catalog setup only if you need to switch providers.`;
     }
 
-    return `Choose ${this.labelFor(type)} for this Stasharr instance. Saving and testing it will lock it in; changing provider type later requires resetting catalog setup and running setup again.`;
+    return `Choose ${this.labelFor(type)} for this Stasharr instance. Save & Test will lock it in. Changing provider type later requires resetting catalog setup and running setup again.`;
   }
 
-  protected statusText(type: IntegrationType): string {
+  protected sectionLabel(type: IntegrationType): string {
+    if (this.isCatalogProvider(type)) {
+      return this.catalogProvider() === type ? 'Chosen catalog provider' : 'Catalog provider option';
+    }
+
+    return 'Required service';
+  }
+
+  protected readinessLabel(type: IntegrationType): string {
+    switch (this.readinessState(type)) {
+      case 'NOT_SAVED':
+        return 'Not Saved';
+      case 'SAVED':
+        return 'Saved';
+      case 'TEST_FAILED':
+        return 'Test Failed';
+      case 'READY':
+        return 'Ready';
+    }
+  }
+
+  protected readinessSummary(type: IntegrationType): string {
     const integration = this.integrations()[type];
-    if (!integration || !hasSavedIntegrationConfig(integration)) {
-      return 'NOT CONFIGURED';
+    const label = this.labelFor(type);
+    const state = this.readinessState(type);
+
+    if (this.isCatalogProvider(type)) {
+      switch (state) {
+        case 'NOT_SAVED':
+          return `Choose ${label} if you want this instance to use it as the catalog provider. Save & Test will lock that choice.`;
+        case 'SAVED':
+          return `${label} is chosen and locked for this instance, but it still needs a successful test before setup can continue.`;
+        case 'TEST_FAILED':
+          return `${label} is still the chosen catalog provider. Repair the connection details and Save & Test again, or reset catalog setup to switch providers.`;
+        case 'READY':
+          return `${label} is chosen, locked, and ready for this instance.`;
+      }
     }
 
-    if (!integration.enabled) {
-      return 'DISABLED';
-    }
+    switch (state) {
+      case 'NOT_SAVED':
+        return `Enter ${label} connection details, then Save & Test to continue setup.`;
+      case 'SAVED':
+        if (integration && !integration.enabled) {
+          return `${label} is saved but disabled. Enable it, then Save & Test to continue setup.`;
+        }
 
-    if (integration.status === 'ERROR') {
-      return 'ERROR';
+        return `${label} is saved but not ready yet. Save & Test to verify connectivity.`;
+      case 'TEST_FAILED':
+        return `Repair ${label} connection details if needed, then Save & Test again to continue setup.`;
+      case 'READY':
+        return `${label} is connected and ready. Use Save & Test after future changes to keep it healthy.`;
     }
+  }
 
-    return isIntegrationReady(integration) ? 'READY' : 'SAVED, NOT TESTED';
+  protected actionHint(type: IntegrationType): string {
+    switch (this.readinessState(type)) {
+      case 'NOT_SAVED':
+        return 'Default path: save these details and immediately run a connection test.';
+      case 'SAVED':
+        return 'Current settings are saved, but setup is still blocked until this service passes a test.';
+      case 'TEST_FAILED':
+        return 'Keep the error visible, repair the details if needed, and run Save & Test again.';
+      case 'READY':
+        return 'This service is ready right now. Use Save & Test after any changes.';
+    }
+  }
+
+  protected lastHealthyAt(type: IntegrationType): string | null {
+    const value = this.integrations()[type]?.lastHealthyAt;
+    return value ? this.formatDateTime(value) : null;
+  }
+
+  protected lastErrorAt(type: IntegrationType): string | null {
+    const value = this.integrations()[type]?.lastErrorAt;
+    return value ? this.formatDateTime(value) : null;
   }
 
   protected hasStoredApiKey(type: IntegrationType): boolean {
@@ -193,6 +268,14 @@ export class SetupPageComponent implements OnInit {
 
   protected isTesting(type: IntegrationType): boolean {
     return this.testState()[type].running;
+  }
+
+  protected isSaveAndTesting(type: IntegrationType): boolean {
+    return this.saveAndTestState()[type].running;
+  }
+
+  protected isWorking(type: IntegrationType): boolean {
+    return this.isSaving(type) || this.isTesting(type) || this.isSaveAndTesting(type);
   }
 
   protected saveIntegration(type: IntegrationType): void {
@@ -208,25 +291,15 @@ export class SetupPageComponent implements OnInit {
       .updateIntegration(type, payload)
       .pipe(
         switchMap((integration) =>
-          forkJoin({
-            setupStatus: this.setupService.getStatus(),
-            integrations: this.integrationsService.getIntegrations(),
-          }).pipe(
-            map(({ setupStatus, integrations }) => ({
-              integration,
-              setupStatus,
-              integrations,
-            })),
-          ),
+          this.refreshSetupState().pipe(map((snapshot) => ({ integration, ...snapshot }))),
         ),
         finalize(() => {
           this.patchActionState(this.saveState, type, { running: false });
         }),
       )
       .subscribe({
-        next: ({ integration, setupStatus, integrations }) => {
-          this.status.set(setupStatus);
-          this.applyIntegrations(integrations);
+        next: ({ integration, status, integrations }) => {
+          this.syncSetupState(status, integrations);
           const message = this.describeSaveSuccess(type, integration);
           this.notifications.success(message);
           this.patchActionState(this.saveState, type, {
@@ -234,7 +307,7 @@ export class SetupPageComponent implements OnInit {
             error: null,
           });
 
-          if (setupStatus.setupComplete) {
+          if (status.setupComplete) {
             void this.router.navigateByUrl('/scenes');
           }
         },
@@ -245,6 +318,66 @@ export class SetupPageComponent implements OnInit {
           );
           this.notifications.error(message);
           this.patchActionState(this.saveState, type, {
+            success: null,
+            error: message,
+          });
+        },
+      });
+  }
+
+  protected saveAndTestIntegration(type: IntegrationType): void {
+    const payload = this.payloadFromForm(type);
+    this.patchActionState(this.saveAndTestState, type, {
+      running: true,
+      success: null,
+      error: null,
+    });
+    this.patchActionState(this.saveState, type, { success: null, error: null });
+    this.patchActionState(this.testState, type, { success: null, error: null });
+
+    this.integrationsService
+      .updateIntegration(type, payload)
+      .pipe(
+        switchMap(() => this.integrationsService.testIntegration(type, payload)),
+        switchMap((integration) =>
+          this.refreshSetupState().pipe(map((snapshot) => ({ integration, ...snapshot }))),
+        ),
+        finalize(() => {
+          this.patchActionState(this.saveAndTestState, type, { running: false });
+        }),
+      )
+      .subscribe({
+        next: ({ integration, status, integrations }) => {
+          this.syncSetupState(status, integrations);
+
+          if (integration.status === 'CONFIGURED') {
+            const message = `${this.labelFor(type)} is ready.`;
+            this.notifications.success(message);
+            this.patchActionState(this.saveAndTestState, type, {
+              success: message,
+              error: null,
+            });
+
+            if (status.setupComplete) {
+              void this.router.navigateByUrl('/scenes');
+            }
+            return;
+          }
+
+          const message = `${this.labelFor(type)} settings were saved, but the test failed.`;
+          this.notifications.error(message);
+          this.patchActionState(this.saveAndTestState, type, {
+            success: null,
+            error: message,
+          });
+        },
+        error: (error: unknown) => {
+          const message = this.describeMutationError(
+            error,
+            `Failed to save and test ${this.labelFor(type)}.`,
+          );
+          this.notifications.error(message);
+          this.patchActionState(this.saveAndTestState, type, {
             success: null,
             error: message,
           });
@@ -264,16 +397,7 @@ export class SetupPageComponent implements OnInit {
       .testIntegration(type, payload)
       .pipe(
         switchMap((integration) =>
-          forkJoin({
-            status: this.setupService.getStatus(),
-            integrations: this.integrationsService.getIntegrations(),
-          }).pipe(
-            map(({ status, integrations }) => ({
-              integration,
-              status,
-              integrations,
-            })),
-          ),
+          this.refreshSetupState().pipe(map((snapshot) => ({ integration, ...snapshot }))),
         ),
         finalize(() => {
           this.patchActionState(this.testState, type, { running: false });
@@ -281,8 +405,7 @@ export class SetupPageComponent implements OnInit {
       )
       .subscribe({
         next: ({ integration, status, integrations }) => {
-          this.status.set(status);
-          this.applyIntegrations(integrations);
+          this.syncSetupState(status, integrations);
 
           if (integration.status === 'CONFIGURED') {
             const message = `${this.labelFor(type)} test passed.`;
@@ -330,20 +453,14 @@ export class SetupPageComponent implements OnInit {
     this.integrationsService
       .resetIntegration(catalogProvider)
       .pipe(
-        switchMap(() =>
-          forkJoin({
-            status: this.setupService.getStatus(),
-            integrations: this.integrationsService.getIntegrations(),
-          }),
-        ),
+        switchMap(() => this.refreshSetupState()),
         finalize(() => {
           this.resettingCatalogProvider.set(false);
         }),
       )
       .subscribe({
         next: ({ status, integrations }) => {
-          this.status.set(status);
-          this.applyIntegrations(integrations);
+          this.syncSetupState(status, integrations);
           this.notifications.info('Catalog setup was reset');
         },
         error: (error: unknown) => {
@@ -369,8 +486,7 @@ export class SetupPageComponent implements OnInit {
       )
       .subscribe({
         next: (response) => {
-          this.status.set(response.status);
-          this.applyIntegrations(response.integrations);
+          this.syncSetupState(response.status, response.integrations);
 
           if (response.status.setupComplete) {
             void this.router.navigateByUrl('/scenes');
@@ -448,6 +564,134 @@ export class SetupPageComponent implements OnInit {
     return trimmed === '' ? undefined : trimmed;
   }
 
+  protected readinessState(type: IntegrationType): ReadinessState {
+    const integration = this.integrations()[type];
+    if (!integration || !hasSavedIntegrationConfig(integration)) {
+      return 'NOT_SAVED';
+    }
+
+    if (integration.status === 'ERROR') {
+      return 'TEST_FAILED';
+    }
+
+    return isIntegrationReady(integration) ? 'READY' : 'SAVED';
+  }
+
+  private catalogChecklistItem(): SetupChecklistItem {
+    const catalogProvider = this.catalogProvider();
+    if (!catalogProvider) {
+      return {
+        key: 'CATALOG',
+        title: 'Catalog provider',
+        state: 'NOT_SAVED',
+        ready: false,
+        summary: 'Choose StashDB or FansDB, then Save & Test the one you want to lock in.',
+      };
+    }
+
+    const state = this.readinessState(catalogProvider);
+    return {
+      key: 'CATALOG',
+      title: 'Catalog provider',
+      state,
+      ready: this.catalogProviderReady(),
+      summary:
+        state === 'READY'
+          ? `${this.labelFor(catalogProvider)} chosen and ready.`
+          : state === 'TEST_FAILED'
+            ? `${this.labelFor(catalogProvider)} chosen, locked, and needs repair.`
+            : `${this.labelFor(catalogProvider)} chosen and locked. Save & Test is still required.`,
+    };
+  }
+
+  private requiredChecklistItem(
+    type: Extract<IntegrationType, 'STASH' | 'WHISPARR'>,
+  ): SetupChecklistItem {
+    const state = this.readinessState(type);
+    return {
+      key: type,
+      title: this.labelFor(type),
+      state,
+      ready: this.requiredServiceReady(type),
+      summary: this.requiredChecklistSummary(type, state),
+    };
+  }
+
+  private requiredChecklistSummary(
+    type: Extract<IntegrationType, 'STASH' | 'WHISPARR'>,
+    state: ReadinessState,
+  ): string {
+    const label = this.labelFor(type);
+    const integration = this.integrations()[type];
+
+    switch (state) {
+      case 'NOT_SAVED':
+        return `${label} still needs connection details.`;
+      case 'SAVED':
+        if (integration && !integration.enabled) {
+          return `${label} is saved but disabled. Enable it, then Save & Test.`;
+        }
+
+        return `${label} is saved, but it still needs a passing test.`;
+      case 'TEST_FAILED':
+        return `${label} needs repair before setup can finish.`;
+      case 'READY':
+        return `${label} is ready.`;
+    }
+  }
+
+  private requiredServiceReady(type: Extract<IntegrationType, 'STASH' | 'WHISPARR'>): boolean {
+    const setupStatus = this.status();
+    if (!setupStatus) {
+      return false;
+    }
+
+    return type === 'STASH' ? setupStatus.required.stash : setupStatus.required.whisparr;
+  }
+
+  private nextStepSummary(): string {
+    const catalogProvider = this.catalogProvider();
+    if (!catalogProvider) {
+      return 'Next step: choose a catalog provider and run Save & Test.';
+    }
+
+    if (!this.catalogProviderReady()) {
+      if (this.catalogProviderNeedsRepair()) {
+        return `Next step: repair ${this.labelFor(catalogProvider)} and run Save & Test again. Reset catalog setup only if you need a different provider.`;
+      }
+
+      return `Next step: finish ${this.labelFor(catalogProvider)} with Save & Test.`;
+    }
+
+    if (!this.requiredServiceReady('STASH')) {
+      return `Next step: Save & Test Stash.`;
+    }
+
+    if (!this.requiredServiceReady('WHISPARR')) {
+      return `Next step: Save & Test Whisparr.`;
+    }
+
+    return 'Every required service is ready.';
+  }
+
+  private refreshSetupState(): Observable<{
+    status: SetupStatusResponse;
+    integrations: IntegrationResponse[];
+  }> {
+    return forkJoin({
+      status: this.setupService.getStatus(),
+      integrations: this.integrationsService.getIntegrations(),
+    });
+  }
+
+  private syncSetupState(
+    status: SetupStatusResponse,
+    integrations: IntegrationResponse[],
+  ): void {
+    this.status.set(status);
+    this.applyIntegrations(integrations);
+  }
+
   private catalogProviderNeedsRepair(): boolean {
     const catalogProvider = this.catalogProvider();
     if (!catalogProvider) {
@@ -470,6 +714,15 @@ export class SetupPageComponent implements OnInit {
     }
 
     return fallback;
+  }
+
+  private formatDateTime(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return date.toLocaleString();
   }
 
   private defaultActionState(): ActionState {
@@ -524,6 +777,16 @@ interface ActionState {
   running: boolean;
   success: string | null;
   error: string | null;
+}
+
+type ReadinessState = 'NOT_SAVED' | 'SAVED' | 'TEST_FAILED' | 'READY';
+
+interface SetupChecklistItem {
+  key: 'CATALOG' | 'STASH' | 'WHISPARR';
+  title: string;
+  state: ReadinessState;
+  ready: boolean;
+  summary: string;
 }
 
 type IntegrationForm = FormGroup<{

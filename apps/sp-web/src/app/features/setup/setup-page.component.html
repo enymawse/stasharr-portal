@@ -1,7 +1,7 @@
 <main>
   <header>
     <h1>Stasharr Setup</h1>
-    <p>Choose the catalog provider for this Stasharr instance, then save and test every required integration.</p>
+    <p>Finish the required integrations in order, keep the chosen catalog provider locked, and repair failures without guessing what is still blocking setup.</p>
   </header>
 
   @if (loading()) {
@@ -16,23 +16,80 @@
   } @else if (loadError()) {
     <p-message severity="error" styleClass="app-page-message">{{ loadError() }}</p-message>
   } @else {
-    @if (isSetupComplete()) {
-      <p-message severity="success" styleClass="app-banner-message">
-        {{ setupSummary() }}
-      </p-message>
-    } @else {
-      <p-message severity="warn" styleClass="app-banner-message">
-        {{ setupSummary() }}
-      </p-message>
-    }
+    <section class="setup-overview">
+      <div class="overview-head">
+        <div>
+          <p class="eyebrow">Readiness checklist</p>
+          <h2>{{ progressSummary() }}</h2>
+          <p class="overview-lead">{{ setupLead() }}</p>
+        </div>
+        <div class="progress-pill" [class.is-complete]="isSetupComplete()">
+          {{ readyCount() }}/{{ checklistItems().length }} ready
+        </div>
+      </div>
+
+      <p class="overview-summary">{{ setupSummary() }}</p>
+
+      <div class="checklist-grid">
+        @for (item of checklistItems(); track item.key) {
+          <article
+            class="checklist-item"
+            [class.is-ready]="item.state === 'READY'"
+            [class.is-error]="item.state === 'TEST_FAILED'"
+            [class.is-saved]="item.state === 'SAVED'"
+            [class.is-pending]="item.state === 'NOT_SAVED'"
+          >
+            <div class="checklist-item-head">
+              <h3>{{ item.title }}</h3>
+              <span
+                class="state-badge"
+                [class.is-ready]="item.state === 'READY'"
+                [class.is-error]="item.state === 'TEST_FAILED'"
+                [class.is-saved]="item.state === 'SAVED'"
+                [class.is-pending]="item.state === 'NOT_SAVED'"
+              >
+                @switch (item.state) {
+                  @case ('NOT_SAVED') { Not Saved }
+                  @case ('SAVED') { Saved }
+                  @case ('TEST_FAILED') { Test Failed }
+                  @case ('READY') { Ready }
+                }
+              </span>
+            </div>
+            <p>{{ item.summary }}</p>
+          </article>
+        }
+      </div>
+    </section>
 
     <section class="cards">
       @for (type of visibleCatalogProviderTypes(); track type) {
         <article class="card">
-          <h2>{{ labelFor(type) }}</h2>
-          <p class="meta">{{ integrationMeta(type) }}</p>
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">{{ sectionLabel(type) }}</p>
+              <h2>{{ labelFor(type) }}</h2>
+            </div>
+            <span
+              class="state-badge"
+              [class.is-ready]="readinessState(type) === 'READY'"
+              [class.is-error]="readinessState(type) === 'TEST_FAILED'"
+              [class.is-saved]="readinessState(type) === 'SAVED'"
+              [class.is-pending]="readinessState(type) === 'NOT_SAVED'"
+            >
+              {{ readinessLabel(type) }}
+            </span>
+          </div>
+          <p class="card-summary">{{ readinessSummary(type) }}</p>
           @if (catalogProviderHelp(type); as helpText) {
             <p class="meta">{{ helpText }}</p>
+          }
+          <div class="health-meta">
+            <p>Last healthy test: {{ lastHealthyAt(type) ?? 'Never' }}</p>
+            <p>Last failed test: {{ lastErrorAt(type) ?? 'None' }}</p>
+          </div>
+          @if (integrations()[type]?.lastErrorMessage; as message) {
+            <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
           }
 
           <form [formGroup]="formFor(type)" (ngSubmit)="saveIntegration(type)">
@@ -44,31 +101,37 @@
             />
 
             <div class="actions">
-              <button pButton type="submit" [disabled]="isSaving(type)">
-                {{ isSaving(type) ? 'Saving...' : 'Save' }}
+              <button pButton type="button" [disabled]="isWorking(type)" (click)="saveAndTestIntegration(type)">
+                {{ isSaveAndTesting(type) ? 'Saving & testing...' : 'Save & Test' }}
               </button>
               <button
                 pButton
-                type="button"
+                type="submit"
                 text
-                [disabled]="isTesting(type)"
-                (click)="testIntegration(type)"
+                [disabled]="isWorking(type)"
               >
-                {{ isTesting(type) ? 'Testing...' : 'Test' }}
+                {{ isSaving(type) ? 'Saving...' : 'Save only' }}
               </button>
               @if (catalogProvider() === type) {
                 <button
                   pButton
                   type="button"
                   text
-                  [disabled]="resettingCatalogProvider()"
+                  [disabled]="resettingCatalogProvider() || isWorking(type)"
                   (click)="resetCatalogProviderChoice()"
                 >
                   {{ resettingCatalogProvider() ? 'Resetting...' : 'Reset catalog setup' }}
                 </button>
               }
             </div>
+            <p class="action-hint">{{ actionHint(type) }}</p>
 
+            @if (saveAndTestState()[type].success; as message) {
+              <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
+            }
+            @if (saveAndTestState()[type].error; as message) {
+              <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+            }
             @if (saveState()[type].success; as message) {
               <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
             }
@@ -89,8 +152,29 @@
     <section class="cards">
       @for (type of requiredServiceTypes; track type) {
         <article class="card">
-          <h2>{{ labelFor(type) }}</h2>
-          <p class="meta">{{ integrationMeta(type) }}</p>
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">{{ sectionLabel(type) }}</p>
+              <h2>{{ labelFor(type) }}</h2>
+            </div>
+            <span
+              class="state-badge"
+              [class.is-ready]="readinessState(type) === 'READY'"
+              [class.is-error]="readinessState(type) === 'TEST_FAILED'"
+              [class.is-saved]="readinessState(type) === 'SAVED'"
+              [class.is-pending]="readinessState(type) === 'NOT_SAVED'"
+            >
+              {{ readinessLabel(type) }}
+            </span>
+          </div>
+          <p class="card-summary">{{ readinessSummary(type) }}</p>
+          <div class="health-meta">
+            <p>Last healthy test: {{ lastHealthyAt(type) ?? 'Never' }}</p>
+            <p>Last failed test: {{ lastErrorAt(type) ?? 'None' }}</p>
+          </div>
+          @if (integrations()[type]?.lastErrorMessage; as message) {
+            <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+          }
 
           <form [formGroup]="formFor(type)" (ngSubmit)="saveIntegration(type)">
             <app-integration-form-fields
@@ -101,20 +185,26 @@
             />
 
             <div class="actions">
-              <button pButton type="submit" [disabled]="isSaving(type)">
-                {{ isSaving(type) ? 'Saving...' : 'Save' }}
+              <button pButton type="button" [disabled]="isWorking(type)" (click)="saveAndTestIntegration(type)">
+                {{ isSaveAndTesting(type) ? 'Saving & testing...' : 'Save & Test' }}
               </button>
               <button
                 pButton
-                type="button"
+                type="submit"
                 text
-                [disabled]="isTesting(type)"
-                (click)="testIntegration(type)"
+                [disabled]="isWorking(type)"
               >
-                {{ isTesting(type) ? 'Testing...' : 'Test' }}
+                {{ isSaving(type) ? 'Saving...' : 'Save only' }}
               </button>
             </div>
+            <p class="action-hint">{{ actionHint(type) }}</p>
 
+            @if (saveAndTestState()[type].success; as message) {
+              <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
+            }
+            @if (saveAndTestState()[type].error; as message) {
+              <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+            }
             @if (saveState()[type].success; as message) {
               <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
             }
