@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   IntegrationResponse,
+  IntegrationTestResponse,
   IntegrationType,
   UpdateIntegrationPayload,
 } from './integrations.types';
@@ -27,8 +28,8 @@ export class IntegrationsService {
   testIntegration(
     type: IntegrationType,
     payload: UpdateIntegrationPayload,
-  ): Observable<IntegrationResponse> {
-    return this.http.post<IntegrationResponse>(
+  ): Observable<IntegrationTestResponse> {
+    return this.http.post<IntegrationTestResponse>(
       `/api/integrations/${type}/test`,
       payload,
     );

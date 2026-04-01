@@ -75,6 +75,7 @@ export function configuredCatalogProviderTypeFromIntegrations(
     enabled?: boolean | null;
     status?: IntegrationStatus | null;
     baseUrl?: string | null;
+    lastHealthyAt?: Date | null;
   }>,
 ): CatalogProviderIntegrationType | null {
   const integrationsByType = new Map(
@@ -83,8 +84,10 @@ export function configuredCatalogProviderTypeFromIntegrations(
   const configuredTypes = CATALOG_PROVIDER_KEYS.filter((providerType) => {
     const integration = integrationsByType.get(providerType);
     return (
+      integration?.enabled === true &&
       integration?.status === IntegrationStatus.CONFIGURED &&
-      !!integration.baseUrl?.trim()
+      !!integration.baseUrl?.trim() &&
+      !!integration.lastHealthyAt
     );
   });
 
@@ -139,15 +142,19 @@ export function instanceCatalogProviderTypeFromIntegrations(
 export function isCatalogProviderReady(
   integration:
     | {
+        enabled?: boolean | null;
         status?: IntegrationStatus | null;
         baseUrl?: string | null;
+        lastHealthyAt?: Date | null;
       }
     | null
     | undefined,
 ): boolean {
   return (
+    integration?.enabled === true &&
     integration?.status === IntegrationStatus.CONFIGURED &&
-    !!integration.baseUrl?.trim()
+    !!integration.baseUrl?.trim() &&
+    !!integration.lastHealthyAt
   );
 }
 
@@ -282,6 +289,7 @@ function pickCatalogProviderType(
       enabled?: boolean | null;
       status?: IntegrationStatus | null;
       baseUrl?: string | null;
+      lastHealthyAt?: Date | null;
     }
   >,
 ): CatalogProviderIntegrationType | null {

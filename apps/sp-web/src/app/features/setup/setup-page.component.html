@@ -1,7 +1,7 @@
 <main>
   <header>
     <h1>Stasharr Setup</h1>
-    <p>Choose the catalog provider for this Stasharr instance, then configure Stash and Whisparr.</p>
+    <p>Choose the catalog provider for this Stasharr instance, then save and test every required integration.</p>
   </header>
 
   @if (loading()) {
@@ -47,6 +47,15 @@
               <button pButton type="submit" [disabled]="isSaving(type)">
                 {{ isSaving(type) ? 'Saving...' : 'Save' }}
               </button>
+              <button
+                pButton
+                type="button"
+                text
+                [disabled]="isTesting(type)"
+                (click)="testIntegration(type)"
+              >
+                {{ isTesting(type) ? 'Testing...' : 'Test' }}
+              </button>
               @if (catalogProvider() === type) {
                 <button
                   pButton
@@ -59,6 +68,19 @@
                 </button>
               }
             </div>
+
+            @if (saveState()[type].success; as message) {
+              <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
+            }
+            @if (saveState()[type].error; as message) {
+              <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+            }
+            @if (testState()[type].success; as message) {
+              <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
+            }
+            @if (testState()[type].error; as message) {
+              <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+            }
           </form>
         </article>
       }
@@ -82,7 +104,29 @@
               <button pButton type="submit" [disabled]="isSaving(type)">
                 {{ isSaving(type) ? 'Saving...' : 'Save' }}
               </button>
+              <button
+                pButton
+                type="button"
+                text
+                [disabled]="isTesting(type)"
+                (click)="testIntegration(type)"
+              >
+                {{ isTesting(type) ? 'Testing...' : 'Test' }}
+              </button>
             </div>
+
+            @if (saveState()[type].success; as message) {
+              <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
+            }
+            @if (saveState()[type].error; as message) {
+              <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+            }
+            @if (testState()[type].success; as message) {
+              <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
+            }
+            @if (testState()[type].error; as message) {
+              <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+            }
           </form>
         </article>
       }

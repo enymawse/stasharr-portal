@@ -20,7 +20,9 @@ import {
   IntegrationResponse,
   IntegrationType,
   UpdateIntegrationPayload,
+  hasSavedIntegrationConfig,
   integrationLabel,
+  isIntegrationReady,
   isCatalogProviderType,
 } from '../../core/api/integrations.types';
 
@@ -119,7 +121,7 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected configured(type: IntegrationType): boolean {
-    return this.integrations()[type]?.status === 'CONFIGURED';
+    return isIntegrationReady(this.integrations()[type]);
   }
 
   protected labelFor(type: IntegrationType): string {
@@ -143,7 +145,11 @@ export class SettingsPageComponent implements OnInit {
     const label = this.configuredCatalogProviderLabel();
     if (label) {
       if (!this.catalogProviderReady()) {
-        return `This Stasharr instance is locked to ${label}, but that catalog integration needs repair. Repair its settings below or reset catalog setup to choose a different provider.`;
+        if (this.catalogProviderNeedsRepair()) {
+          return `This Stasharr instance is locked to ${label}, but that catalog integration needs repair. Repair its settings below or reset catalog setup to choose a different provider.`;
+        }
+
+        return `This Stasharr instance is locked to ${label}, but that catalog integration has not passed a test yet. Test or repair its settings below, or reset catalog setup to choose a different provider.`;
       }
 
       return `This Stasharr instance is configured for ${label}. To use a different catalog provider, reset catalog setup and re-run setup.`;
@@ -159,7 +165,11 @@ export class SettingsPageComponent implements OnInit {
     }
 
     if (!this.catalogProviderReady()) {
-      return `${this.labelFor(type)} remains this instance's catalog provider even while unhealthy. Repair it here, or reset catalog setup before changing provider type.`;
+      if (this.catalogProviderNeedsRepair()) {
+        return `${this.labelFor(type)} remains this instance's catalog provider even while unhealthy. Repair it here, or reset catalog setup before changing provider type.`;
+      }
+
+      return `${this.labelFor(type)} remains this instance's catalog provider while its saved settings are unverified. Test or repair it here, or reset catalog setup before changing provider type.`;
     }
 
     return `${this.labelFor(type)} is the catalog provider configured for this Stasharr instance. Reset catalog setup before changing provider type.`;
@@ -171,11 +181,19 @@ export class SettingsPageComponent implements OnInit {
 
   protected statusText(type: IntegrationType): string {
     const integration = this.integrations()[type];
-    if (!integration) {
+    if (!integration || !hasSavedIntegrationConfig(integration)) {
       return 'NOT CONFIGURED';
     }
 
-    return integration.status.replaceAll('_', ' ');
+    if (!integration.enabled) {
+      return 'DISABLED';
+    }
+
+    if (integration.status === 'ERROR') {
+      return 'ERROR';
+    }
+
+    return this.configured(type) ? 'READY' : 'SAVED, NOT TESTED';
   }
 
   protected hasStoredApiKey(type: IntegrationType): boolean {
@@ -252,23 +270,30 @@ export class SettingsPageComponent implements OnInit {
     this.integrationsService
       .updateIntegration(type, payload)
       .pipe(
-        switchMap(() =>
+        switchMap((integration) =>
           forkJoin({
             integrations: this.integrationsService.getIntegrations(),
             setupStatus: this.setupService.getStatus(),
-          }),
+          }).pipe(
+            map(({ integrations, setupStatus }) => ({
+              integration,
+              integrations,
+              setupStatus,
+            })),
+          ),
         ),
         finalize(() => {
           this.patchActionState(this.saveState, type, { running: false });
         }),
       )
       .subscribe({
-        next: ({ integrations, setupStatus }) => {
+        next: ({ integration, integrations, setupStatus }) => {
           this.setupStatus.set(setupStatus);
           this.applyIntegrations(integrations);
-          this.notifications.success(`${this.labelFor(type)} settings saved`);
+          const message = this.describeSaveSuccess(type, integration);
+          this.notifications.success(message);
           this.patchActionState(this.saveState, type, {
-            success: `${this.labelFor(type)} settings saved.`,
+            success: message,
             error: null,
           });
         },
@@ -298,9 +323,13 @@ export class SettingsPageComponent implements OnInit {
       .testIntegration(type, payload)
       .pipe(
         switchMap((integration) =>
-          this.setupService.getStatus().pipe(
-            map((setupStatus) => ({
+          forkJoin({
+            integrations: this.integrationsService.getIntegrations(),
+            setupStatus: this.setupService.getStatus(),
+          }).pipe(
+            map(({ integrations, setupStatus }) => ({
               integration,
+              integrations,
               setupStatus,
             })),
           ),
@@ -310,13 +339,26 @@ export class SettingsPageComponent implements OnInit {
         }),
       )
       .subscribe({
-        next: ({ integration, setupStatus }) => {
+        next: ({ integration, integrations, setupStatus }) => {
           this.setupStatus.set(setupStatus);
-          this.updateIntegration(type, integration);
-          this.notifications.success(`${this.labelFor(type)} test passed`);
+          this.applyIntegrations(integrations);
+
+          if (integration.status === 'CONFIGURED') {
+            const message = `${this.labelFor(type)} test passed.`;
+            this.notifications.success(message);
+            this.patchActionState(this.testState, type, {
+              success: message,
+              error: null,
+            });
+            return;
+          }
+
+          const message =
+            integration.lastErrorMessage?.trim() || `${this.labelFor(type)} test failed.`;
+          this.notifications.error(message);
           this.patchActionState(this.testState, type, {
-            success: `${this.labelFor(type)} test passed.`,
-            error: null,
+            success: null,
+            error: message,
           });
         },
         error: (error: unknown) => {
@@ -535,19 +577,21 @@ export class SettingsPageComponent implements OnInit {
     return this.isCatalogProvider(type) ? false : true;
   }
 
-  private updateIntegration(type: IntegrationType, integration: IntegrationResponse): void {
-    this.integrations.update((current) => ({
-      ...current,
-      [type]: integration,
-    }));
-  }
-
   private catalogProvider(): CatalogProviderType | null {
     return this.setupStatus()?.catalogProvider ?? null;
   }
 
   private catalogProviderReady(): boolean {
     return this.setupStatus()?.required.catalog ?? false;
+  }
+
+  private catalogProviderNeedsRepair(): boolean {
+    const catalogProvider = this.catalogProvider();
+    if (!catalogProvider) {
+      return false;
+    }
+
+    return this.integrations()[catalogProvider]?.status === 'ERROR';
   }
 
   private createIntegrationForm(): IntegrationForm {
@@ -586,6 +630,25 @@ export class SettingsPageComponent implements OnInit {
     }
 
     return fallback;
+  }
+
+  private describeSaveSuccess(
+    type: IntegrationType,
+    integration: IntegrationResponse,
+  ): string {
+    if (integration.status === 'ERROR') {
+      return `${this.labelFor(type)} settings saved. Repair the connection details and run the test again.`;
+    }
+
+    if (isIntegrationReady(integration)) {
+      return `${this.labelFor(type)} settings saved.`;
+    }
+
+    if (hasSavedIntegrationConfig(integration)) {
+      return `${this.labelFor(type)} settings saved. Run a test to verify connectivity.`;
+    }
+
+    return `${this.labelFor(type)} settings saved.`;
   }
 
   private defaultActionState(): ActionState {

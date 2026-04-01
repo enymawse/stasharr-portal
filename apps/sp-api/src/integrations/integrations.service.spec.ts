@@ -121,6 +121,7 @@ describe('IntegrationsService', () => {
         config: null,
       },
     ]);
+    findUnique.mockResolvedValue(null);
     upsert.mockResolvedValue({
       type: IntegrationType.FANSDB,
       enabled: true,
@@ -164,10 +165,62 @@ describe('IntegrationsService', () => {
           enabled: true,
           baseUrl: 'http://fansdb.local/graphql',
           config: buildCatalogProviderSelectionConfig(),
-          status: IntegrationStatus.CONFIGURED,
+          status: IntegrationStatus.NOT_CONFIGURED,
+          lastHealthyAt: null,
+          lastErrorAt: null,
+          lastErrorMessage: null,
         }),
       }),
     );
+  });
+
+  it('preserves the stored API key when saving without a new one and clears readiness on connection changes', async () => {
+    findUnique.mockResolvedValue({
+      type: IntegrationType.STASH,
+      enabled: true,
+      name: 'Local Stash',
+      baseUrl: 'http://stash.old',
+      apiKey: 'existing-token',
+      status: IntegrationStatus.CONFIGURED,
+      lastHealthyAt: new Date('2026-04-01T00:00:00.000Z'),
+      lastErrorAt: null,
+      lastErrorMessage: null,
+    });
+    upsert.mockResolvedValue({
+      type: IntegrationType.STASH,
+      enabled: true,
+      status: IntegrationStatus.NOT_CONFIGURED,
+      hasApiKey: true,
+    });
+
+    await service.upsert(IntegrationType.STASH, {
+      baseUrl: 'http://stash.new',
+    });
+
+    expect(upsert).toHaveBeenCalledWith({
+      where: { type: IntegrationType.STASH },
+      update: expect.objectContaining({
+        enabled: true,
+        name: 'Local Stash',
+        baseUrl: 'http://stash.new',
+        apiKey: 'existing-token',
+        status: IntegrationStatus.NOT_CONFIGURED,
+        lastHealthyAt: null,
+        lastErrorAt: null,
+        lastErrorMessage: null,
+      }),
+      create: expect.objectContaining({
+        type: IntegrationType.STASH,
+        enabled: true,
+        name: 'Local Stash',
+        baseUrl: 'http://stash.new',
+        apiKey: 'existing-token',
+        status: IntegrationStatus.NOT_CONFIGURED,
+        lastHealthyAt: null,
+        lastErrorAt: null,
+        lastErrorMessage: null,
+      }),
+    });
   });
 
   it('rejects configuring a different catalog provider until catalog setup is reset', async () => {
@@ -207,6 +260,8 @@ describe('IntegrationsService', () => {
   it('tests stash integration and stores success metadata', async () => {
     findUnique.mockResolvedValue({
       type: IntegrationType.STASH,
+      enabled: true,
+      name: 'Local Stash',
       baseUrl: 'http://stash.local',
       apiKey: 'token',
     });
@@ -231,6 +286,10 @@ describe('IntegrationsService', () => {
     const stashUpsertCall = upsert.mock.calls[0]?.[0] as {
       where: { type: IntegrationType };
       update: {
+        enabled: boolean;
+        name: string | null;
+        baseUrl: string | null;
+        apiKey: string | null;
         status: IntegrationStatus;
         lastHealthyAt: Date | null;
         lastErrorAt: Date | null;
@@ -238,10 +297,55 @@ describe('IntegrationsService', () => {
       };
     };
     expect(stashUpsertCall.where.type).toBe(IntegrationType.STASH);
+    expect(stashUpsertCall.update.enabled).toBe(true);
+    expect(stashUpsertCall.update.name).toBe('Local Stash');
+    expect(stashUpsertCall.update.baseUrl).toBe('http://stash.local');
+    expect(stashUpsertCall.update.apiKey).toBe('token');
     expect(stashUpsertCall.update.status).toBe(IntegrationStatus.CONFIGURED);
     expect(stashUpsertCall.update.lastHealthyAt).toBeInstanceOf(Date);
     expect(stashUpsertCall.update.lastErrorAt).toBeNull();
     expect(stashUpsertCall.update.lastErrorMessage).toBeNull();
+  });
+
+  it('persists the config that was tested when the test succeeds', async () => {
+    findUnique.mockResolvedValue({
+      type: IntegrationType.STASH,
+      enabled: true,
+      name: 'Local Stash',
+      baseUrl: 'http://stash.old',
+      apiKey: 'old-token',
+      status: IntegrationStatus.ERROR,
+      lastHealthyAt: null,
+      lastErrorAt: new Date('2026-03-31T00:00:00.000Z'),
+      lastErrorMessage: 'bad credentials',
+    });
+    stashTestConnection.mockResolvedValue(undefined);
+    upsert.mockResolvedValue({
+      type: IntegrationType.STASH,
+      status: IntegrationStatus.CONFIGURED,
+      baseUrl: 'http://stash.new',
+      apiKey: 'new-token',
+    });
+
+    await service.testIntegration(IntegrationType.STASH, {
+      baseUrl: 'http://stash.new',
+      apiKey: 'new-token',
+    });
+
+    expect(stashTestConnection).toHaveBeenCalledWith({
+      baseUrl: 'http://stash.new',
+      apiKey: 'new-token',
+    });
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { type: IntegrationType.STASH },
+        update: expect.objectContaining({
+          baseUrl: 'http://stash.new',
+          apiKey: 'new-token',
+          status: IntegrationStatus.CONFIGURED,
+        }),
+      }),
+    );
   });
 
   it('rejects testing a different catalog provider until catalog setup is reset', async () => {
@@ -270,8 +374,9 @@ describe('IntegrationsService', () => {
   it('stores error metadata when integration test fails', async () => {
     findUnique.mockResolvedValue({
       type: IntegrationType.WHISPARR,
-      baseUrl: 'http://whisparr.local',
-      apiKey: 'token',
+      enabled: true,
+      baseUrl: 'http://whisparr.old',
+      apiKey: 'old-token',
     });
     whisparrTestConnection.mockRejectedValue(new Error('bad credentials'));
     upsert.mockResolvedValue({
@@ -281,7 +386,10 @@ describe('IntegrationsService', () => {
     });
 
     await expect(
-      service.testIntegration(IntegrationType.WHISPARR, {}),
+      service.testIntegration(IntegrationType.WHISPARR, {
+        baseUrl: 'http://whisparr.local',
+        apiKey: 'token',
+      }),
     ).resolves.toMatchObject({
       type: IntegrationType.WHISPARR,
       status: IntegrationStatus.ERROR,
@@ -291,13 +399,19 @@ describe('IntegrationsService', () => {
     const whisparrUpsertCall = upsert.mock.calls[0]?.[0] as {
       where: { type: IntegrationType };
       update: {
+        baseUrl: string | null;
+        apiKey: string | null;
         status: IntegrationStatus;
+        lastHealthyAt: Date | null;
         lastErrorAt: Date | null;
         lastErrorMessage: string | null;
       };
     };
     expect(whisparrUpsertCall.where.type).toBe(IntegrationType.WHISPARR);
+    expect(whisparrUpsertCall.update.baseUrl).toBe('http://whisparr.local');
+    expect(whisparrUpsertCall.update.apiKey).toBe('token');
     expect(whisparrUpsertCall.update.status).toBe(IntegrationStatus.ERROR);
+    expect(whisparrUpsertCall.update.lastHealthyAt).toBeNull();
     expect(whisparrUpsertCall.update.lastErrorAt).toBeInstanceOf(Date);
     expect(whisparrUpsertCall.update.lastErrorMessage).toBe('bad credentials');
   });

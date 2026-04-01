@@ -25,14 +25,16 @@ function buildHealthStatus(): HealthStatusResponse {
 function buildIntegration(
   overrides: Partial<IntegrationResponse> & Pick<IntegrationResponse, 'type'>,
 ): IntegrationResponse {
+  const status = overrides.status ?? 'CONFIGURED';
   return {
     type: overrides.type,
     enabled: overrides.enabled ?? true,
-    status: overrides.status ?? 'CONFIGURED',
+    status,
     name: overrides.name ?? null,
     baseUrl: overrides.baseUrl ?? 'http://service.local',
     hasApiKey: overrides.hasApiKey ?? true,
-    lastHealthyAt: overrides.lastHealthyAt ?? null,
+    lastHealthyAt:
+      overrides.lastHealthyAt ?? (status === 'CONFIGURED' ? '2026-04-01T00:00:00.000Z' : null),
     lastErrorAt: overrides.lastErrorAt ?? null,
     lastErrorMessage: overrides.lastErrorMessage ?? null,
   };
@@ -71,6 +73,11 @@ describe('SettingsPageComponent', () => {
     const healthService = {
       getStatus: vi.fn().mockReturnValue(of(buildHealthStatus())),
     };
+    const notifications = {
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [SettingsPageComponent],
@@ -96,11 +103,7 @@ describe('SettingsPageComponent', () => {
         },
         {
           provide: AppNotificationsService,
-          useValue: {
-            success: vi.fn(),
-            error: vi.fn(),
-            info: vi.fn(),
-          },
+          useValue: notifications,
         },
       ],
     }).compileComponents();
@@ -110,7 +113,13 @@ describe('SettingsPageComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    return { fixture, component: fixture.componentInstance as any };
+    return {
+      fixture,
+      component: fixture.componentInstance as any,
+      integrationsService,
+      setupService,
+      notifications,
+    };
   }
 
   it('shows only the configured catalog provider tab and reset guidance after setup', async () => {
@@ -207,5 +216,93 @@ describe('SettingsPageComponent', () => {
     expect(component.catalogProviderHelp('FANSDB')).toBe(
       "FansDB remains this instance's catalog provider even while unhealthy. Repair it here, or reset catalog setup before changing provider type.",
     );
+  });
+
+  it('shows test success only when the returned integration is configured', async () => {
+    const initialIntegrations = [
+      buildIntegration({ type: 'STASH' }),
+      buildIntegration({ type: 'WHISPARR', status: 'NOT_CONFIGURED', lastHealthyAt: null }),
+      buildIntegration({ type: 'STASHDB' }),
+    ];
+    const { fixture, component, integrationsService, setupService, notifications } =
+      await renderPage(initialIntegrations, {
+        setupComplete: false,
+        required: { stash: true, catalog: true, whisparr: false },
+        catalogProvider: 'STASHDB',
+      });
+
+    const testedIntegration = buildIntegration({
+      type: 'WHISPARR',
+      status: 'CONFIGURED',
+      lastHealthyAt: '2026-04-01T01:00:00.000Z',
+    });
+    integrationsService.testIntegration.mockReturnValue(of(testedIntegration));
+    integrationsService.getIntegrations.mockReturnValue(
+      of([
+        buildIntegration({ type: 'STASH' }),
+        testedIntegration,
+        buildIntegration({ type: 'STASHDB' }),
+      ]),
+    );
+    setupService.getStatus.mockReturnValue(
+      of({
+        setupComplete: true,
+        required: { stash: true, catalog: true, whisparr: true },
+        catalogProvider: 'STASHDB',
+      }),
+    );
+
+    component.testIntegration('WHISPARR');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(notifications.success).toHaveBeenCalledWith('Whisparr test passed.');
+    expect(notifications.error).not.toHaveBeenCalled();
+    expect(component.statusText('WHISPARR')).toBe('READY');
+  });
+
+  it('treats an in-band error test result as a failed test', async () => {
+    const initialIntegrations = [
+      buildIntegration({ type: 'STASH' }),
+      buildIntegration({ type: 'WHISPARR', status: 'NOT_CONFIGURED', lastHealthyAt: null }),
+      buildIntegration({ type: 'STASHDB' }),
+    ];
+    const { fixture, component, integrationsService, setupService, notifications } =
+      await renderPage(initialIntegrations, {
+        setupComplete: false,
+        required: { stash: true, catalog: true, whisparr: false },
+        catalogProvider: 'STASHDB',
+      });
+
+    const testedIntegration = buildIntegration({
+      type: 'WHISPARR',
+      status: 'ERROR',
+      lastHealthyAt: null,
+      lastErrorAt: '2026-04-01T01:00:00.000Z',
+      lastErrorMessage: 'bad credentials',
+    });
+    integrationsService.testIntegration.mockReturnValue(of(testedIntegration));
+    integrationsService.getIntegrations.mockReturnValue(
+      of([
+        buildIntegration({ type: 'STASH' }),
+        testedIntegration,
+        buildIntegration({ type: 'STASHDB' }),
+      ]),
+    );
+    setupService.getStatus.mockReturnValue(
+      of({
+        setupComplete: false,
+        required: { stash: true, catalog: true, whisparr: false },
+        catalogProvider: 'STASHDB',
+      }),
+    );
+
+    component.testIntegration('WHISPARR');
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(notifications.error).toHaveBeenCalledWith('bad credentials');
+    expect(notifications.success).not.toHaveBeenCalledWith('Whisparr test passed.');
+    expect(component.statusText('WHISPARR')).toBe('ERROR');
   });
 });

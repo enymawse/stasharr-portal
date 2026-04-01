@@ -32,6 +32,24 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
 
+type PersistedIntegrationValues = {
+  enabled: boolean;
+  name: string | null;
+  baseUrl: string | null;
+  apiKey: string | null;
+};
+
+type PersistedIntegrationState = {
+  status: IntegrationStatus;
+  lastHealthyAt: Date | null;
+  lastErrorAt: Date | null;
+  lastErrorMessage: string | null;
+};
+
+type TestedIntegrationConfig = IntegrationConfig & {
+  status: Extract<IntegrationStatus, 'CONFIGURED' | 'ERROR'>;
+};
+
 @Injectable()
 export class IntegrationsService {
   constructor(
@@ -51,43 +69,38 @@ export class IntegrationsService {
     type: IntegrationType,
     dto: UpdateIntegrationDto,
   ): Promise<IntegrationConfig> {
-    const normalizedName = this.normalizeInput(dto.name);
-    const normalizedBaseUrl = this.normalizeInput(dto.baseUrl);
-    const normalizedApiKey = this.normalizeInput(dto.apiKey);
+    const existing = await this.prisma.integrationConfig.findUnique({
+      where: { type },
+    });
     const isCatalogProvider = isCatalogProviderIntegrationType(type);
-    const configured = isCatalogProvider
-      ? !!normalizedBaseUrl
-      : !!normalizedBaseUrl || !!normalizedApiKey || !!normalizedName;
+    const persistedValues = this.resolvePersistedValues(type, dto, existing);
+    const configured = this.hasSavedConfig(type, persistedValues);
 
     if (isCatalogProvider) {
       await this.assertCatalogProviderSaveAllowed(type, configured);
     }
 
+    const healthState = this.resolveSavedHealthState(
+      existing,
+      persistedValues,
+      configured,
+    );
     const selectionConfig =
       isCatalogProvider && configured
         ? this.catalogProviderSelectionConfig()
         : undefined;
     const updateData = {
-      enabled: isCatalogProvider ? true : dto.enabled,
-      name: normalizedName,
-      baseUrl: normalizedBaseUrl,
-      apiKey: normalizedApiKey,
-      status: configured
-        ? IntegrationStatus.CONFIGURED
-        : IntegrationStatus.NOT_CONFIGURED,
-      lastErrorAt: null,
-      lastErrorMessage: null,
+      ...persistedValues,
+      ...healthState,
       ...(selectionConfig ? { config: selectionConfig } : {}),
     } satisfies Prisma.IntegrationConfigUpdateInput;
     const createData = {
       type,
-      enabled: isCatalogProvider ? true : (dto.enabled ?? true),
-      name: normalizedName,
-      baseUrl: normalizedBaseUrl,
-      apiKey: normalizedApiKey,
-      status: configured
-        ? IntegrationStatus.CONFIGURED
-        : IntegrationStatus.NOT_CONFIGURED,
+      ...persistedValues,
+      status: IntegrationStatus.NOT_CONFIGURED,
+      lastHealthyAt: null,
+      lastErrorAt: null,
+      lastErrorMessage: null,
       ...(selectionConfig ? { config: selectionConfig } : {}),
     } satisfies Prisma.IntegrationConfigCreateInput;
     const upsertArgs = {
@@ -130,17 +143,22 @@ export class IntegrationsService {
   async testIntegration(
     type: IntegrationType,
     dto: UpdateIntegrationDto,
-  ): Promise<IntegrationConfig> {
-    const selectedCatalogProviderType = isCatalogProviderIntegrationType(type)
-      ? await this.assertCatalogProviderMutationAllowed(type)
-      : null;
-    const selectionConfig =
-      selectedCatalogProviderType === type
-        ? this.catalogProviderSelectionConfig()
-        : undefined;
+  ): Promise<TestedIntegrationConfig> {
+    if (isCatalogProviderIntegrationType(type)) {
+      await this.assertCatalogProviderMutationAllowed(type);
+    }
+
+    const existing = await this.prisma.integrationConfig.findUnique({
+      where: { type },
+    });
+    const persistedValues = this.resolvePersistedValues(type, dto, existing);
+    const selectionConfig = isCatalogProviderIntegrationType(type)
+      ? this.catalogProviderSelectionConfig()
+      : undefined;
+    const configChanged = this.connectionDetailsChanged(existing, persistedValues);
 
     try {
-      const config = await this.resolveTestConfig(type, dto);
+      const config = this.resolveTestConfig(persistedValues);
 
       switch (type) {
         case IntegrationType.STASH:
@@ -156,46 +174,33 @@ export class IntegrationsService {
       }
 
       const now = new Date();
-      return this.prisma.integrationConfig.upsert({
-        where: { type },
-        update: {
+      return this.persistIntegration(
+        type,
+        {
+          ...persistedValues,
           status: IntegrationStatus.CONFIGURED,
           lastHealthyAt: now,
           lastErrorAt: null,
           lastErrorMessage: null,
-          ...(selectionConfig ? { config: selectionConfig } : {}),
         },
-        create: {
-          type,
-          enabled: true,
-          status: IntegrationStatus.CONFIGURED,
-          lastHealthyAt: now,
-          ...(selectionConfig ? { config: selectionConfig } : {}),
-          lastErrorAt: null,
-          lastErrorMessage: null,
-        },
-      });
+        selectionConfig,
+      ) as Promise<TestedIntegrationConfig>;
     } catch (error) {
       const message = this.resolveErrorMessage(error);
-      const failed = await this.prisma.integrationConfig.upsert({
-        where: { type },
-        update: {
+      return this.persistIntegration(
+        type,
+        {
+          ...persistedValues,
           status: IntegrationStatus.ERROR,
-          lastErrorAt: new Date(),
-          lastErrorMessage: message,
-          ...(selectionConfig ? { config: selectionConfig } : {}),
-        },
-        create: {
-          type,
-          enabled: true,
-          status: IntegrationStatus.ERROR,
-          ...(selectionConfig ? { config: selectionConfig } : {}),
+          lastHealthyAt:
+            configChanged || !existing?.lastHealthyAt
+              ? null
+              : existing.lastHealthyAt,
           lastErrorAt: new Date(),
           lastErrorMessage: message,
         },
-      });
-
-      return failed;
+        selectionConfig,
+      ) as Promise<TestedIntegrationConfig>;
     }
   }
 
@@ -315,21 +320,14 @@ export class IntegrationsService {
     );
   }
 
-  private async resolveTestConfig(
-    type: IntegrationType,
-    dto: UpdateIntegrationDto,
-  ): Promise<
+  private resolveTestConfig(
+    values: PersistedIntegrationValues,
+  ):
     | StashAdapterBaseConfig
     | StashdbAdapterBaseConfig
-    | WhisparrAdapterBaseConfig
-  > {
-    const existing = await this.prisma.integrationConfig.findUnique({
-      where: { type },
-    });
-
-    const baseUrl =
-      this.normalizeInput(dto.baseUrl) ?? existing?.baseUrl ?? null;
-    const apiKey = this.normalizeInput(dto.apiKey) ?? existing?.apiKey ?? null;
+    | WhisparrAdapterBaseConfig {
+    const baseUrl = values.baseUrl;
+    const apiKey = values.apiKey;
 
     if (!baseUrl) {
       throw new Error('Base URL is required to test this integration.');
@@ -339,6 +337,110 @@ export class IntegrationsService {
       baseUrl,
       apiKey,
     };
+  }
+
+  private resolvePersistedValues(
+    type: IntegrationType,
+    dto: UpdateIntegrationDto,
+    existing: IntegrationConfig | null,
+  ): PersistedIntegrationValues {
+    return {
+      enabled: isCatalogProviderIntegrationType(type)
+        ? true
+        : (dto.enabled ?? existing?.enabled ?? true),
+      name: this.mergeNormalizedInput(existing?.name, dto.name),
+      baseUrl: this.mergeNormalizedInput(existing?.baseUrl, dto.baseUrl),
+      apiKey: this.mergeNormalizedInput(existing?.apiKey, dto.apiKey),
+    };
+  }
+
+  private resolveSavedHealthState(
+    existing: IntegrationConfig | null,
+    values: PersistedIntegrationValues,
+    configured: boolean,
+  ): PersistedIntegrationState {
+    if (!configured || !existing || this.connectionDetailsChanged(existing, values)) {
+      return {
+        status: IntegrationStatus.NOT_CONFIGURED,
+        lastHealthyAt: null,
+        lastErrorAt: null,
+        lastErrorMessage: null,
+      };
+    }
+
+    return {
+      status: existing.status,
+      lastHealthyAt: existing.lastHealthyAt,
+      lastErrorAt: existing.lastErrorAt,
+      lastErrorMessage: existing.lastErrorMessage,
+    };
+  }
+
+  private async persistIntegration(
+    type: IntegrationType,
+    state: PersistedIntegrationValues & PersistedIntegrationState,
+    selectionConfig?: Prisma.InputJsonValue,
+  ): Promise<IntegrationConfig> {
+    const updateData = {
+      ...state,
+      ...(selectionConfig ? { config: selectionConfig } : {}),
+    } satisfies Prisma.IntegrationConfigUpdateInput;
+    const createData = {
+      type,
+      ...state,
+      ...(selectionConfig ? { config: selectionConfig } : {}),
+    } satisfies Prisma.IntegrationConfigCreateInput;
+    const upsertArgs = {
+      where: { type },
+      update: updateData,
+      create: createData,
+    } satisfies Prisma.IntegrationConfigUpsertArgs;
+
+    if (isCatalogProviderIntegrationType(type) && this.hasSavedConfig(type, state)) {
+      const [, integration] = await this.prisma.$transaction([
+        this.prisma.integrationConfig.updateMany({
+          where: {
+            type: {
+              in: this.otherCatalogProviderTypes(type),
+            },
+          },
+          data: this.resetPayload(),
+        }),
+        this.prisma.integrationConfig.upsert(upsertArgs),
+      ]);
+
+      return integration as IntegrationConfig;
+    }
+
+    return this.prisma.integrationConfig.upsert(upsertArgs);
+  }
+
+  private hasSavedConfig(
+    type: IntegrationType,
+    values: Pick<PersistedIntegrationValues, 'name' | 'baseUrl' | 'apiKey'>,
+  ): boolean {
+    if (isCatalogProviderIntegrationType(type)) {
+      return !!values.baseUrl;
+    }
+
+    return !!values.baseUrl || !!values.apiKey || !!values.name;
+  }
+
+  private connectionDetailsChanged(
+    existing: IntegrationConfig | null,
+    values: Pick<PersistedIntegrationValues, 'baseUrl' | 'apiKey'>,
+  ): boolean {
+    return (
+      (existing?.baseUrl ?? null) !== values.baseUrl ||
+      (existing?.apiKey ?? null) !== values.apiKey
+    );
+  }
+
+  private mergeNormalizedInput(
+    existingValue: string | null | undefined,
+    nextValue: string | null | undefined,
+  ): string | null {
+    return this.normalizeInput(nextValue) ?? existingValue ?? null;
   }
 
   private async getInstanceCatalogProviderType(): Promise<CatalogProviderIntegrationType | null> {

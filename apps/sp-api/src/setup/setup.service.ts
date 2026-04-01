@@ -33,7 +33,9 @@ export class SetupService {
       integrations.some(
         (integration) =>
           integration.type === type &&
-          integration.status === IntegrationStatus.CONFIGURED,
+          integration.enabled &&
+          integration.status === IntegrationStatus.CONFIGURED &&
+          !!integration.lastHealthyAt,
       );
 
     const required = {

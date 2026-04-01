@@ -13,14 +13,16 @@ import { SetupPageComponent } from './setup-page.component';
 function buildIntegration(
   overrides: Partial<IntegrationResponse> & Pick<IntegrationResponse, 'type'>,
 ): IntegrationResponse {
+  const status = overrides.status ?? 'CONFIGURED';
   return {
     type: overrides.type,
     enabled: overrides.enabled ?? true,
-    status: overrides.status ?? 'CONFIGURED',
+    status,
     name: overrides.name ?? null,
     baseUrl: overrides.baseUrl ?? 'http://service.local',
     hasApiKey: overrides.hasApiKey ?? true,
-    lastHealthyAt: overrides.lastHealthyAt ?? null,
+    lastHealthyAt:
+      overrides.lastHealthyAt ?? (status === 'CONFIGURED' ? '2026-04-01T00:00:00.000Z' : null),
     lastErrorAt: overrides.lastErrorAt ?? null,
     lastErrorMessage: overrides.lastErrorMessage ?? null,
   };
@@ -103,10 +105,10 @@ describe('SetupPageComponent', () => {
 
     expect(component.visibleCatalogProviderTypes()).toEqual(['STASHDB', 'FANSDB']);
     expect(component.setupSummary()).toBe(
-      'Setup in progress: choose the catalog provider for this Stasharr instance, then configure Stash and Whisparr.',
+      'Setup in progress: choose the catalog provider for this Stasharr instance, then save and test Stash and Whisparr.',
     );
     expect(component.catalogProviderHelp('FANSDB')).toBe(
-      'Choose FansDB for this Stasharr instance. Changing provider type later requires resetting catalog setup and running setup again.',
+      'Choose FansDB for this Stasharr instance. Saving and testing it will lock it in; changing provider type later requires resetting catalog setup and running setup again.',
     );
     expect(component.showEnabledToggle('FANSDB')).toBe(false);
   });
@@ -134,10 +136,38 @@ describe('SetupPageComponent', () => {
 
     expect(component.visibleCatalogProviderTypes()).toEqual(['FANSDB']);
     expect(component.setupSummary()).toBe(
-      'Setup in progress: this Stasharr instance is configured for FansDB. Finish Stash and Whisparr, or reset catalog setup to choose a different provider.',
+      'Setup in progress: this Stasharr instance is configured for FansDB. Save and test Stash and Whisparr to finish setup, or reset catalog setup to choose a different provider.',
     );
     expect(component.catalogProviderHelp('FANSDB')).toBe(
       "FansDB is locked in as this instance's catalog provider. /scenes, performers, studios, requests, and indexing will use it.",
+    );
+  });
+
+  it('keeps setup incomplete until the chosen provider passes a test', async () => {
+    const { component } = await renderPage(
+      {
+        setupComplete: false,
+        required: { stash: true, catalog: false, whisparr: true },
+        catalogProvider: 'FANSDB',
+      },
+      [
+        buildIntegration({ type: 'STASH' }),
+        buildIntegration({ type: 'WHISPARR' }),
+        buildIntegration({
+          type: 'FANSDB',
+          status: 'NOT_CONFIGURED',
+          baseUrl: 'http://fansdb.local/graphql',
+          lastHealthyAt: null,
+        }),
+      ],
+    );
+
+    expect(component.visibleCatalogProviderTypes()).toEqual(['FANSDB']);
+    expect(component.setupSummary()).toBe(
+      'Setup in progress: this Stasharr instance is locked to FansDB, but that catalog integration still needs a successful test before setup can finish. Test or repair it below, or reset catalog setup to choose a different provider.',
+    );
+    expect(component.catalogProviderHelp('FANSDB')).toBe(
+      "FansDB is locked in as this instance's catalog provider, but it has not passed a test yet. Test or repair it below, or reset catalog setup before choosing a different provider.",
     );
   });
 

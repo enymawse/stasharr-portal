@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { IntegrationType } from '@prisma/client';
 import { IntegrationResponseDto } from './dto/integration-response.dto';
+import { IntegrationTestResponseDto } from './dto/integration-test-response.dto';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { IntegrationsService } from './integrations.service';
 
@@ -41,14 +42,14 @@ export class IntegrationsController {
   async test(
     @Param('type') type: string,
     @Body() dto: UpdateIntegrationDto,
-  ): Promise<IntegrationResponseDto> {
+  ): Promise<IntegrationTestResponseDto> {
     const normalizedType = this.parseIntegrationType(type);
     const integration = await this.integrationsService.testIntegration(
       normalizedType,
       dto,
     );
 
-    return this.toResponseDto(integration);
+    return this.toTestResponseDto(integration);
   }
 
   @Delete(':type')
@@ -97,6 +98,23 @@ export class IntegrationsController {
       lastHealthyAt: integration.lastHealthyAt?.toISOString() ?? null,
       lastErrorAt: integration.lastErrorAt?.toISOString() ?? null,
       lastErrorMessage: integration.lastErrorMessage,
+    };
+  }
+
+  private toTestResponseDto(integration: {
+    type: IntegrationType;
+    enabled: boolean;
+    status: 'CONFIGURED' | 'ERROR';
+    name: string | null;
+    baseUrl: string | null;
+    apiKey: string | null;
+    lastHealthyAt: Date | null;
+    lastErrorAt: Date | null;
+    lastErrorMessage: string | null;
+  }): IntegrationTestResponseDto {
+    return {
+      ...this.toResponseDto(integration),
+      status: integration.status,
     };
   }
 }

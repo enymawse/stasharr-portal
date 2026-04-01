@@ -1,7 +1,7 @@
 <main>
   <header class="page-head">
     <h1>Settings</h1>
-    <p>Configure services, run tests, and review status.</p>
+    <p>Configure services, save changes, run tests, and review health.</p>
   </header>
 
   <section class="indexing-link-card">
@@ -88,6 +88,19 @@
                     {{ isTesting(type) ? 'Testing...' : 'Test' }}
                   </button>
                 </div>
+
+                @if (saveState()[type].success; as message) {
+                  <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
+                }
+                @if (saveState()[type].error; as message) {
+                  <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+                }
+                @if (testState()[type].success; as message) {
+                  <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
+                }
+                @if (testState()[type].error; as message) {
+                  <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+                }
 
               </form>
 

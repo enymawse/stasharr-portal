@@ -1,5 +1,7 @@
 export type CatalogProviderType = 'STASHDB' | 'FANSDB';
 export type IntegrationType = 'STASH' | 'WHISPARR' | CatalogProviderType;
+export type IntegrationStatus = 'NOT_CONFIGURED' | 'CONFIGURED' | 'ERROR';
+export type IntegrationTestStatus = 'CONFIGURED' | 'ERROR';
 
 export function isCatalogProviderType(
   type: IntegrationType,
@@ -23,13 +25,17 @@ export function integrationLabel(type: IntegrationType): string {
 export interface IntegrationResponse {
   type: IntegrationType;
   enabled: boolean;
-  status: 'NOT_CONFIGURED' | 'CONFIGURED' | 'ERROR';
+  status: IntegrationStatus;
   name: string | null;
   baseUrl: string | null;
   hasApiKey: boolean;
   lastHealthyAt: string | null;
   lastErrorAt: string | null;
   lastErrorMessage: string | null;
+}
+
+export interface IntegrationTestResponse extends Omit<IntegrationResponse, 'status'> {
+  status: IntegrationTestStatus;
 }
 
 export interface UpdateIntegrationPayload {
@@ -39,19 +45,59 @@ export interface UpdateIntegrationPayload {
   apiKey?: string;
 }
 
+export function hasSavedIntegrationConfig(
+  integration:
+    | Pick<IntegrationResponse, 'type' | 'name' | 'baseUrl' | 'hasApiKey'>
+    | null
+    | undefined,
+): boolean {
+  if (!integration) {
+    return false;
+  }
+
+  if (isCatalogProviderType(integration.type)) {
+    return !!integration.baseUrl?.trim();
+  }
+
+  return (
+    !!integration.baseUrl?.trim() ||
+    integration.hasApiKey ||
+    !!integration.name?.trim()
+  );
+}
+
+export function isIntegrationReady(
+  integration:
+    | Pick<
+        IntegrationResponse,
+        'enabled' | 'status' | 'baseUrl' | 'lastHealthyAt'
+      >
+    | null
+    | undefined,
+): boolean {
+  return (
+    integration?.enabled === true &&
+    integration.status === 'CONFIGURED' &&
+    !!integration.baseUrl?.trim() &&
+    !!integration.lastHealthyAt
+  );
+}
+
 export function resolveConfiguredCatalogProviderType(
   integrations: ReadonlyArray<
-    Pick<IntegrationResponse, 'type' | 'enabled' | 'status' | 'baseUrl'>
+    Pick<
+      IntegrationResponse,
+      'type' | 'enabled' | 'status' | 'baseUrl' | 'lastHealthyAt'
+    >
   >,
 ): CatalogProviderType | null {
   const configuredProviders = integrations.filter(
     (integration): integration is Pick<
       IntegrationResponse,
-      'type' | 'enabled' | 'status' | 'baseUrl'
+      'type' | 'enabled' | 'status' | 'baseUrl' | 'lastHealthyAt'
     > & { type: CatalogProviderType } =>
       isCatalogProviderType(integration.type) &&
-      integration.status === 'CONFIGURED' &&
-      !!integration.baseUrl?.trim(),
+      isIntegrationReady(integration),
   );
 
   if (configuredProviders.length === 0) {

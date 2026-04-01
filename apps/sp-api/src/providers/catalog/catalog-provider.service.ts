@@ -102,7 +102,11 @@ export class CatalogProviderService {
     const label = getCatalogProviderLabel(selectedType);
     const baseUrl = integration.baseUrl?.trim();
 
-    if (integration.status !== IntegrationStatus.CONFIGURED) {
+    if (
+      integration.status !== IntegrationStatus.CONFIGURED ||
+      !integration.enabled ||
+      !integration.lastHealthyAt
+    ) {
       throw new ConflictException(`${label} catalog provider is not configured.`);
     }
 

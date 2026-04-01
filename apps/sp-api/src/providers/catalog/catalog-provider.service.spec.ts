@@ -58,6 +58,7 @@ describe('CatalogProviderService', () => {
         status: IntegrationStatus.CONFIGURED,
         baseUrl: 'http://stashdb.local/graphql',
         config: buildCatalogProviderSelectionConfig(),
+        lastHealthyAt: new Date('2026-04-01T00:00:00.000Z'),
       },
       {
         type: IntegrationType.FANSDB,
@@ -73,6 +74,7 @@ describe('CatalogProviderService', () => {
       status: IntegrationStatus.CONFIGURED,
       baseUrl: 'http://stashdb.local/graphql',
       apiKey: 'stashdb-key',
+      lastHealthyAt: new Date('2026-04-01T00:00:00.000Z'),
     });
 
     await expect(service.getConfiguredCatalogProvider()).resolves.toEqual({
@@ -91,12 +93,14 @@ describe('CatalogProviderService', () => {
         enabled: false,
         status: IntegrationStatus.CONFIGURED,
         baseUrl: 'http://stashdb.local/graphql',
+        lastHealthyAt: new Date('2026-04-01T00:00:00.000Z'),
       },
       {
         type: IntegrationType.FANSDB,
         enabled: true,
         status: IntegrationStatus.CONFIGURED,
         baseUrl: 'http://fansdb.local/graphql',
+        lastHealthyAt: new Date('2026-04-01T00:00:00.000Z'),
       },
     ]);
     integrationsService.findOne = jest.fn().mockResolvedValue({
@@ -105,6 +109,7 @@ describe('CatalogProviderService', () => {
       status: IntegrationStatus.CONFIGURED,
       baseUrl: 'http://fansdb.local/graphql',
       apiKey: 'fansdb-key',
+      lastHealthyAt: new Date('2026-04-01T00:00:00.000Z'),
     });
 
     await expect(service.getConfiguredCatalogProvider()).resolves.toEqual({
@@ -124,6 +129,7 @@ describe('CatalogProviderService', () => {
         status: IntegrationStatus.CONFIGURED,
         baseUrl: 'http://fansdb.local/graphql',
         config: buildCatalogProviderSelectionConfig(),
+        lastHealthyAt: new Date('2026-04-01T00:00:00.000Z'),
       },
     ]);
     integrationsService.findOne = jest.fn().mockResolvedValue({
@@ -132,6 +138,7 @@ describe('CatalogProviderService', () => {
       status: IntegrationStatus.CONFIGURED,
       baseUrl: '   ',
       apiKey: null,
+      lastHealthyAt: new Date('2026-04-01T00:00:00.000Z'),
     });
 
     await expect(service.getConfiguredCatalogProvider()).rejects.toBeInstanceOf(
@@ -159,6 +166,30 @@ describe('CatalogProviderService', () => {
 
     await expect(service.getConfiguredCatalogProvider()).rejects.toBeInstanceOf(
       ConflictException,
+    );
+  });
+
+  it('throws when a chosen catalog provider has never tested healthy', async () => {
+    integrationsService.findAll = jest.fn().mockResolvedValue([
+      {
+        type: IntegrationType.STASHDB,
+        enabled: true,
+        status: IntegrationStatus.CONFIGURED,
+        baseUrl: 'http://stashdb.local/graphql',
+        config: buildCatalogProviderSelectionConfig(),
+      },
+    ]);
+    integrationsService.findOne = jest.fn().mockResolvedValue({
+      type: IntegrationType.STASHDB,
+      enabled: true,
+      status: IntegrationStatus.CONFIGURED,
+      baseUrl: 'http://stashdb.local/graphql',
+      apiKey: 'stashdb-key',
+      lastHealthyAt: null,
+    });
+
+    await expect(service.getConfiguredCatalogProvider()).rejects.toThrow(
+      'StashDB catalog provider is not configured.',
     );
   });
 
