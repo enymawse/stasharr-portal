@@ -1,4 +1,4 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, Input, computed, signal } from '@angular/core';
 import { SceneStatus } from '../../core/api/discover.types';
 import {
   sceneStatusBadgeLabel,
@@ -10,7 +10,7 @@ import {
 @Component({
   selector: 'app-scene-status-badge',
   template: `
-    @if (mode() === 'icon') {
+    @if (displayMode() === 'icon') {
       @if (iconVisible()) {
         <span
           class="icon"
@@ -29,18 +29,40 @@ import {
   styleUrl: './scene-status-badge.component.scss',
 })
 export class SceneStatusBadgeComponent {
-  readonly status = input.required<SceneStatus>();
-  readonly mode = input<'badge' | 'icon'>('badge');
+  private readonly statusValue = signal<SceneStatus | null>(null);
+  private readonly modeValue = signal<'badge' | 'icon'>('badge');
 
-  protected readonly iconVisible = computed(() => sceneStatusIconVisible(this.status()));
+  @Input({ alias: 'status', required: true })
+  set statusInput(value: SceneStatus) {
+    this.statusValue.set(value);
+  }
 
-  protected readonly badgeLabel = computed(() => sceneStatusBadgeLabel(this.status()));
+  @Input({ alias: 'mode' })
+  set modeInput(value: 'badge' | 'icon' | null | undefined) {
+    this.modeValue.set(value ?? 'badge');
+  }
+
+  protected readonly currentStatus = computed(() => {
+    const status = this.statusValue();
+
+    if (status === null) {
+      throw new Error('SceneStatusBadgeComponent status input is required.');
+    }
+
+    return status;
+  });
+  protected readonly displayMode = computed(() => this.modeValue());
+  protected readonly iconVisible = computed(() => sceneStatusIconVisible(this.currentStatus()));
+
+  protected readonly badgeLabel = computed(() => sceneStatusBadgeLabel(this.currentStatus()));
 
   protected readonly badgeClass = computed(
-    () => `badge ${sceneStatusBadgeModifier(this.status())}`,
+    () => `badge ${sceneStatusBadgeModifier(this.currentStatus())}`,
   );
 
-  protected readonly iconClass = computed(() => `icon ${sceneStatusBadgeModifier(this.status())}`);
+  protected readonly iconClass = computed(
+    () => `icon ${sceneStatusBadgeModifier(this.currentStatus())}`,
+  );
 
-  protected readonly statusIconClass = computed(() => sceneStatusIconClass(this.status()));
+  protected readonly statusIconClass = computed(() => sceneStatusIconClass(this.currentStatus()));
 }

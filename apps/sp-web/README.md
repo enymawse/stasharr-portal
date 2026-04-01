@@ -38,10 +38,16 @@ This will compile your project and store the build artifacts in the `dist/` dire
 
 ## Running unit tests
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+To execute all frontend unit tests with the [Vitest](https://vitest.dev/) CLI, run:
 
 ```bash
-ng test
+pnpm --filter ./apps/sp-web test
+```
+
+To execute one targeted component spec from the CLI, run:
+
+```bash
+pnpm --filter ./apps/sp-web exec vitest run src/app/features/setup/setup-page.component.spec.ts
 ```
 
 ## Running end-to-end tests
