@@ -288,16 +288,32 @@ export class SettingsPageComponent implements OnInit {
     return this.saveAndTestState()[type].running;
   }
 
-  protected isWorking(type: IntegrationType): boolean {
-    return this.isSaving(type) || this.isSaveAndTesting(type);
-  }
-
   protected isResetting(type: IntegrationType): boolean {
     return this.resetState()[type].running;
   }
 
+  protected isBusy(type: IntegrationType): boolean {
+    return this.isSaving(type) || this.isSaveAndTesting(type) || this.isResetting(type);
+  }
+
+  protected isWorking(type: IntegrationType): boolean {
+    return this.isBusy(type) || this.resettingAll();
+  }
+
+  protected anyMutationRunning(): boolean {
+    return this.resettingAll() || this.allServiceTypes.some((type) => this.isBusy(type));
+  }
+
+  protected canResetIntegration(type: IntegrationType): boolean {
+    return !this.isBusy(type) && !this.resettingAll();
+  }
+
+  private canMutateIntegration(type: IntegrationType): boolean {
+    return !this.isBusy(type) && !this.resettingAll();
+  }
+
   protected requestIntegrationReset(type: IntegrationType): void {
-    if (this.isResetting(type) || this.resettingAll()) {
+    if (!this.canResetIntegration(type)) {
       return;
     }
 
@@ -322,7 +338,7 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected requestResetAll(): void {
-    if (this.resettingAll()) {
+    if (this.anyMutationRunning()) {
       return;
     }
 
@@ -343,6 +359,10 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected saveIntegration(type: IntegrationType): void {
+    if (!this.canMutateIntegration(type)) {
+      return;
+    }
+
     const payload = this.payloadFromForm(type);
     this.patchActionState(this.saveState, type, {
       running: true,
@@ -386,6 +406,10 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected saveAndTestIntegration(type: IntegrationType): void {
+    if (!this.canMutateIntegration(type)) {
+      return;
+    }
+
     const payload = this.payloadFromForm(type);
     this.patchActionState(this.saveAndTestState, type, {
       running: true,
@@ -441,6 +465,10 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected resetIntegration(type: IntegrationType): void {
+    if (!this.canMutateIntegration(type)) {
+      return;
+    }
+
     this.patchActionState(this.resetState, type, {
       running: true,
       success: null,
@@ -487,6 +515,10 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected resetAllIntegrations(): void {
+    if (this.anyMutationRunning()) {
+      return;
+    }
+
     this.resettingAll.set(true);
 
     this.integrationsService

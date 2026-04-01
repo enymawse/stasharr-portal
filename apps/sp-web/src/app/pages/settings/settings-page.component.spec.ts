@@ -1,7 +1,7 @@
 import '@angular/compiler';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { ConfirmationService } from 'primeng/api';
 import { HealthService } from '../../core/api/health.service';
@@ -49,6 +49,26 @@ function textContent(element: Element | null): string {
   return element?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 }
 
+function buildSettingsIntegrations(): IntegrationResponse[] {
+  return [
+    buildIntegration({ type: 'STASH' }),
+    buildIntegration({ type: 'WHISPARR' }),
+    buildIntegration({
+      type: 'STASHDB',
+      enabled: true,
+      baseUrl: 'http://stashdb.local/graphql',
+    }),
+  ];
+}
+
+function buildSettingsSetupStatus(): SetupStatusResponse {
+  return {
+    setupComplete: true,
+    required: { stash: true, catalog: true, whisparr: true },
+    catalogProvider: 'STASHDB',
+  };
+}
+
 describe('SettingsPageComponent', () => {
   const originalResizeObserver = globalThis.ResizeObserver;
 
@@ -87,6 +107,9 @@ describe('SettingsPageComponent', () => {
       error: vi.fn(),
       info: vi.fn(),
     };
+    const confirmationService = {
+      confirm: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [SettingsPageComponent],
@@ -106,9 +129,7 @@ describe('SettingsPageComponent', () => {
         },
         {
           provide: ConfirmationService,
-          useValue: {
-            confirm: vi.fn(),
-          },
+          useValue: confirmationService,
         },
         {
           provide: AppNotificationsService,
@@ -128,6 +149,7 @@ describe('SettingsPageComponent', () => {
       integrationsService,
       setupService,
       notifications,
+      confirmationService,
     };
   }
 
@@ -156,6 +178,20 @@ describe('SettingsPageComponent', () => {
     const panel = panels.find((candidate) => textContent(candidate.querySelector('h2')) === title);
     expect(panel).toBeTruthy();
     return panel as HTMLElement;
+  }
+
+  function integrationResetButton(panel: HTMLElement): HTMLButtonElement {
+    const button = panel.querySelector('.danger-card button') as HTMLButtonElement | null;
+    expect(button).toBeTruthy();
+    return button as HTMLButtonElement;
+  }
+
+  function globalResetButton(fixture: { nativeElement: HTMLElement }): HTMLButtonElement {
+    const button = fixture.nativeElement.querySelector(
+      '.global-danger button',
+    ) as HTMLButtonElement | null;
+    expect(button).toBeTruthy();
+    return button as HTMLButtonElement;
   }
 
   it('shows the top-level readiness summary and checklist when all required services are ready', async () => {
@@ -421,5 +457,175 @@ describe('SettingsPageComponent', () => {
     expect(notifications.success).toHaveBeenCalledWith('Whisparr is ready.');
     expect(textContent(panelByTitle(fixture, 'Whisparr'))).toContain('Ready');
     expect(textContent(panelByTitle(fixture, 'Whisparr'))).toContain('Whisparr is ready.');
+  });
+
+  it('disables and blocks per-integration reset while save is running, then re-enables it', async () => {
+    const { fixture, component, integrationsService, confirmationService } = await renderPage(
+      buildSettingsIntegrations(),
+      buildSettingsSetupStatus(),
+    );
+
+    const saveSubject = new Subject<IntegrationResponse>();
+    integrationsService.updateIntegration.mockReturnValue(saveSubject);
+
+    component.formFor('WHISPARR').setValue({
+      name: 'Remote Whisparr',
+      baseUrl: 'http://whisparr.local',
+      apiKey: 'token-123',
+      enabled: true,
+    });
+
+    component.saveIntegration('WHISPARR');
+    fixture.detectChanges();
+
+    const resetButton = integrationResetButton(panelByTitle(fixture, 'Whisparr'));
+    expect(resetButton.disabled).toBe(true);
+
+    component.requestIntegrationReset('WHISPARR');
+    expect(confirmationService.confirm).not.toHaveBeenCalled();
+
+    saveSubject.next(
+      buildIntegration({
+        type: 'WHISPARR',
+        name: 'Remote Whisparr',
+        baseUrl: 'http://whisparr.local',
+        hasApiKey: true,
+      }),
+    );
+    saveSubject.complete();
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(integrationResetButton(panelByTitle(fixture, 'Whisparr')).disabled).toBe(false);
+  });
+
+  it('disables and blocks per-integration reset while Save & Test is running', async () => {
+    const { fixture, component, integrationsService, confirmationService } = await renderPage(
+      buildSettingsIntegrations(),
+      buildSettingsSetupStatus(),
+    );
+
+    const updateSubject = new Subject<IntegrationResponse>();
+    integrationsService.updateIntegration.mockReturnValue(updateSubject);
+    integrationsService.testIntegration.mockReturnValue(
+      of(
+        buildIntegration({
+          type: 'WHISPARR',
+          name: 'Remote Whisparr',
+          baseUrl: 'http://whisparr.local',
+          hasApiKey: true,
+        }),
+      ),
+    );
+
+    component.formFor('WHISPARR').setValue({
+      name: 'Remote Whisparr',
+      baseUrl: 'http://whisparr.local',
+      apiKey: 'token-123',
+      enabled: true,
+    });
+
+    component.saveAndTestIntegration('WHISPARR');
+    fixture.detectChanges();
+
+    expect(integrationResetButton(panelByTitle(fixture, 'Whisparr')).disabled).toBe(true);
+
+    component.requestIntegrationReset('WHISPARR');
+    expect(confirmationService.confirm).not.toHaveBeenCalled();
+
+    updateSubject.next(
+      buildIntegration({
+        type: 'WHISPARR',
+        status: 'NOT_CONFIGURED',
+        name: 'Remote Whisparr',
+        baseUrl: 'http://whisparr.local',
+        hasApiKey: true,
+        lastHealthyAt: null,
+      }),
+    );
+    updateSubject.complete();
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(integrationResetButton(panelByTitle(fixture, 'Whisparr')).disabled).toBe(false);
+  });
+
+  it('disables and blocks reset-all while any integration mutation is running', async () => {
+    const { fixture, component, integrationsService, confirmationService } = await renderPage(
+      buildSettingsIntegrations(),
+      buildSettingsSetupStatus(),
+    );
+
+    const saveSubject = new Subject<IntegrationResponse>();
+    integrationsService.updateIntegration.mockReturnValue(saveSubject);
+
+    component.formFor('WHISPARR').setValue({
+      name: 'Remote Whisparr',
+      baseUrl: 'http://whisparr.local',
+      apiKey: 'token-123',
+      enabled: true,
+    });
+
+    component.saveIntegration('WHISPARR');
+    fixture.detectChanges();
+
+    expect(globalResetButton(fixture).disabled).toBe(true);
+
+    component.requestResetAll();
+    expect(confirmationService.confirm).not.toHaveBeenCalled();
+
+    saveSubject.next(
+      buildIntegration({
+        type: 'WHISPARR',
+        name: 'Remote Whisparr',
+        baseUrl: 'http://whisparr.local',
+        hasApiKey: true,
+      }),
+    );
+    saveSubject.complete();
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(globalResetButton(fixture).disabled).toBe(false);
+  });
+
+  it('shows a resetting state and disables save actions while reset is running', async () => {
+    const { fixture, component, integrationsService } = await renderPage(
+      buildSettingsIntegrations(),
+      buildSettingsSetupStatus(),
+    );
+
+    const resetSubject = new Subject<void>();
+    integrationsService.resetIntegration.mockReturnValue(resetSubject);
+
+    component.resetIntegration('WHISPARR');
+    fixture.detectChanges();
+
+    const panel = panelByTitle(fixture, 'Whisparr');
+    const formButtons = Array.from(
+      panel.querySelectorAll('.actions button') as NodeListOf<HTMLButtonElement>,
+    );
+
+    expect(formButtons.map((button) => button.disabled)).toEqual([true, true]);
+    expect(textContent(integrationResetButton(panel))).toBe('Resetting...');
+    expect(integrationResetButton(panel).disabled).toBe(true);
+
+    resetSubject.next();
+    resetSubject.complete();
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(formButtons.map((button) => button.disabled)).toEqual([false, false]);
+    expect(textContent(integrationResetButton(panelByTitle(fixture, 'Whisparr')))).toBe(
+      'Reset Whisparr Integration',
+    );
   });
 });

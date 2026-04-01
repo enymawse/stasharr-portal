@@ -191,10 +191,12 @@
                     pButton
                     type="button"
                     class="danger"
-                    [disabled]="isResetting(type)"
+                    [disabled]="!canResetIntegration(type)"
                     (click)="requestIntegrationReset(type)"
                   >
-                    Reset {{ labelFor(type) }} Integration
+                    {{
+                      isResetting(type) ? 'Resetting...' : `Reset ${labelFor(type)} Integration`
+                    }}
                   </button>
                 </div>
               </section>
@@ -269,8 +271,14 @@
         this instance.
       </p>
 
-      <button pButton type="button" class="danger" (click)="requestResetAll()">
-        Reset all integrations
+      <button
+        pButton
+        type="button"
+        class="danger"
+        [disabled]="anyMutationRunning()"
+        (click)="requestResetAll()"
+      >
+        {{ resettingAll() ? 'Resetting all...' : 'Reset all integrations' }}
       </button>
     </section>
   }
