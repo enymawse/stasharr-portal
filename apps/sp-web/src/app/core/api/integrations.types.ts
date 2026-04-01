@@ -2,6 +2,7 @@ export type CatalogProviderType = 'STASHDB' | 'FANSDB';
 export type IntegrationType = 'STASH' | 'WHISPARR' | CatalogProviderType;
 export type IntegrationStatus = 'NOT_CONFIGURED' | 'CONFIGURED' | 'ERROR';
 export type IntegrationTestStatus = 'CONFIGURED' | 'ERROR';
+export type ReadinessState = 'NOT_SAVED' | 'SAVED' | 'TEST_FAILED' | 'READY';
 
 export function isCatalogProviderType(
   type: IntegrationType,
@@ -81,6 +82,39 @@ export function isIntegrationReady(
     !!integration.baseUrl?.trim() &&
     !!integration.lastHealthyAt
   );
+}
+
+export function integrationReadinessState(
+  integration:
+    | Pick<
+        IntegrationResponse,
+        'type' | 'name' | 'baseUrl' | 'hasApiKey' | 'enabled' | 'status' | 'lastHealthyAt'
+      >
+    | null
+    | undefined,
+): ReadinessState {
+  if (!integration || !hasSavedIntegrationConfig(integration)) {
+    return 'NOT_SAVED';
+  }
+
+  if (integration.status === 'ERROR') {
+    return 'TEST_FAILED';
+  }
+
+  return isIntegrationReady(integration) ? 'READY' : 'SAVED';
+}
+
+export function integrationReadinessLabel(state: ReadinessState): string {
+  switch (state) {
+    case 'NOT_SAVED':
+      return 'Not Saved';
+    case 'SAVED':
+      return 'Saved';
+    case 'TEST_FAILED':
+      return 'Test Failed';
+    case 'READY':
+      return 'Ready';
+  }
 }
 
 export function resolveConfiguredCatalogProviderType(

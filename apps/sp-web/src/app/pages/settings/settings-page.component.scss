@@ -49,6 +49,77 @@ p {
   white-space: nowrap;
 }
 
+.settings-overview {
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 1rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 88%, transparent), var(--surface-1));
+  display: grid;
+  gap: 0.9rem;
+}
+
+.overview-head,
+.card-head,
+.checklist-item-head,
+.panel-head {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.overview-lead {
+  margin-top: 0.45rem;
+  font-size: 1.02rem;
+}
+
+.progress-pill {
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  padding: 0.45rem 0.75rem;
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
+.progress-pill.is-complete {
+  border-color: color-mix(in srgb, var(--success-color, #2f855a) 48%, var(--border-strong));
+}
+
+.overview-meta {
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  color: var(--text-muted);
+  font-size: 0.94rem;
+}
+
+.overview-summary {
+  color: var(--text-secondary, var(--text-muted));
+}
+
+.checklist-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.checklist-item {
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  padding: 0.85rem;
+  background: var(--surface-elevated);
+}
+
 .tabs-shell {
   border: 1px solid var(--border-subtle);
   background: var(--surface-1);
@@ -97,27 +168,68 @@ p {
   gap: 0.75rem;
 }
 
-.panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.55rem;
+.card-summary {
+  font-size: 0.98rem;
 }
 
-.status {
+.meta {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.health-meta {
+  display: grid;
+  gap: 0.32rem;
   color: var(--text-muted);
   font-size: 0.92rem;
 }
 
 form {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.75rem;
 }
 
 .actions {
   display: flex;
-  gap: 0.45rem;
+  gap: 0.55rem;
   flex-wrap: wrap;
+}
+
+.action-hint {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.state-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.is-ready {
+  border-color: color-mix(in srgb, var(--success-color, #2f855a) 48%, var(--border-strong));
+  background: color-mix(in srgb, var(--success-color, #2f855a) 14%, var(--surface-elevated));
+}
+
+.is-saved {
+  border-color: color-mix(in srgb, var(--warning-color, #b7791f) 48%, var(--border-strong));
+  background: color-mix(in srgb, var(--warning-color, #b7791f) 12%, var(--surface-elevated));
+}
+
+.is-error {
+  border-color: color-mix(in srgb, var(--error-color, #c53030) 52%, var(--border-strong));
+  background: color-mix(in srgb, var(--error-color, #c53030) 12%, var(--surface-elevated));
+}
+
+.is-pending {
+  border-color: var(--border-strong);
 }
 
 .health-card,
@@ -143,16 +255,14 @@ form {
   text-decoration: none;
 }
 
-.hint,
-.meta {
-  color: var(--text-muted);
-  font-size: 0.88rem;
-}
-
 .health-grid {
   display: grid;
   gap: 0.36rem;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.error {
+  color: var(--error-color, #c53030);
 }
 
 :host ::ng-deep .p-button {
@@ -188,8 +298,16 @@ form {
 
 @media (max-width: 720px) {
   .indexing-link-card,
+  .overview-head,
+  .card-head,
+  .checklist-item-head,
   .panel-head {
     flex-direction: column;
     align-items: start;
+  }
+
+  .progress-pill,
+  .state-badge {
+    align-self: flex-start;
   }
 }

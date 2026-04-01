@@ -1,7 +1,7 @@
 <main>
   <header class="page-head">
     <h1>Settings</h1>
-    <p>Configure services, save changes, run tests, and review health.</p>
+    <p>Repair integrations with the same readiness model used during setup.</p>
   </header>
 
   <section class="indexing-link-card">
@@ -24,14 +24,61 @@
   } @else if (loadError()) {
     <p-message severity="error" styleClass="state-message">{{ loadError() }}</p-message>
   } @else {
-    <section class="indexing-link-card">
-      <div>
-        <h2>Catalog Provider</h2>
-        <p>{{ catalogProviderSummary() }}</p>
+    <section class="settings-overview">
+      <div class="overview-head">
+        <div>
+          <p class="eyebrow">Integration health</p>
+          <h2>{{ progressSummary() }}</h2>
+          <p class="overview-lead">{{ integrationHealthLead() }}</p>
+        </div>
+        <div class="progress-pill" [class.is-complete]="allRequiredReady()">
+          {{ readyCount() }}/{{ checklistItems().length }} ready
+        </div>
       </div>
-      @if (!configuredCatalogProviderLabel()) {
-        <a class="page-link" [routerLink]="['/setup']">Return to setup</a>
+
+      <div class="overview-meta">
+        <p>
+          Catalog provider: <strong>{{ configuredCatalogProviderLabel() ?? 'Not chosen' }}</strong>
+        </p>
+        <p>Primary repair path: <strong>Save & Test</strong></p>
+      </div>
+
+      <p class="overview-summary">{{ integrationHealthSummary() }}</p>
+
+      @if (repairWarning(); as message) {
+        <p-message severity="warn" styleClass="state-message">{{ message }}</p-message>
       }
+
+      <div class="checklist-grid">
+        @for (item of checklistItems(); track item.key) {
+          <article
+            class="checklist-item"
+            [class.is-ready]="item.state === 'READY'"
+            [class.is-error]="item.state === 'TEST_FAILED'"
+            [class.is-saved]="item.state === 'SAVED'"
+            [class.is-pending]="item.state === 'NOT_SAVED'"
+          >
+            <div class="checklist-item-head">
+              <h3>{{ item.title }}</h3>
+              <span
+                class="state-badge"
+                [class.is-ready]="item.state === 'READY'"
+                [class.is-error]="item.state === 'TEST_FAILED'"
+                [class.is-saved]="item.state === 'SAVED'"
+                [class.is-pending]="item.state === 'NOT_SAVED'"
+              >
+                @switch (item.state) {
+                  @case ('NOT_SAVED') { Not Saved }
+                  @case ('SAVED') { Saved }
+                  @case ('TEST_FAILED') { Test Failed }
+                  @case ('READY') { Ready }
+                }
+              </span>
+            </div>
+            <p>{{ item.summary }}</p>
+          </article>
+        }
+      </div>
     </section>
 
     <section class="tabs-shell">
@@ -58,75 +105,99 @@
           @for (type of serviceTabs(); track type) {
             <p-tabpanel [value]="type">
               <section class="service-panel">
-              <div class="panel-head">
-                <h2>{{ labelFor(type) }}</h2>
-                <p class="status">Status: {{ statusText(type) }}</p>
-              </div>
-              @if (catalogProviderHelp(type); as helpText) {
-                <p class="status">{{ helpText }}</p>
-              }
+                <div class="card-head">
+                  <div>
+                    <p class="eyebrow">{{ sectionLabel(type) }}</p>
+                    <h2>{{ labelFor(type) }}</h2>
+                  </div>
+                  <span
+                    class="state-badge"
+                    [class.is-ready]="readinessState(type) === 'READY'"
+                    [class.is-error]="readinessState(type) === 'TEST_FAILED'"
+                    [class.is-saved]="readinessState(type) === 'SAVED'"
+                    [class.is-pending]="readinessState(type) === 'NOT_SAVED'"
+                  >
+                    {{ readinessLabel(type) }}
+                  </span>
+                </div>
 
-              <form [formGroup]="formFor(type)" (ngSubmit)="saveIntegration(type)">
-                <app-integration-form-fields
-                  [form]="formFor(type)"
-                  [hasStoredApiKey]="hasStoredApiKey(type)"
-                  [enabledInputId]="'settings-enabled-' + type"
-                  [showEnabledToggle]="showEnabledToggle(type)"
-                />
+                <p class="card-summary">{{ readinessSummary(type) }}</p>
+                @if (catalogProviderHelp(type); as helpText) {
+                  <p class="meta">{{ helpText }}</p>
+                }
 
-                <div class="actions">
-                  <button pButton type="submit" [disabled]="isSaving(type)">
-                    {{ isSaving(type) ? 'Saving...' : 'Save changes' }}
-                  </button>
+                <div class="health-meta">
+                  <p>Last healthy test: {{ lastHealthyAt(type) ?? 'Never' }}</p>
+                  <p>Last failed test: {{ lastErrorAt(type) ?? 'None' }}</p>
+                </div>
+
+                @if (integrations()[type]?.lastErrorMessage; as message) {
+                  <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+                }
+
+                <form [formGroup]="formFor(type)" (ngSubmit)="saveAndTestIntegration(type)">
+                  <app-integration-form-fields
+                    [form]="formFor(type)"
+                    [hasStoredApiKey]="hasStoredApiKey(type)"
+                    [enabledInputId]="'settings-enabled-' + type"
+                    [showEnabledToggle]="showEnabledToggle(type)"
+                  />
+
+                  <div class="actions">
+                    <button pButton type="submit" [disabled]="isWorking(type)">
+                      {{ isSaveAndTesting(type) ? 'Saving & testing...' : 'Save & Test' }}
+                    </button>
+                    <button
+                      pButton
+                      type="button"
+                      text
+                      [disabled]="isWorking(type)"
+                      (click)="saveIntegration(type)"
+                    >
+                      {{ isSaving(type) ? 'Saving...' : 'Save only' }}
+                    </button>
+                  </div>
+
+                  <p class="action-hint">{{ actionHint(type) }}</p>
+
+                  @if (saveAndTestState()[type].success; as message) {
+                    <p-message severity="success" styleClass="inline-message">{{
+                      message
+                    }}</p-message>
+                  }
+                  @if (saveAndTestState()[type].error; as message) {
+                    <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+                  }
+                  @if (saveState()[type].success; as message) {
+                    <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
+                  }
+                  @if (saveState()[type].error; as message) {
+                    <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+                  }
+                </form>
+
+                <div class="health-card">
+                  <h3>Health</h3>
+                  <p>Last healthy: {{ lastHealthyAt(type) ?? 'Never' }}</p>
+                  <p>Last error: {{ lastErrorAt(type) ?? 'None' }}</p>
+                  @if (integrations()[type]?.lastErrorMessage; as message) {
+                    <p class="error">{{ message }}</p>
+                  }
+                </div>
+
+                <div class="danger-card">
+                  <h3>Reset {{ labelFor(type) }} Integration</h3>
                   <button
                     pButton
                     type="button"
-                    text
-                    [disabled]="isTesting(type)"
-                    (click)="testIntegration(type)"
+                    class="danger"
+                    [disabled]="isResetting(type)"
+                    (click)="requestIntegrationReset(type)"
                   >
-                    {{ isTesting(type) ? 'Testing...' : 'Test' }}
+                    Reset {{ labelFor(type) }} Integration
                   </button>
                 </div>
-
-                @if (saveState()[type].success; as message) {
-                  <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
-                }
-                @if (saveState()[type].error; as message) {
-                  <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
-                }
-                @if (testState()[type].success; as message) {
-                  <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
-                }
-                @if (testState()[type].error; as message) {
-                  <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
-                }
-
-              </form>
-
-              <div class="health-card">
-                <h3>Health</h3>
-                <p>Last healthy: {{ lastHealthyAt(type) ?? 'Never' }}</p>
-                <p>Last error: {{ lastErrorAt(type) ?? 'None' }}</p>
-                @if (integrations()[type]?.lastErrorMessage; as message) {
-                  <p class="error">{{ message }}</p>
-                }
-              </div>
-
-              <div class="danger-card">
-                <h3>Reset {{ labelFor(type) }} Integration</h3>
-                <button
-                  pButton
-                  type="button"
-                  class="danger"
-                  [disabled]="isResetting(type)"
-                  (click)="requestIntegrationReset(type)"
-                >
-                  Reset {{ labelFor(type) }} Integration
-                </button>
-
-              </div>
-            </section>
+              </section>
             </p-tabpanel>
           }
           <p-tabpanel value="ABOUT">

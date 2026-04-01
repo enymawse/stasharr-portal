@@ -10,9 +10,12 @@ import {
   CatalogProviderType,
   IntegrationResponse,
   IntegrationType,
+  ReadinessState,
   UpdateIntegrationPayload,
   hasSavedIntegrationConfig,
   integrationLabel,
+  integrationReadinessLabel,
+  integrationReadinessState,
   isIntegrationReady,
   isCatalogProviderType,
 } from '../../core/api/integrations.types';
@@ -189,16 +192,7 @@ export class SetupPageComponent implements OnInit {
   }
 
   protected readinessLabel(type: IntegrationType): string {
-    switch (this.readinessState(type)) {
-      case 'NOT_SAVED':
-        return 'Not Saved';
-      case 'SAVED':
-        return 'Saved';
-      case 'TEST_FAILED':
-        return 'Test Failed';
-      case 'READY':
-        return 'Ready';
-    }
+    return integrationReadinessLabel(this.readinessState(type));
   }
 
   protected readinessSummary(type: IntegrationType): string {
@@ -565,16 +559,7 @@ export class SetupPageComponent implements OnInit {
   }
 
   protected readinessState(type: IntegrationType): ReadinessState {
-    const integration = this.integrations()[type];
-    if (!integration || !hasSavedIntegrationConfig(integration)) {
-      return 'NOT_SAVED';
-    }
-
-    if (integration.status === 'ERROR') {
-      return 'TEST_FAILED';
-    }
-
-    return isIntegrationReady(integration) ? 'READY' : 'SAVED';
+    return integrationReadinessState(this.integrations()[type]);
   }
 
   private catalogChecklistItem(): SetupChecklistItem {
@@ -778,8 +763,6 @@ interface ActionState {
   success: string | null;
   error: string | null;
 }
-
-type ReadinessState = 'NOT_SAVED' | 'SAVED' | 'TEST_FAILED' | 'READY';
 
 interface SetupChecklistItem {
   key: 'CATALOG' | 'STASH' | 'WHISPARR';

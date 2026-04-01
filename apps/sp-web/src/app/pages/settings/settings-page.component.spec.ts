@@ -30,14 +30,23 @@ function buildIntegration(
     type: overrides.type,
     enabled: overrides.enabled ?? true,
     status,
-    name: overrides.name ?? null,
-    baseUrl: overrides.baseUrl ?? 'http://service.local',
+    name: 'name' in overrides ? overrides.name ?? null : null,
+    baseUrl: 'baseUrl' in overrides ? overrides.baseUrl ?? null : 'http://service.local',
     hasApiKey: overrides.hasApiKey ?? true,
     lastHealthyAt:
-      overrides.lastHealthyAt ?? (status === 'CONFIGURED' ? '2026-04-01T00:00:00.000Z' : null),
-    lastErrorAt: overrides.lastErrorAt ?? null,
-    lastErrorMessage: overrides.lastErrorMessage ?? null,
+      'lastHealthyAt' in overrides
+        ? overrides.lastHealthyAt ?? null
+        : status === 'CONFIGURED'
+          ? '2026-04-01T00:00:00.000Z'
+          : null,
+    lastErrorAt: 'lastErrorAt' in overrides ? overrides.lastErrorAt ?? null : null,
+    lastErrorMessage:
+      'lastErrorMessage' in overrides ? overrides.lastErrorMessage ?? null : null,
   };
+}
+
+function textContent(element: Element | null): string {
+  return element?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 }
 
 describe('SettingsPageComponent', () => {
@@ -122,8 +131,35 @@ describe('SettingsPageComponent', () => {
     };
   }
 
-  it('shows only the configured catalog provider tab and reset guidance after setup', async () => {
-    const { component } = await renderPage(
+  function overview(fixture: { nativeElement: HTMLElement }): HTMLElement {
+    const element = fixture.nativeElement.querySelector('.settings-overview') as HTMLElement | null;
+    expect(element).toBeTruthy();
+    return element as HTMLElement;
+  }
+
+  function checklistItemByTitle(
+    fixture: { nativeElement: HTMLElement },
+    title: string,
+  ): HTMLElement {
+    const items = Array.from(
+      fixture.nativeElement.querySelectorAll('.checklist-item') as NodeListOf<HTMLElement>,
+    );
+    const item = items.find((candidate) => textContent(candidate.querySelector('h3')) === title);
+    expect(item).toBeTruthy();
+    return item as HTMLElement;
+  }
+
+  function panelByTitle(fixture: { nativeElement: HTMLElement }, title: string): HTMLElement {
+    const panels = Array.from(
+      fixture.nativeElement.querySelectorAll('.service-panel') as NodeListOf<HTMLElement>,
+    );
+    const panel = panels.find((candidate) => textContent(candidate.querySelector('h2')) === title);
+    expect(panel).toBeTruthy();
+    return panel as HTMLElement;
+  }
+
+  it('shows the top-level readiness summary and checklist when all required services are ready', async () => {
+    const { fixture, component } = await renderPage(
       [
         buildIntegration({ type: 'STASH' }),
         buildIntegration({ type: 'WHISPARR' }),
@@ -134,8 +170,11 @@ describe('SettingsPageComponent', () => {
         }),
         buildIntegration({
           type: 'FANSDB',
+          status: 'NOT_CONFIGURED',
           enabled: false,
-          baseUrl: 'http://fansdb.local/graphql',
+          baseUrl: null,
+          hasApiKey: false,
+          lastHealthyAt: null,
         }),
       ],
       {
@@ -146,8 +185,14 @@ describe('SettingsPageComponent', () => {
     );
 
     expect(component.serviceTabs()).toEqual(['STASH', 'WHISPARR', 'STASHDB']);
-    expect(component.catalogProviderSummary()).toBe(
-      'This Stasharr instance is configured for StashDB. To use a different catalog provider, reset catalog setup and re-run setup.',
+    expect(textContent(overview(fixture))).toContain('3 of 3 required services ready');
+    expect(textContent(overview(fixture))).toContain(
+      'Every required service has passed readiness checks.',
+    );
+    expect(textContent(overview(fixture))).toContain('Catalog provider: StashDB');
+    expect(textContent(checklistItemByTitle(fixture, 'Catalog provider'))).toContain('Ready');
+    expect(textContent(checklistItemByTitle(fixture, 'Catalog provider'))).toContain(
+      'StashDB chosen and ready.',
     );
     expect(component.catalogProviderHelp('STASHDB')).toBe(
       'StashDB is the catalog provider configured for this Stasharr instance. Reset catalog setup before changing provider type.',
@@ -155,20 +200,112 @@ describe('SettingsPageComponent', () => {
     expect(component.showEnabledToggle('STASHDB')).toBe(false);
   });
 
+  it('shows a repair summary and readiness checklist state when a required integration is unhealthy', async () => {
+    const { fixture, component } = await renderPage(
+      [
+        buildIntegration({ type: 'STASH' }),
+        buildIntegration({
+          type: 'WHISPARR',
+          status: 'ERROR',
+          baseUrl: 'http://whisparr.local',
+          lastHealthyAt: null,
+          lastErrorAt: '2026-04-01T01:00:00.000Z',
+          lastErrorMessage: 'bad credentials',
+        }),
+        buildIntegration({
+          type: 'STASHDB',
+          enabled: true,
+          baseUrl: 'http://stashdb.local/graphql',
+        }),
+      ],
+      {
+        setupComplete: false,
+        required: { stash: true, catalog: true, whisparr: false },
+        catalogProvider: 'STASHDB',
+      },
+    );
+
+    expect(textContent(overview(fixture))).toContain('2 of 3 required services ready');
+    expect(textContent(overview(fixture))).toContain('Whisparr needs repair.');
+    expect(textContent(overview(fixture))).toContain(
+      'Repair needed: Whisparr needs repair. Use Save & Test on the affected integration below.',
+    );
+
+    const whisparrChecklist = checklistItemByTitle(fixture, 'Whisparr');
+    expect(textContent(whisparrChecklist)).toContain('Test Failed');
+    expect(textContent(whisparrChecklist)).toContain('Whisparr needs repair.');
+
+    const panel = panelByTitle(fixture, 'Whisparr');
+    expect(textContent(panel)).toContain('Test Failed');
+    expect(textContent(panel)).toContain(
+      'Repair Whisparr connection details if needed, then Save & Test again to restore readiness.',
+    );
+    expect(textContent(panel)).toContain('bad credentials');
+  });
+
+  it('keeps the chosen catalog provider locked and separates repair from reset guidance', async () => {
+    const { fixture, component } = await renderPage(
+      [
+        buildIntegration({ type: 'STASH' }),
+        buildIntegration({ type: 'WHISPARR' }),
+        buildIntegration({
+          type: 'FANSDB',
+          status: 'ERROR',
+          enabled: true,
+          baseUrl: 'http://fansdb.local/graphql',
+          lastHealthyAt: null,
+          lastErrorMessage: 'forbidden',
+        }),
+        buildIntegration({
+          type: 'STASHDB',
+          status: 'NOT_CONFIGURED',
+          enabled: false,
+          baseUrl: null,
+          hasApiKey: false,
+          lastHealthyAt: null,
+        }),
+      ],
+      {
+        setupComplete: false,
+        required: { stash: true, catalog: false, whisparr: true },
+        catalogProvider: 'FANSDB',
+      },
+    );
+
+    expect(component.serviceTabs()).toEqual(['STASH', 'WHISPARR', 'FANSDB']);
+    expect(textContent(overview(fixture))).toContain('FansDB needs repair.');
+    expect(textContent(overview(fixture))).toContain(
+      'Catalog provider: FansDB. It stays locked to this instance even while unhealthy.',
+    );
+
+    const panel = panelByTitle(fixture, 'FansDB');
+    expect(textContent(panel)).toContain('Test Failed');
+    expect(textContent(panel)).toContain(
+      "FansDB remains this instance's catalog provider even while unhealthy. Repair it here and Save & Test again. Reset catalog setup only if you need to switch providers.",
+    );
+    expect(textContent(panel)).toContain('Reset FansDB Integration');
+  });
+
   it('hides catalog tabs when no provider is configured and points the user back to setup', async () => {
-    const { component } = await renderPage(
+    const { fixture, component } = await renderPage(
       [
         buildIntegration({ type: 'STASH' }),
         buildIntegration({ type: 'WHISPARR' }),
         buildIntegration({
           type: 'STASHDB',
           status: 'NOT_CONFIGURED',
+          enabled: false,
           baseUrl: null,
+          hasApiKey: false,
+          lastHealthyAt: null,
         }),
         buildIntegration({
           type: 'FANSDB',
           status: 'NOT_CONFIGURED',
+          enabled: false,
           baseUrl: null,
+          hasApiKey: false,
+          lastHealthyAt: null,
         }),
       ],
       {
@@ -180,49 +317,28 @@ describe('SettingsPageComponent', () => {
 
     expect(component.serviceTabs()).toEqual(['STASH', 'WHISPARR']);
     expect(component.configuredCatalogProviderLabel()).toBeNull();
-    expect(component.catalogProviderSummary()).toBe(
-      'No catalog provider is configured right now. Return to setup to choose StashDB or FansDB for this instance.',
+    expect(textContent(overview(fixture))).toContain('Catalog provider: Not chosen');
+    expect(textContent(overview(fixture))).toContain('Primary repair path: Save & Test');
+    expect(textContent(overview(fixture))).toContain(
+      'Catalog provider: not chosen. Return to setup to lock StashDB or FansDB for this instance.',
     );
+    expect(textContent(checklistItemByTitle(fixture, 'Catalog provider'))).toContain('Not Saved');
   });
 
-  it('keeps the chosen catalog provider tab visible when that provider is unhealthy', async () => {
-    const { component } = await renderPage(
-      [
-        buildIntegration({ type: 'STASH' }),
-        buildIntegration({ type: 'WHISPARR' }),
-        buildIntegration({
-          type: 'FANSDB',
-          status: 'ERROR',
-          baseUrl: 'http://fansdb.local/graphql',
-          lastErrorMessage: 'bad credentials',
-        }),
-        buildIntegration({
-          type: 'STASHDB',
-          status: 'NOT_CONFIGURED',
-          baseUrl: null,
-        }),
-      ],
-      {
-        setupComplete: false,
-        required: { stash: true, catalog: false, whisparr: true },
-        catalogProvider: 'FANSDB',
-      },
-    );
-
-    expect(component.serviceTabs()).toEqual(['STASH', 'WHISPARR', 'FANSDB']);
-    expect(component.catalogProviderSummary()).toBe(
-      'This Stasharr instance is locked to FansDB, but that catalog integration needs repair. Repair its settings below or reset catalog setup to choose a different provider.',
-    );
-    expect(component.catalogProviderHelp('FANSDB')).toBe(
-      "FansDB remains this instance's catalog provider even while unhealthy. Repair it here, or reset catalog setup before changing provider type.",
-    );
-  });
-
-  it('shows test success only when the returned integration is configured', async () => {
+  it('uses Save & Test as the primary repair action in Settings', async () => {
     const initialIntegrations = [
       buildIntegration({ type: 'STASH' }),
-      buildIntegration({ type: 'WHISPARR', status: 'NOT_CONFIGURED', lastHealthyAt: null }),
-      buildIntegration({ type: 'STASHDB' }),
+      buildIntegration({
+        type: 'WHISPARR',
+        status: 'NOT_CONFIGURED',
+        baseUrl: null,
+        hasApiKey: false,
+        lastHealthyAt: null,
+      }),
+      buildIntegration({
+        type: 'STASHDB',
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
     ];
     const { fixture, component, integrationsService, setupService, notifications } =
       await renderPage(initialIntegrations, {
@@ -231,20 +347,36 @@ describe('SettingsPageComponent', () => {
         catalogProvider: 'STASHDB',
       });
 
+    const savedIntegration = buildIntegration({
+      type: 'WHISPARR',
+      status: 'NOT_CONFIGURED',
+      name: 'Remote Whisparr',
+      baseUrl: 'http://whisparr.local',
+      hasApiKey: true,
+      lastHealthyAt: null,
+    });
     const testedIntegration = buildIntegration({
       type: 'WHISPARR',
       status: 'CONFIGURED',
-      lastHealthyAt: '2026-04-01T01:00:00.000Z',
+      name: 'Remote Whisparr',
+      baseUrl: 'http://whisparr.local',
+      hasApiKey: true,
+      lastHealthyAt: '2026-04-01T03:00:00.000Z',
     });
+
+    integrationsService.updateIntegration.mockReturnValue(of(savedIntegration));
     integrationsService.testIntegration.mockReturnValue(of(testedIntegration));
-    integrationsService.getIntegrations.mockReturnValue(
+    integrationsService.getIntegrations.mockReturnValueOnce(
       of([
         buildIntegration({ type: 'STASH' }),
         testedIntegration,
-        buildIntegration({ type: 'STASHDB' }),
+        buildIntegration({
+          type: 'STASHDB',
+          baseUrl: 'http://stashdb.local/graphql',
+        }),
       ]),
     );
-    setupService.getStatus.mockReturnValue(
+    setupService.getStatus.mockReturnValueOnce(
       of({
         setupComplete: true,
         required: { stash: true, catalog: true, whisparr: true },
@@ -252,57 +384,42 @@ describe('SettingsPageComponent', () => {
       }),
     );
 
-    component.testIntegration('WHISPARR');
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect(notifications.success).toHaveBeenCalledWith('Whisparr test passed.');
-    expect(notifications.error).not.toHaveBeenCalled();
-    expect(component.statusText('WHISPARR')).toBe('READY');
-  });
-
-  it('treats an in-band error test result as a failed test', async () => {
-    const initialIntegrations = [
-      buildIntegration({ type: 'STASH' }),
-      buildIntegration({ type: 'WHISPARR', status: 'NOT_CONFIGURED', lastHealthyAt: null }),
-      buildIntegration({ type: 'STASHDB' }),
-    ];
-    const { fixture, component, integrationsService, setupService, notifications } =
-      await renderPage(initialIntegrations, {
-        setupComplete: false,
-        required: { stash: true, catalog: true, whisparr: false },
-        catalogProvider: 'STASHDB',
-      });
-
-    const testedIntegration = buildIntegration({
-      type: 'WHISPARR',
-      status: 'ERROR',
-      lastHealthyAt: null,
-      lastErrorAt: '2026-04-01T01:00:00.000Z',
-      lastErrorMessage: 'bad credentials',
+    component.formFor('WHISPARR').setValue({
+      name: 'Remote Whisparr',
+      baseUrl: 'http://whisparr.local',
+      apiKey: 'token-123',
+      enabled: true,
     });
-    integrationsService.testIntegration.mockReturnValue(of(testedIntegration));
-    integrationsService.getIntegrations.mockReturnValue(
-      of([
-        buildIntegration({ type: 'STASH' }),
-        testedIntegration,
-        buildIntegration({ type: 'STASHDB' }),
-      ]),
-    );
-    setupService.getStatus.mockReturnValue(
-      of({
-        setupComplete: false,
-        required: { stash: true, catalog: true, whisparr: false },
-        catalogProvider: 'STASHDB',
-      }),
-    );
 
-    component.testIntegration('WHISPARR');
+    const panel = panelByTitle(fixture, 'Whisparr');
+    const buttons = Array.from(panel.querySelectorAll('button') as NodeListOf<HTMLButtonElement>);
+    expect(buttons.map((button) => textContent(button)).slice(0, 2)).toEqual([
+      'Save & Test',
+      'Save only',
+    ]);
+
+    const saveAndTestButton = buttons.find((button) => textContent(button) === 'Save & Test');
+    expect(saveAndTestButton).toBeTruthy();
+
+    saveAndTestButton?.click();
+    fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(notifications.error).toHaveBeenCalledWith('bad credentials');
-    expect(notifications.success).not.toHaveBeenCalledWith('Whisparr test passed.');
-    expect(component.statusText('WHISPARR')).toBe('ERROR');
+    expect(integrationsService.updateIntegration).toHaveBeenCalledWith('WHISPARR', {
+      enabled: true,
+      name: 'Remote Whisparr',
+      baseUrl: 'http://whisparr.local',
+      apiKey: 'token-123',
+    });
+    expect(integrationsService.testIntegration).toHaveBeenCalledWith('WHISPARR', {
+      enabled: true,
+      name: 'Remote Whisparr',
+      baseUrl: 'http://whisparr.local',
+      apiKey: 'token-123',
+    });
+    expect(notifications.success).toHaveBeenCalledWith('Whisparr is ready.');
+    expect(textContent(panelByTitle(fixture, 'Whisparr'))).toContain('Ready');
+    expect(textContent(panelByTitle(fixture, 'Whisparr'))).toContain('Whisparr is ready.');
   });
 });
