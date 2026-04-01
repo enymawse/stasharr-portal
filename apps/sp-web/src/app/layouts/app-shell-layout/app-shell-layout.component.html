@@ -98,17 +98,45 @@
         routerLink="/settings"
         routerLinkActive="active"
         [routerLinkActiveOptions]="{ exact: true }"
-        class="nav-item"
+        class="nav-item settings-nav-item"
+        data-testid="settings-nav-link"
+        [class.has-alert]="!!degradedState()"
       >
         <span class="icon" aria-hidden="true"><i class="pi pi-cog"></i></span>
         @if (!collapsed()) {
           <span>Settings</span>
+          @if (degradedState()) {
+            <span class="nav-badge" data-testid="settings-nav-indicator">Repair</span>
+          }
         }
       </a>
     </nav>
   </aside>
 
   <main class="content">
+    @if (degradedState(); as degradedState) {
+      <div class="content-status-strip">
+        <section
+          class="degraded-banner"
+          data-testid="degraded-banner"
+          role="status"
+          aria-live="polite"
+        >
+          <div class="degraded-copy">
+            <p class="degraded-eyebrow">Degraded mode</p>
+            <p class="degraded-message">{{ degradedState.message }}</p>
+          </div>
+          <a
+            routerLink="/settings"
+            class="degraded-action"
+            data-testid="repair-integrations-link"
+          >
+            Repair Integrations
+          </a>
+        </section>
+      </div>
+    }
+
     <router-outlet />
   </main>
 </div>

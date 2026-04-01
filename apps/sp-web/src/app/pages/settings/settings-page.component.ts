@@ -24,6 +24,7 @@ import {
   isCatalogProviderType,
 } from '../../core/api/integrations.types';
 import { SetupService } from '../../core/api/setup.service';
+import { SetupStatusStore } from '../../core/api/setup-status.store';
 import { SetupStatusResponse } from '../../core/api/setup.types';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import { IntegrationFormFieldsComponent } from '../../shared/integration-form-fields/integration-form-fields.component';
@@ -52,6 +53,7 @@ type SettingsTab = ServiceTab | 'ABOUT';
 export class SettingsPageComponent implements OnInit {
   private readonly integrationsService = inject(IntegrationsService);
   private readonly setupService = inject(SetupService);
+  private readonly setupStatusStore = inject(SetupStatusStore);
   private readonly healthService = inject(HealthService);
   private readonly confirmationService = inject(ConfirmationService);
   private readonly notifications = inject(AppNotificationsService);
@@ -616,6 +618,7 @@ export class SettingsPageComponent implements OnInit {
     integrations: IntegrationResponse[],
   ): void {
     this.setupStatus.set(setupStatus);
+    this.setupStatusStore.sync(setupStatus);
     this.applyIntegrations(integrations);
   }
 
