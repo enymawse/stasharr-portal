@@ -30,18 +30,17 @@ function buildIntegration(
     type: overrides.type,
     enabled: overrides.enabled ?? true,
     status,
-    name: 'name' in overrides ? overrides.name ?? null : null,
-    baseUrl: 'baseUrl' in overrides ? overrides.baseUrl ?? null : 'http://service.local',
+    name: 'name' in overrides ? (overrides.name ?? null) : null,
+    baseUrl: 'baseUrl' in overrides ? (overrides.baseUrl ?? null) : 'http://service.local',
     hasApiKey: overrides.hasApiKey ?? true,
     lastHealthyAt:
       'lastHealthyAt' in overrides
-        ? overrides.lastHealthyAt ?? null
+        ? (overrides.lastHealthyAt ?? null)
         : status === 'CONFIGURED'
           ? '2026-04-01T00:00:00.000Z'
           : null,
-    lastErrorAt: 'lastErrorAt' in overrides ? overrides.lastErrorAt ?? null : null,
-    lastErrorMessage:
-      'lastErrorMessage' in overrides ? overrides.lastErrorMessage ?? null : null,
+    lastErrorAt: 'lastErrorAt' in overrides ? (overrides.lastErrorAt ?? null) : null,
+    lastErrorMessage: 'lastErrorMessage' in overrides ? (overrides.lastErrorMessage ?? null) : null,
   };
 }
 
@@ -184,6 +183,14 @@ describe('SettingsPageComponent', () => {
     const button = panel.querySelector('.danger-card button') as HTMLButtonElement | null;
     expect(button).toBeTruthy();
     return button as HTMLButtonElement;
+  }
+
+  function integrationActionButtons(panel: HTMLElement): HTMLButtonElement[] {
+    const buttons = Array.from(
+      panel.querySelectorAll('.actions button') as NodeListOf<HTMLButtonElement>,
+    );
+    expect(buttons).toHaveLength(2);
+    return buttons;
   }
 
   function globalResetButton(fixture: { nativeElement: HTMLElement }): HTMLButtonElement {
@@ -459,7 +466,7 @@ describe('SettingsPageComponent', () => {
     expect(textContent(panelByTitle(fixture, 'Whisparr'))).toContain('Whisparr is ready.');
   });
 
-  it('disables and blocks per-integration reset while save is running, then re-enables it', async () => {
+  it('serializes page mutations while save is running on another integration, then re-enables actions', async () => {
     const { fixture, component, integrationsService, confirmationService } = await renderPage(
       buildSettingsIntegrations(),
       buildSettingsSetupStatus(),
@@ -478,10 +485,28 @@ describe('SettingsPageComponent', () => {
     component.saveIntegration('WHISPARR');
     fixture.detectChanges();
 
-    const resetButton = integrationResetButton(panelByTitle(fixture, 'Whisparr'));
-    expect(resetButton.disabled).toBe(true);
+    const whisparrPanel = panelByTitle(fixture, 'Whisparr');
+    const stashPanel = panelByTitle(fixture, 'Stash');
 
-    component.requestIntegrationReset('WHISPARR');
+    expect(textContent(integrationActionButtons(whisparrPanel)[1])).toBe('Saving...');
+    expect(integrationActionButtons(stashPanel).map((button) => button.disabled)).toEqual([
+      true,
+      true,
+    ]);
+    expect(integrationResetButton(stashPanel).disabled).toBe(true);
+    expect(globalResetButton(fixture).disabled).toBe(true);
+
+    component.saveIntegration('STASH');
+    component.saveAndTestIntegration('STASH');
+    component.resetIntegration('STASH');
+    component.requestIntegrationReset('STASH');
+    component.requestResetAll();
+    component.resetAllIntegrations();
+
+    expect(integrationsService.updateIntegration).toHaveBeenCalledTimes(1);
+    expect(integrationsService.testIntegration).not.toHaveBeenCalled();
+    expect(integrationsService.resetIntegration).not.toHaveBeenCalled();
+    expect(integrationsService.resetAllIntegrations).not.toHaveBeenCalled();
     expect(confirmationService.confirm).not.toHaveBeenCalled();
 
     saveSubject.next(
@@ -498,10 +523,14 @@ describe('SettingsPageComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(integrationResetButton(panelByTitle(fixture, 'Whisparr')).disabled).toBe(false);
+    expect(
+      integrationActionButtons(panelByTitle(fixture, 'Stash')).map((button) => button.disabled),
+    ).toEqual([false, false]);
+    expect(integrationResetButton(panelByTitle(fixture, 'Stash')).disabled).toBe(false);
+    expect(globalResetButton(fixture).disabled).toBe(false);
   });
 
-  it('disables and blocks per-integration reset while Save & Test is running', async () => {
+  it('serializes page mutations while Save & Test is running on another integration', async () => {
     const { fixture, component, integrationsService, confirmationService } = await renderPage(
       buildSettingsIntegrations(),
       buildSettingsSetupStatus(),
@@ -530,9 +559,19 @@ describe('SettingsPageComponent', () => {
     component.saveAndTestIntegration('WHISPARR');
     fixture.detectChanges();
 
-    expect(integrationResetButton(panelByTitle(fixture, 'Whisparr')).disabled).toBe(true);
+    const whisparrPanel = panelByTitle(fixture, 'Whisparr');
+    const stashPanel = panelByTitle(fixture, 'Stash');
 
-    component.requestIntegrationReset('WHISPARR');
+    expect(textContent(integrationActionButtons(whisparrPanel)[0])).toBe('Saving & testing...');
+    expect(integrationActionButtons(stashPanel).map((button) => button.disabled)).toEqual([
+      true,
+      true,
+    ]);
+    expect(integrationResetButton(stashPanel).disabled).toBe(true);
+    expect(globalResetButton(fixture).disabled).toBe(true);
+
+    component.requestIntegrationReset('STASH');
+    component.requestResetAll();
     expect(confirmationService.confirm).not.toHaveBeenCalled();
 
     updateSubject.next(
@@ -551,52 +590,15 @@ describe('SettingsPageComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(integrationResetButton(panelByTitle(fixture, 'Whisparr')).disabled).toBe(false);
-  });
-
-  it('disables and blocks reset-all while any integration mutation is running', async () => {
-    const { fixture, component, integrationsService, confirmationService } = await renderPage(
-      buildSettingsIntegrations(),
-      buildSettingsSetupStatus(),
-    );
-
-    const saveSubject = new Subject<IntegrationResponse>();
-    integrationsService.updateIntegration.mockReturnValue(saveSubject);
-
-    component.formFor('WHISPARR').setValue({
-      name: 'Remote Whisparr',
-      baseUrl: 'http://whisparr.local',
-      apiKey: 'token-123',
-      enabled: true,
-    });
-
-    component.saveIntegration('WHISPARR');
-    fixture.detectChanges();
-
-    expect(globalResetButton(fixture).disabled).toBe(true);
-
-    component.requestResetAll();
-    expect(confirmationService.confirm).not.toHaveBeenCalled();
-
-    saveSubject.next(
-      buildIntegration({
-        type: 'WHISPARR',
-        name: 'Remote Whisparr',
-        baseUrl: 'http://whisparr.local',
-        hasApiKey: true,
-      }),
-    );
-    saveSubject.complete();
-
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
+    expect(
+      integrationActionButtons(panelByTitle(fixture, 'Stash')).map((button) => button.disabled),
+    ).toEqual([false, false]);
+    expect(integrationResetButton(panelByTitle(fixture, 'Stash')).disabled).toBe(false);
     expect(globalResetButton(fixture).disabled).toBe(false);
   });
 
-  it('shows a resetting state and disables save actions while reset is running', async () => {
-    const { fixture, component, integrationsService } = await renderPage(
+  it('shows a resetting state and serializes other panels while reset is running', async () => {
+    const { fixture, component, integrationsService, confirmationService } = await renderPage(
       buildSettingsIntegrations(),
       buildSettingsSetupStatus(),
     );
@@ -607,14 +609,32 @@ describe('SettingsPageComponent', () => {
     component.resetIntegration('WHISPARR');
     fixture.detectChanges();
 
-    const panel = panelByTitle(fixture, 'Whisparr');
-    const formButtons = Array.from(
-      panel.querySelectorAll('.actions button') as NodeListOf<HTMLButtonElement>,
-    );
+    const whisparrPanel = panelByTitle(fixture, 'Whisparr');
+    const stashPanel = panelByTitle(fixture, 'Stash');
 
-    expect(formButtons.map((button) => button.disabled)).toEqual([true, true]);
-    expect(textContent(integrationResetButton(panel))).toBe('Resetting...');
-    expect(integrationResetButton(panel).disabled).toBe(true);
+    expect(integrationActionButtons(whisparrPanel).map((button) => button.disabled)).toEqual([
+      true,
+      true,
+    ]);
+    expect(textContent(integrationResetButton(whisparrPanel))).toBe('Resetting...');
+    expect(integrationResetButton(whisparrPanel).disabled).toBe(true);
+    expect(integrationActionButtons(stashPanel).map((button) => button.disabled)).toEqual([
+      true,
+      true,
+    ]);
+    expect(integrationResetButton(stashPanel).disabled).toBe(true);
+    expect(globalResetButton(fixture).disabled).toBe(true);
+
+    component.saveIntegration('STASH');
+    component.saveAndTestIntegration('STASH');
+    component.requestIntegrationReset('STASH');
+    component.requestResetAll();
+    component.resetAllIntegrations();
+
+    expect(integrationsService.updateIntegration).not.toHaveBeenCalled();
+    expect(integrationsService.testIntegration).not.toHaveBeenCalled();
+    expect(integrationsService.resetAllIntegrations).not.toHaveBeenCalled();
+    expect(confirmationService.confirm).not.toHaveBeenCalled();
 
     resetSubject.next();
     resetSubject.complete();
@@ -623,7 +643,11 @@ describe('SettingsPageComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(formButtons.map((button) => button.disabled)).toEqual([false, false]);
+    expect(
+      integrationActionButtons(panelByTitle(fixture, 'Stash')).map((button) => button.disabled),
+    ).toEqual([false, false]);
+    expect(integrationResetButton(panelByTitle(fixture, 'Stash')).disabled).toBe(false);
+    expect(globalResetButton(fixture).disabled).toBe(false);
     expect(textContent(integrationResetButton(panelByTitle(fixture, 'Whisparr')))).toBe(
       'Reset Whisparr Integration',
     );

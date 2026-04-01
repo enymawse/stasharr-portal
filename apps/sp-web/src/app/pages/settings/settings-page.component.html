@@ -68,10 +68,18 @@
                 [class.is-pending]="item.state === 'NOT_SAVED'"
               >
                 @switch (item.state) {
-                  @case ('NOT_SAVED') { Not Saved }
-                  @case ('SAVED') { Saved }
-                  @case ('TEST_FAILED') { Test Failed }
-                  @case ('READY') { Ready }
+                  @case ('NOT_SAVED') {
+                    Not Saved
+                  }
+                  @case ('SAVED') {
+                    Saved
+                  }
+                  @case ('TEST_FAILED') {
+                    Test Failed
+                  }
+                  @case ('READY') {
+                    Ready
+                  }
                 }
               </span>
             </div>
@@ -144,14 +152,14 @@
                   />
 
                   <div class="actions">
-                    <button pButton type="submit" [disabled]="isWorking(type)">
+                    <button pButton type="submit" [disabled]="pageMutationRunning()">
                       {{ isSaveAndTesting(type) ? 'Saving & testing...' : 'Save & Test' }}
                     </button>
                     <button
                       pButton
                       type="button"
                       text
-                      [disabled]="isWorking(type)"
+                      [disabled]="pageMutationRunning()"
                       (click)="saveIntegration(type)"
                     >
                       {{ isSaving(type) ? 'Saving...' : 'Save only' }}
@@ -166,13 +174,19 @@
                     }}</p-message>
                   }
                   @if (saveAndTestState()[type].error; as message) {
-                    <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+                    <p-message severity="error" styleClass="inline-message">{{
+                      message
+                    }}</p-message>
                   }
                   @if (saveState()[type].success; as message) {
-                    <p-message severity="success" styleClass="inline-message">{{ message }}</p-message>
+                    <p-message severity="success" styleClass="inline-message">{{
+                      message
+                    }}</p-message>
                   }
                   @if (saveState()[type].error; as message) {
-                    <p-message severity="error" styleClass="inline-message">{{ message }}</p-message>
+                    <p-message severity="error" styleClass="inline-message">{{
+                      message
+                    }}</p-message>
                   }
                 </form>
 
@@ -191,12 +205,10 @@
                     pButton
                     type="button"
                     class="danger"
-                    [disabled]="!canResetIntegration(type)"
+                    [disabled]="pageMutationRunning()"
                     (click)="requestIntegrationReset(type)"
                   >
-                    {{
-                      isResetting(type) ? 'Resetting...' : `Reset ${labelFor(type)} Integration`
-                    }}
+                    {{ isResetting(type) ? 'Resetting...' : `Reset ${labelFor(type)} Integration` }}
                   </button>
                 </div>
               </section>
@@ -267,15 +279,15 @@
     <section class="global-danger">
       <h2>Global Danger Zone</h2>
       <p>
-        Resetting all integrations clears Stash, Whisparr, and the catalog provider choice for
-        this instance.
+        Resetting all integrations clears Stash, Whisparr, and the catalog provider choice for this
+        instance.
       </p>
 
       <button
         pButton
         type="button"
         class="danger"
-        [disabled]="anyMutationRunning()"
+        [disabled]="pageMutationRunning()"
         (click)="requestResetAll()"
       >
         {{ resettingAll() ? 'Resetting all...' : 'Reset all integrations' }}

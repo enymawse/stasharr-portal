@@ -192,7 +192,9 @@ export class SettingsPageComponent implements OnInit {
     }
 
     const nextStep = this.nextRepairSummary();
-    return nextStep ? `Repair needed: ${nextStep} Use Save & Test on the affected integration below.` : null;
+    return nextStep
+      ? `Repair needed: ${nextStep} Use Save & Test on the affected integration below.`
+      : null;
   }
 
   protected configuredCatalogProviderLabel(): string | null {
@@ -296,24 +298,12 @@ export class SettingsPageComponent implements OnInit {
     return this.isSaving(type) || this.isSaveAndTesting(type) || this.isResetting(type);
   }
 
-  protected isWorking(type: IntegrationType): boolean {
-    return this.isBusy(type) || this.resettingAll();
-  }
-
-  protected anyMutationRunning(): boolean {
+  protected pageMutationRunning(): boolean {
     return this.resettingAll() || this.allServiceTypes.some((type) => this.isBusy(type));
   }
 
-  protected canResetIntegration(type: IntegrationType): boolean {
-    return !this.isBusy(type) && !this.resettingAll();
-  }
-
-  private canMutateIntegration(type: IntegrationType): boolean {
-    return !this.isBusy(type) && !this.resettingAll();
-  }
-
   protected requestIntegrationReset(type: IntegrationType): void {
-    if (!this.canResetIntegration(type)) {
+    if (this.pageMutationRunning()) {
       return;
     }
 
@@ -338,7 +328,7 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected requestResetAll(): void {
-    if (this.anyMutationRunning()) {
+    if (this.pageMutationRunning()) {
       return;
     }
 
@@ -359,7 +349,7 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected saveIntegration(type: IntegrationType): void {
-    if (!this.canMutateIntegration(type)) {
+    if (this.pageMutationRunning()) {
       return;
     }
 
@@ -406,7 +396,7 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected saveAndTestIntegration(type: IntegrationType): void {
-    if (!this.canMutateIntegration(type)) {
+    if (this.pageMutationRunning()) {
       return;
     }
 
@@ -465,7 +455,7 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected resetIntegration(type: IntegrationType): void {
-    if (!this.canMutateIntegration(type)) {
+    if (this.pageMutationRunning()) {
       return;
     }
 
@@ -515,7 +505,7 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected resetAllIntegrations(): void {
-    if (this.anyMutationRunning()) {
+    if (this.pageMutationRunning()) {
       return;
     }
 
@@ -748,7 +738,8 @@ export class SettingsPageComponent implements OnInit {
         title: 'Catalog provider',
         state: 'NOT_SAVED',
         ready: false,
-        summary: 'No catalog provider is locked right now. Return to setup to choose StashDB or FansDB.',
+        summary:
+          'No catalog provider is locked right now. Return to setup to choose StashDB or FansDB.',
       };
     }
 
@@ -843,10 +834,7 @@ export class SettingsPageComponent implements OnInit {
     return fallback;
   }
 
-  private describeSaveSuccess(
-    type: IntegrationType,
-    integration: IntegrationResponse,
-  ): string {
+  private describeSaveSuccess(type: IntegrationType, integration: IntegrationResponse): string {
     if (integration.status === 'ERROR') {
       return `${this.labelFor(type)} settings saved. Repair the connection details and run Save & Test again.`;
     }
