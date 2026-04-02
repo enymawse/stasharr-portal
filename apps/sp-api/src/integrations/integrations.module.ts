@@ -3,11 +3,12 @@ import { StashModule } from '../providers/stash/stash.module';
 import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import { StashdbModule } from '../providers/stashdb/stashdb.module';
 import { WhisparrModule } from '../providers/whisparr/whisparr.module';
+import { RuntimeHealthModule } from '../runtime-health/runtime-health.module';
 import { IntegrationsController } from './integrations.controller';
 import { IntegrationsService } from './integrations.service';
 
 @Module({
-  imports: [StashModule, StashdbModule, WhisparrModule],
+  imports: [StashModule, StashdbModule, WhisparrModule, RuntimeHealthModule],
   controllers: [IntegrationsController],
   providers: [IntegrationsService, CatalogProviderService],
   exports: [IntegrationsService, CatalogProviderService],

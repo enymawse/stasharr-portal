@@ -7,6 +7,7 @@ import { HealthService } from '../../core/api/health.service';
 import { HealthStatusResponse } from '../../core/api/health.types';
 import { IntegrationsService } from '../../core/api/integrations.service';
 import { IntegrationResponse } from '../../core/api/integrations.types';
+import { RuntimeHealthService } from '../../core/api/runtime-health.service';
 import { SetupService } from '../../core/api/setup.service';
 import { SetupStatusResponse } from '../../core/api/setup.types';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
@@ -100,6 +101,9 @@ describe('SettingsPageComponent', () => {
     const healthService = {
       getStatus: vi.fn().mockReturnValue(of(buildHealthStatus())),
     };
+    const runtimeHealthService = {
+      requestRefresh: vi.fn(),
+    };
     const notifications = {
       success: vi.fn(),
       error: vi.fn(),
@@ -126,6 +130,10 @@ describe('SettingsPageComponent', () => {
           useValue: healthService,
         },
         {
+          provide: RuntimeHealthService,
+          useValue: runtimeHealthService,
+        },
+        {
           provide: ConfirmationService,
           useValue: confirmationService,
         },
@@ -146,6 +154,7 @@ describe('SettingsPageComponent', () => {
       component: fixture.componentInstance as any,
       integrationsService,
       setupService,
+      runtimeHealthService,
       notifications,
       confirmationService,
     };
@@ -382,7 +391,14 @@ describe('SettingsPageComponent', () => {
         baseUrl: 'http://stashdb.local/graphql',
       }),
     ];
-    const { fixture, component, integrationsService, setupService, notifications } =
+    const {
+      fixture,
+      component,
+      integrationsService,
+      setupService,
+      runtimeHealthService,
+      notifications,
+    } =
       await renderPage(initialIntegrations, {
         setupComplete: false,
         required: { stash: true, catalog: true, whisparr: false },
@@ -460,9 +476,98 @@ describe('SettingsPageComponent', () => {
       baseUrl: 'http://whisparr.local',
       apiKey: 'token-123',
     });
+    expect(runtimeHealthService.requestRefresh).toHaveBeenCalledTimes(1);
     expect(notifications.success).toHaveBeenCalledWith('Whisparr is ready.');
     expect(textContent(panelByTitle(fixture, 'Whisparr'))).toContain('Ready');
     expect(textContent(panelByTitle(fixture, 'Whisparr'))).toContain('Whisparr is ready.');
+  });
+
+  it('requests a runtime-health refresh after a successful integration reset', async () => {
+    const { component, integrationsService, runtimeHealthService } = await renderPage(
+      buildSettingsIntegrations(),
+      buildSettingsSetupStatus(),
+    );
+
+    integrationsService.resetIntegration.mockReturnValue(
+      of(
+        buildIntegration({
+          type: 'WHISPARR',
+          status: 'NOT_CONFIGURED',
+          enabled: true,
+          baseUrl: null,
+          hasApiKey: false,
+          lastHealthyAt: null,
+        }),
+      ),
+    );
+    integrationsService.getIntegrations.mockReturnValueOnce(
+      of([
+        buildIntegration({ type: 'STASH' }),
+        buildIntegration({
+          type: 'WHISPARR',
+          status: 'NOT_CONFIGURED',
+          enabled: true,
+          baseUrl: null,
+          hasApiKey: false,
+          lastHealthyAt: null,
+        }),
+        buildIntegration({
+          type: 'STASHDB',
+          baseUrl: 'http://stashdb.local/graphql',
+        }),
+      ]),
+    );
+    component.resetIntegration('WHISPARR');
+
+    expect(runtimeHealthService.requestRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('requests a runtime-health refresh after reset-all completes', async () => {
+    const { component, integrationsService, runtimeHealthService } = await renderPage(
+      buildSettingsIntegrations(),
+      buildSettingsSetupStatus(),
+    );
+
+    integrationsService.resetAllIntegrations.mockReturnValue(
+      of([
+        buildIntegration({
+          type: 'FANSDB',
+          status: 'NOT_CONFIGURED',
+          enabled: true,
+          baseUrl: null,
+          hasApiKey: false,
+          lastHealthyAt: null,
+        }),
+        buildIntegration({
+          type: 'STASH',
+          status: 'NOT_CONFIGURED',
+          enabled: true,
+          baseUrl: null,
+          hasApiKey: false,
+          lastHealthyAt: null,
+        }),
+        buildIntegration({
+          type: 'STASHDB',
+          status: 'NOT_CONFIGURED',
+          enabled: true,
+          baseUrl: null,
+          hasApiKey: false,
+          lastHealthyAt: null,
+        }),
+        buildIntegration({
+          type: 'WHISPARR',
+          status: 'NOT_CONFIGURED',
+          enabled: true,
+          baseUrl: null,
+          hasApiKey: false,
+          lastHealthyAt: null,
+        }),
+      ]),
+    );
+
+    component.resetAllIntegrations();
+
+    expect(runtimeHealthService.requestRefresh).toHaveBeenCalledTimes(1);
   });
 
   it('serializes page mutations while save is running on another integration, then re-enables actions', async () => {

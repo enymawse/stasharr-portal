@@ -30,6 +30,8 @@ import {
   isCatalogProviderIntegrationType,
 } from '../providers/catalog/catalog-provider.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { RuntimeHealthService } from '../runtime-health/runtime-health.service';
+import { runtimeHealthServiceForIntegration } from './integration-runtime-health.util';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
 
 type PersistedIntegrationValues = {
@@ -57,6 +59,7 @@ export class IntegrationsService {
     private readonly stashAdapter: StashAdapter,
     private readonly stashdbAdapter: StashdbAdapter,
     private readonly whisparrAdapter: WhisparrAdapter,
+    private readonly runtimeHealthService: RuntimeHealthService,
   ) {}
 
   findAll(): Promise<IntegrationConfig[]> {
@@ -75,6 +78,11 @@ export class IntegrationsService {
     const isCatalogProvider = isCatalogProviderIntegrationType(type);
     const persistedValues = this.resolvePersistedValues(type, dto, existing);
     const configured = this.hasSavedConfig(type, persistedValues);
+    const runtimeHealthInvalidated = this.runtimeHealthInvalidatedBySave(
+      existing,
+      persistedValues,
+      configured,
+    );
 
     if (isCatalogProvider) {
       await this.assertCatalogProviderSaveAllowed(type, configured);
@@ -122,10 +130,20 @@ export class IntegrationsService {
         this.prisma.integrationConfig.upsert(upsertArgs),
       ]);
 
+      if (runtimeHealthInvalidated) {
+        await this.clearRuntimeHealth(type);
+      }
+
       return integration;
     }
 
-    return this.prisma.integrationConfig.upsert(upsertArgs);
+    const integration = await this.prisma.integrationConfig.upsert(upsertArgs);
+
+    if (runtimeHealthInvalidated) {
+      await this.clearRuntimeHealth(type);
+    }
+
+    return integration;
   }
 
   async findOne(type: IntegrationType): Promise<IntegrationConfig> {
@@ -156,6 +174,7 @@ export class IntegrationsService {
       ? this.catalogProviderSelectionConfig()
       : undefined;
     const configChanged = this.connectionDetailsChanged(existing, persistedValues);
+    const runtimeService = runtimeHealthServiceForIntegration(type);
 
     try {
       const config = this.resolveTestConfig(persistedValues);
@@ -174,7 +193,7 @@ export class IntegrationsService {
       }
 
       const now = new Date();
-      return this.persistIntegration(
+      const integration = (await this.persistIntegration(
         type,
         {
           ...persistedValues,
@@ -184,10 +203,12 @@ export class IntegrationsService {
           lastErrorMessage: null,
         },
         selectionConfig,
-      ) as Promise<TestedIntegrationConfig>;
+      )) as TestedIntegrationConfig;
+      await this.runtimeHealthService.recordManualRecovery(runtimeService);
+      return integration;
     } catch (error) {
       const message = this.resolveErrorMessage(error);
-      return this.persistIntegration(
+      const integration = (await this.persistIntegration(
         type,
         {
           ...persistedValues,
@@ -200,7 +221,13 @@ export class IntegrationsService {
           lastErrorMessage: message,
         },
         selectionConfig,
-      ) as Promise<TestedIntegrationConfig>;
+      )) as TestedIntegrationConfig;
+
+      if (configChanged) {
+        await this.runtimeHealthService.clearService(runtimeService);
+      }
+
+      return integration;
     }
   }
 
@@ -223,11 +250,12 @@ export class IntegrationsService {
         (integration) => integration.type === type,
       );
       if (resetIntegration) {
+        await this.clearRuntimeHealth(type);
         return resetIntegration;
       }
     }
 
-    return this.prisma.integrationConfig.upsert({
+    const integration = await this.prisma.integrationConfig.upsert({
       where: { type },
       update: this.resetPayload(),
       create: {
@@ -235,6 +263,10 @@ export class IntegrationsService {
         ...this.resetPayload(),
       },
     });
+
+    await this.clearRuntimeHealth(type);
+
+    return integration;
   }
 
   async resetAll(): Promise<IntegrationConfig[]> {
@@ -252,6 +284,8 @@ export class IntegrationsService {
         }),
       ),
     );
+
+    await this.runtimeHealthService.clearAllServices();
 
     return resetRecords.sort((a, b) => a.type.localeCompare(b.type));
   }
@@ -433,6 +467,20 @@ export class IntegrationsService {
     return (
       (existing?.baseUrl ?? null) !== values.baseUrl ||
       (existing?.apiKey ?? null) !== values.apiKey
+    );
+  }
+
+  private runtimeHealthInvalidatedBySave(
+    existing: IntegrationConfig | null,
+    values: Pick<PersistedIntegrationValues, 'baseUrl' | 'apiKey'>,
+    configured: boolean,
+  ): boolean {
+    return !configured || this.connectionDetailsChanged(existing, values);
+  }
+
+  private async clearRuntimeHealth(type: IntegrationType): Promise<void> {
+    await this.runtimeHealthService.clearService(
+      runtimeHealthServiceForIntegration(type),
     );
   }
 

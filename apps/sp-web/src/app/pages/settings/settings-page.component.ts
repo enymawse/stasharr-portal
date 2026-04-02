@@ -26,6 +26,7 @@ import {
 import { SetupService } from '../../core/api/setup.service';
 import { SetupStatusStore } from '../../core/api/setup-status.store';
 import { SetupStatusResponse } from '../../core/api/setup.types';
+import { RuntimeHealthService } from '../../core/api/runtime-health.service';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import { IntegrationFormFieldsComponent } from '../../shared/integration-form-fields/integration-form-fields.component';
 
@@ -55,6 +56,7 @@ export class SettingsPageComponent implements OnInit {
   private readonly setupService = inject(SetupService);
   private readonly setupStatusStore = inject(SetupStatusStore);
   private readonly healthService = inject(HealthService);
+  private readonly runtimeHealthService = inject(RuntimeHealthService);
   private readonly confirmationService = inject(ConfirmationService);
   private readonly notifications = inject(AppNotificationsService);
   private readonly router = inject(Router);
@@ -376,6 +378,7 @@ export class SettingsPageComponent implements OnInit {
       .subscribe({
         next: ({ integration, setupStatus, integrations }) => {
           this.syncSettingsState(setupStatus, integrations);
+          this.runtimeHealthService.requestRefresh();
           const message = this.describeSaveSuccess(type, integration);
           this.notifications.success(message);
           this.patchActionState(this.saveState, type, {
@@ -424,6 +427,7 @@ export class SettingsPageComponent implements OnInit {
       .subscribe({
         next: ({ integration, setupStatus, integrations }) => {
           this.syncSettingsState(setupStatus, integrations);
+          this.runtimeHealthService.requestRefresh();
 
           if (integration.status === 'CONFIGURED') {
             const message = `${this.labelFor(type)} is ready.`;
@@ -478,6 +482,7 @@ export class SettingsPageComponent implements OnInit {
       .subscribe({
         next: ({ setupStatus, integrations }) => {
           this.syncSettingsState(setupStatus, integrations);
+          this.runtimeHealthService.requestRefresh();
           if (this.isCatalogProvider(type)) {
             this.notifications.info('Catalog setup was reset');
             this.activeTab.set('STASH');
@@ -531,6 +536,7 @@ export class SettingsPageComponent implements OnInit {
       .subscribe({
         next: ({ setupStatus, integrations }) => {
           this.syncSettingsState(setupStatus, integrations);
+          this.runtimeHealthService.requestRefresh();
           this.notifications.info('All integrations were reset to not configured');
           this.activeTab.set('STASH');
           void this.router.navigateByUrl('/setup');

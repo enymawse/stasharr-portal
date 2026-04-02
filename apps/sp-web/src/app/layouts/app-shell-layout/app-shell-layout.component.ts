@@ -61,6 +61,7 @@ export class AppShellLayoutComponent implements OnInit {
   ngOnInit(): void {
     merge(
       of(null),
+      this.runtimeHealthService.refreshRequested$,
       this.router.events.pipe(
         filter((event): event is NavigationEnd => event instanceof NavigationEnd),
       ),

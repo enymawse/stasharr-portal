@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { RuntimeHealthResponse } from './runtime-health.types';
 
 @Injectable({
@@ -8,8 +8,15 @@ import { RuntimeHealthResponse } from './runtime-health.types';
 })
 export class RuntimeHealthService {
   private readonly http = inject(HttpClient);
+  private readonly refreshRequests = new Subject<void>();
+
+  readonly refreshRequested$ = this.refreshRequests.asObservable();
 
   getStatus(): Observable<RuntimeHealthResponse> {
     return this.http.get<RuntimeHealthResponse>('/api/health/runtime');
+  }
+
+  requestRefresh(): void {
+    this.refreshRequests.next();
   }
 }

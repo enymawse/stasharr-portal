@@ -83,6 +83,29 @@ describe('RuntimeHealthService', () => {
           return next;
         },
       ),
+      deleteMany: jest.fn(
+        async ({
+          where,
+        }: {
+          where:
+            | { service: RuntimeHealthServiceKey }
+            | { service: { in: RuntimeHealthServiceKey[] } };
+        }) => {
+          const services =
+            typeof where.service === 'object' && where.service !== null
+              ? where.service.in
+              : [where.service];
+          let count = 0;
+
+          for (const service of services) {
+            if (records.delete(service)) {
+              count += 1;
+            }
+          }
+
+          return { count };
+        },
+      ),
     },
   } as unknown as PrismaService;
 
@@ -145,6 +168,43 @@ describe('RuntimeHealthService', () => {
       (prisma.runtimeIntegrationHealth.upsert as jest.Mock).mock.calls.length,
     ).toBe(upsertCountAfterDegrade);
     jest.useRealTimers();
+  });
+
+  it('records manual recovery even without prior runtime history', async () => {
+    await service.recordManualRecovery(RuntimeHealthServiceKey.CATALOG);
+
+    const summary = await service.getSummary();
+    expect(summary.degraded).toBe(false);
+    expect(summary.services.catalog.degraded).toBe(false);
+    expect(summary.services.catalog.status).toBe(RuntimeHealthStatus.HEALTHY);
+    expect(summary.services.catalog.lastHealthyAt).not.toBeNull();
+  });
+
+  it('clears runtime health for a single service', async () => {
+    await service.recordFailure(RuntimeHealthServiceKey.WHISPARR, new Error('timeout'));
+    await service.recordFailure(RuntimeHealthServiceKey.WHISPARR, new Error('timeout'));
+
+    await service.clearService(RuntimeHealthServiceKey.WHISPARR);
+
+    const summary = await service.getSummary();
+    expect(summary.degraded).toBe(false);
+    expect(summary.services.whisparr.degraded).toBe(false);
+    expect(summary.services.whisparr.consecutiveFailures).toBe(0);
+  });
+
+  it('clears runtime health for all tracked services', async () => {
+    await service.recordFailure(RuntimeHealthServiceKey.CATALOG, new Error('catalog down'));
+    await service.recordFailure(RuntimeHealthServiceKey.CATALOG, new Error('catalog down'));
+    await service.recordFailure(RuntimeHealthServiceKey.STASH, new Error('stash down'));
+    await service.recordFailure(RuntimeHealthServiceKey.STASH, new Error('stash down'));
+
+    await service.clearAllServices();
+
+    const summary = await service.getSummary();
+    expect(summary.degraded).toBe(false);
+    expect(summary.services.catalog.degraded).toBe(false);
+    expect(summary.services.stash.degraded).toBe(false);
+    expect(summary.services.whisparr.degraded).toBe(false);
   });
 
   it('returns healthy defaults for services without runtime health history', async () => {

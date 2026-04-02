@@ -21,6 +21,11 @@ interface RuntimeHealthSnapshot {
 @Injectable()
 export class RuntimeHealthService {
   static readonly FAILURE_THRESHOLD = 2;
+  private static readonly SERVICES = [
+    RuntimeHealthServiceKey.CATALOG,
+    RuntimeHealthServiceKey.STASH,
+    RuntimeHealthServiceKey.WHISPARR,
+  ] as const;
   private static readonly DEGRADED_FAILURE_THROTTLE_MS = 30_000;
 
   private readonly logger = new Logger(RuntimeHealthService.name);
@@ -116,6 +121,54 @@ export class RuntimeHealthService {
     });
 
     this.cache.set(service, persisted);
+  }
+
+  async recordManualRecovery(service: RuntimeHealthServiceKey): Promise<void> {
+    const current = await this.getSnapshot(service);
+    const now = new Date();
+    const persisted = await this.prisma.runtimeIntegrationHealth.upsert({
+      where: { service },
+      create: {
+        service,
+        status: RuntimeHealthStatus.HEALTHY,
+        consecutiveFailures: 0,
+        lastHealthyAt: now,
+        lastFailureAt: null,
+        lastErrorMessage: null,
+        degradedAt: null,
+      },
+      update: {
+        status: RuntimeHealthStatus.HEALTHY,
+        consecutiveFailures: 0,
+        lastHealthyAt: now,
+        lastFailureAt: current.record.lastFailureAt,
+        lastErrorMessage: current.record.lastErrorMessage,
+        degradedAt: null,
+      },
+    });
+
+    this.cache.set(service, persisted);
+  }
+
+  async clearService(service: RuntimeHealthServiceKey): Promise<void> {
+    await this.prisma.runtimeIntegrationHealth.deleteMany({
+      where: { service },
+    });
+    this.cache.delete(service);
+  }
+
+  async clearAllServices(): Promise<void> {
+    await this.prisma.runtimeIntegrationHealth.deleteMany({
+      where: {
+        service: {
+          in: [...RuntimeHealthService.SERVICES],
+        },
+      },
+    });
+
+    for (const service of RuntimeHealthService.SERVICES) {
+      this.cache.delete(service);
+    }
   }
 
   private async getSnapshot(

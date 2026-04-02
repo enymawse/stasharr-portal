@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { Subject, of } from 'rxjs';
 import { RuntimeHealthService } from '../../core/api/runtime-health.service';
 import { RuntimeHealthResponse } from '../../core/api/runtime-health.types';
 import { SetupService } from '../../core/api/setup.service';
@@ -71,11 +71,13 @@ describe('AppShellLayoutComponent', () => {
     setupStatus = buildSetupStatus(),
     runtimeHealth = buildRuntimeHealth(),
   ) {
+    const refreshRequests = new Subject<void>();
     const setupService = {
       getStatus: vi.fn().mockReturnValue(of(setupStatus)),
     };
     const runtimeHealthService = {
       getStatus: vi.fn().mockReturnValue(of(runtimeHealth)),
+      refreshRequested$: refreshRequests.asObservable(),
     };
 
     await TestBed.configureTestingModule({
@@ -98,7 +100,7 @@ describe('AppShellLayoutComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    return { fixture, setupService, runtimeHealthService };
+    return { fixture, setupService, runtimeHealthService, refreshRequests };
   }
 
   afterEach(() => {
@@ -199,6 +201,7 @@ describe('AppShellLayoutComponent', () => {
     vi.useFakeTimers();
 
     try {
+      const refreshRequests = new Subject<void>();
       const setupService = {
         getStatus: vi.fn().mockReturnValue(of(buildSetupStatus())),
       };
@@ -226,6 +229,7 @@ describe('AppShellLayoutComponent', () => {
             ),
           )
           .mockReturnValueOnce(of(buildRuntimeHealth())),
+        refreshRequested$: refreshRequests.asObservable(),
       };
 
       await TestBed.configureTestingModule({
@@ -261,6 +265,69 @@ describe('AppShellLayoutComponent', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('clears a runtime outage warning as soon as runtime health is refreshed', async () => {
+    const refreshRequests = new Subject<void>();
+    const setupService = {
+      getStatus: vi.fn().mockReturnValue(of(buildSetupStatus())),
+    };
+    const runtimeHealthService = {
+      getStatus: vi
+        .fn()
+        .mockReturnValueOnce(
+          of(
+            buildRuntimeHealth({
+              degraded: true,
+              services: {
+                ...buildRuntimeHealth().services,
+                whisparr: {
+                  service: 'WHISPARR',
+                  status: 'DEGRADED',
+                  degraded: true,
+                  consecutiveFailures: 2,
+                  lastHealthyAt: '2026-04-02T00:00:00.000Z',
+                  lastFailureAt: '2026-04-02T00:01:00.000Z',
+                  lastErrorMessage: 'Failed to reach Whisparr provider endpoint.',
+                  degradedAt: '2026-04-02T00:01:00.000Z',
+                },
+              },
+            }),
+          ),
+        )
+        .mockReturnValueOnce(of(buildRuntimeHealth())),
+      refreshRequested$: refreshRequests.asObservable(),
+    };
+
+    await TestBed.configureTestingModule({
+      imports: [AppShellLayoutComponent],
+      providers: [
+        provideRouter([]),
+        {
+          provide: SetupService,
+          useValue: setupService,
+        },
+        {
+          provide: RuntimeHealthService,
+          useValue: runtimeHealthService,
+        },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(AppShellLayoutComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[data-testid="degraded-banner"]')).toBeTruthy();
+
+    refreshRequests.next();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[data-testid="degraded-banner"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-indicator"]')).toBeNull();
   });
 
   it('keeps setup degradation messaging ahead of runtime outage messaging', async () => {

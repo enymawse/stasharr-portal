@@ -1,9 +1,15 @@
-import { IntegrationStatus, IntegrationType, Prisma } from '@prisma/client';
+import {
+  IntegrationStatus,
+  IntegrationType,
+  Prisma,
+  RuntimeHealthServiceKey,
+} from '@prisma/client';
 import { StashAdapter } from '../providers/stash/stash.adapter';
 import { StashdbAdapter } from '../providers/stashdb/stashdb.adapter';
 import { WhisparrAdapter } from '../providers/whisparr/whisparr.adapter';
 import { buildCatalogProviderSelectionConfig } from '../providers/catalog/catalog-provider.util';
 import { PrismaService } from '../prisma/prisma.service';
+import { RuntimeHealthService } from '../runtime-health/runtime-health.service';
 import { IntegrationsService } from './integrations.service';
 
 describe('IntegrationsService', () => {
@@ -15,6 +21,9 @@ describe('IntegrationsService', () => {
   const stashTestConnection = jest.fn();
   const stashdbTestConnection = jest.fn();
   const whisparrTestConnection = jest.fn();
+  const clearRuntimeHealth = jest.fn();
+  const clearAllRuntimeHealth = jest.fn();
+  const recordManualRecovery = jest.fn();
 
   const prisma = {
     integrationConfig: {
@@ -38,6 +47,12 @@ describe('IntegrationsService', () => {
     testConnection: whisparrTestConnection,
   } as unknown as WhisparrAdapter;
 
+  const runtimeHealthService = {
+    clearService: clearRuntimeHealth,
+    clearAllServices: clearAllRuntimeHealth,
+    recordManualRecovery,
+  } as unknown as RuntimeHealthService;
+
   let service: IntegrationsService;
 
   beforeEach(() => {
@@ -47,6 +62,7 @@ describe('IntegrationsService', () => {
       stashAdapter,
       stashdbAdapter,
       whisparrAdapter,
+      runtimeHealthService,
     );
   });
 
@@ -83,6 +99,7 @@ describe('IntegrationsService', () => {
         lastErrorMessage: null,
       },
     });
+    expect(clearRuntimeHealth).toHaveBeenCalledWith(RuntimeHealthServiceKey.STASH);
   });
 
   it('resets all integrations and returns them sorted by type', async () => {
@@ -96,6 +113,7 @@ describe('IntegrationsService', () => {
     const result = await service.resetAll();
 
     expect(transaction).toHaveBeenCalledTimes(1);
+    expect(clearAllRuntimeHealth).toHaveBeenCalledTimes(1);
     expect(result.map((integration) => integration.type)).toEqual([
       IntegrationType.FANSDB,
       IntegrationType.STASH,
@@ -172,6 +190,7 @@ describe('IntegrationsService', () => {
         }),
       }),
     );
+    expect(clearRuntimeHealth).toHaveBeenCalledWith(RuntimeHealthServiceKey.CATALOG);
   });
 
   it('preserves the stored API key when saving without a new one and clears readiness on connection changes', async () => {
@@ -221,6 +240,32 @@ describe('IntegrationsService', () => {
         lastErrorMessage: null,
       }),
     });
+    expect(clearRuntimeHealth).toHaveBeenCalledWith(RuntimeHealthServiceKey.STASH);
+  });
+
+  it('preserves runtime health when saving without a material connection change', async () => {
+    findUnique.mockResolvedValue({
+      type: IntegrationType.STASH,
+      enabled: true,
+      name: 'Local Stash',
+      baseUrl: 'http://stash.local',
+      apiKey: 'existing-token',
+      status: IntegrationStatus.CONFIGURED,
+      lastHealthyAt: new Date('2026-04-01T00:00:00.000Z'),
+      lastErrorAt: null,
+      lastErrorMessage: null,
+    });
+    upsert.mockResolvedValue({
+      type: IntegrationType.STASH,
+      enabled: true,
+      status: IntegrationStatus.CONFIGURED,
+    });
+
+    await service.upsert(IntegrationType.STASH, {
+      name: 'Renamed Stash',
+    });
+
+    expect(clearRuntimeHealth).not.toHaveBeenCalled();
   });
 
   it('rejects configuring a different catalog provider until catalog setup is reset', async () => {
@@ -254,6 +299,7 @@ describe('IntegrationsService', () => {
     const result = await service.reset(IntegrationType.FANSDB);
 
     expect(transaction).toHaveBeenCalledTimes(1);
+    expect(clearRuntimeHealth).toHaveBeenCalledWith(RuntimeHealthServiceKey.CATALOG);
     expect(result).toEqual({ type: IntegrationType.FANSDB });
   });
 
@@ -305,6 +351,7 @@ describe('IntegrationsService', () => {
     expect(stashUpsertCall.update.lastHealthyAt).toBeInstanceOf(Date);
     expect(stashUpsertCall.update.lastErrorAt).toBeNull();
     expect(stashUpsertCall.update.lastErrorMessage).toBeNull();
+    expect(recordManualRecovery).toHaveBeenCalledWith(RuntimeHealthServiceKey.STASH);
   });
 
   it('persists the config that was tested when the test succeeds', async () => {
@@ -346,6 +393,40 @@ describe('IntegrationsService', () => {
         }),
       }),
     );
+    expect(recordManualRecovery).toHaveBeenCalledWith(RuntimeHealthServiceKey.STASH);
+  });
+
+  it('marks the catalog runtime service healthy after a successful catalog repair test', async () => {
+    findMany.mockResolvedValue([]);
+    findUnique.mockResolvedValue({
+      type: IntegrationType.STASHDB,
+      enabled: true,
+      baseUrl: 'http://stashdb.local/graphql',
+      apiKey: null,
+      status: IntegrationStatus.ERROR,
+      lastHealthyAt: null,
+      lastErrorAt: new Date('2026-03-31T00:00:00.000Z'),
+      lastErrorMessage: 'catalog down',
+    });
+    stashdbTestConnection.mockResolvedValue(undefined);
+    updateMany.mockResolvedValue({ count: 0 });
+    upsert.mockResolvedValue({
+      type: IntegrationType.STASHDB,
+      status: IntegrationStatus.CONFIGURED,
+      baseUrl: 'http://stashdb.local/graphql',
+    });
+    transaction.mockImplementation(async (operations: Promise<unknown>[]) =>
+      Promise.all(operations),
+    );
+
+    await expect(
+      service.testIntegration(IntegrationType.STASHDB, {}),
+    ).resolves.toMatchObject({
+      type: IntegrationType.STASHDB,
+      status: IntegrationStatus.CONFIGURED,
+    });
+
+    expect(recordManualRecovery).toHaveBeenCalledWith(RuntimeHealthServiceKey.CATALOG);
   });
 
   it('rejects testing a different catalog provider until catalog setup is reset', async () => {
@@ -414,5 +495,7 @@ describe('IntegrationsService', () => {
     expect(whisparrUpsertCall.update.lastHealthyAt).toBeNull();
     expect(whisparrUpsertCall.update.lastErrorAt).toBeInstanceOf(Date);
     expect(whisparrUpsertCall.update.lastErrorMessage).toBe('bad credentials');
+    expect(clearRuntimeHealth).toHaveBeenCalledWith(RuntimeHealthServiceKey.WHISPARR);
+    expect(recordManualRecovery).not.toHaveBeenCalled();
   });
 });
