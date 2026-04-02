@@ -1,7 +1,6 @@
 import {
   AfterViewInit,
   Component,
-  DestroyRef,
   ElementRef,
   OnDestroy,
   OnInit,
@@ -10,9 +9,8 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { catchError, finalize, merge, of, Subscription, switchMap, timer } from 'rxjs';
+import { finalize, Subscription } from 'rxjs';
 import { Message } from 'primeng/message';
 import { ProgressSpinner } from 'primeng/progressspinner';
 import { AcquisitionService } from '../../core/api/acquisition.service';
@@ -23,10 +21,7 @@ import {
   AcquisitionSceneItem,
 } from '../../core/api/acquisition.types';
 import { RuntimeHealthService } from '../../core/api/runtime-health.service';
-import {
-  RuntimeHealthResponse,
-  summarizeRuntimeDegradedState,
-} from '../../core/api/runtime-health.types';
+import { summarizeRuntimeDegradedState } from '../../core/api/runtime-health.types';
 import { SetupStatusStore } from '../../core/api/setup-status.store';
 import { summarizeDegradedSetupState } from '../../core/api/setup.types';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
@@ -64,7 +59,6 @@ interface AcquisitionPageAlert {
 })
 export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly PAGE_SIZE = 24;
-  private static readonly RUNTIME_HEALTH_POLL_INTERVAL_MS = 30_000;
   private static readonly EMPTY_COUNTS: AcquisitionCountsByLifecycle = {
     REQUESTED: 0,
     DOWNLOADING: 0,
@@ -79,7 +73,6 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
   ];
 
   private readonly acquisitionService = inject(AcquisitionService);
-  private readonly destroyRef = inject(DestroyRef);
   private readonly runtimeHealthService = inject(RuntimeHealthService);
   private readonly setupStatusStore = inject(SetupStatusStore);
   private readonly route = inject(ActivatedRoute);
@@ -119,7 +112,7 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
   protected readonly hasMore = signal(true);
   protected readonly inFlight = signal(false);
   protected readonly items = signal<AcquisitionSceneItem[]>([]);
-  protected readonly runtimeHealth = signal<RuntimeHealthResponse | null>(null);
+  protected readonly runtimeHealth = this.runtimeHealthService.status;
   protected readonly selectedLifecycle = signal<AcquisitionLifecycleFilter>('ANY');
   protected readonly countsByLifecycle = signal<AcquisitionCountsByLifecycle>(
     AcquisitionPageComponent.EMPTY_COUNTS,
@@ -177,11 +170,7 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
 
     if (selectedLifecycle !== 'ANY') {
       return [
-        this.buildSection(
-          selectedLifecycle,
-          items,
-          this.countForLifecycle(selectedLifecycle),
-        ),
+        this.buildSection(selectedLifecycle, items, this.countForLifecycle(selectedLifecycle)),
       ];
     }
 
@@ -220,8 +209,8 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
   });
 
   ngOnInit(): void {
+    this.runtimeHealthService.ensureStarted();
     this.setupUrlStateSync();
-    this.setupRuntimeHealthSync();
   }
 
   ngAfterViewInit(): void {
@@ -471,7 +460,9 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
     }
   }
 
-  private lifecycleTone(lifecycle: AcquisitionLifecycleState): Exclude<AcquisitionSectionTone, 'overview'> {
+  private lifecycleTone(
+    lifecycle: AcquisitionLifecycleState,
+  ): Exclude<AcquisitionSectionTone, 'overview'> {
     switch (lifecycle) {
       case 'FAILED':
         return 'attention';
@@ -486,11 +477,7 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
   }
 
   private humanizeStatus(value: string): string {
-    return value
-      .trim()
-      .replace(/[_-]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .toLowerCase();
+    return value.trim().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').toLowerCase();
   }
 
   private buildDegradedAlert(
@@ -528,28 +515,6 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
       message:
         'Downloaded scenes may take longer to appear as imported while Stash is unhealthy. Check Settings if import handoffs look stuck.',
     };
-  }
-
-  private setupRuntimeHealthSync(): void {
-    merge(
-      of(null),
-      this.runtimeHealthService.refreshRequested$,
-      timer(
-        AcquisitionPageComponent.RUNTIME_HEALTH_POLL_INTERVAL_MS,
-        AcquisitionPageComponent.RUNTIME_HEALTH_POLL_INTERVAL_MS,
-      ),
-    )
-      .pipe(
-        switchMap(() => this.loadRuntimeHealth()),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe((status) => {
-        this.runtimeHealth.set(status);
-      });
-  }
-
-  private loadRuntimeHealth() {
-    return this.runtimeHealthService.refreshStatus().pipe(catchError(() => of(null)));
   }
 
   private loadNextPage(): void {
@@ -638,7 +603,9 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
     });
   }
 
-  private readUrlState(queryParamMap: import('@angular/router').ParamMap): AcquisitionLifecycleFilter {
+  private readUrlState(
+    queryParamMap: import('@angular/router').ParamMap,
+  ): AcquisitionLifecycleFilter {
     const lifecycle = queryParamMap.get('lifecycle');
 
     return lifecycle === 'REQUESTED' ||

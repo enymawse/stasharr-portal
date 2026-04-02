@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { Subject, of } from 'rxjs';
+import { of } from 'rxjs';
 import { AcquisitionService } from '../../core/api/acquisition.service';
 import {
   AcquisitionLifecycleFilter,
@@ -118,8 +118,7 @@ function buildRuntimeHealth(
 ): RuntimeHealthResponse {
   return {
     degraded: overrides.degraded ?? HEALTHY_RUNTIME_HEALTH.degraded,
-    failureThreshold:
-      overrides.failureThreshold ?? HEALTHY_RUNTIME_HEALTH.failureThreshold,
+    failureThreshold: overrides.failureThreshold ?? HEALTHY_RUNTIME_HEALTH.failureThreshold,
     services: {
       catalog: overrides.services?.catalog ?? HEALTHY_RUNTIME_HEALTH.services.catalog,
       stash: overrides.services?.stash ?? HEALTHY_RUNTIME_HEALTH.services.stash,
@@ -201,24 +200,16 @@ describe('AcquisitionPageComponent', () => {
       ANY: allResponse,
       FAILED:
         options?.responses?.FAILED ??
-        buildResponse(
-          allResponse.items.filter((item) => item.status.state === 'FAILED'),
-        ),
+        buildResponse(allResponse.items.filter((item) => item.status.state === 'FAILED')),
       DOWNLOADING:
         options?.responses?.DOWNLOADING ??
-        buildResponse(
-          allResponse.items.filter((item) => item.status.state === 'DOWNLOADING'),
-        ),
+        buildResponse(allResponse.items.filter((item) => item.status.state === 'DOWNLOADING')),
       IMPORT_PENDING:
         options?.responses?.IMPORT_PENDING ??
-        buildResponse(
-          allResponse.items.filter((item) => item.status.state === 'IMPORT_PENDING'),
-        ),
+        buildResponse(allResponse.items.filter((item) => item.status.state === 'IMPORT_PENDING')),
       REQUESTED:
         options?.responses?.REQUESTED ??
-        buildResponse(
-          allResponse.items.filter((item) => item.status.state === 'REQUESTED'),
-        ),
+        buildResponse(allResponse.items.filter((item) => item.status.state === 'REQUESTED')),
     };
 
     const acquisitionService = {
@@ -226,12 +217,11 @@ describe('AcquisitionPageComponent', () => {
         of(responses[lifecycle as AcquisitionLifecycleFilter] ?? responses.ANY),
       ),
     };
-    const refreshRequests = new Subject<void>();
-    let runtimeHealth = options?.runtimeHealth ?? HEALTHY_RUNTIME_HEALTH;
+    const runtimeHealthState = signal(options?.runtimeHealth ?? HEALTHY_RUNTIME_HEALTH);
     const runtimeHealthService = {
-      refreshStatus: vi.fn(() => of(runtimeHealth)),
-      refreshRequested$: refreshRequests.asObservable(),
-      requestRefresh: vi.fn(() => refreshRequests.next()),
+      ensureStarted: vi.fn(),
+      requestRefresh: vi.fn(),
+      status: runtimeHealthState.asReadonly(),
     };
     const setupStatusStore = {
       status: signal(options?.setupStatus ?? buildSetupStatus()),
@@ -279,10 +269,7 @@ describe('AcquisitionPageComponent', () => {
       fixture,
       acquisitionService,
       runtimeHealthService,
-      refreshRequests,
-      setRuntimeHealth: (next: RuntimeHealthResponse) => {
-        runtimeHealth = next;
-      },
+      setRuntimeHealth: (next: RuntimeHealthResponse) => runtimeHealthState.set(next),
     };
   }
 
@@ -296,8 +283,8 @@ describe('AcquisitionPageComponent', () => {
       fixture.nativeElement.querySelectorAll('.lifecycle-section h3'),
     ).map((element) => element.textContent?.trim());
 
+    expect(runtimeHealthService.ensureStarted).toHaveBeenCalledTimes(1);
     expect(acquisitionService.getScenesFeed).toHaveBeenCalledWith(1, 24, 'ANY');
-    expect(runtimeHealthService.refreshStatus).toHaveBeenCalledTimes(1);
     expect(failedSummaryCard?.textContent).toContain('1');
     expect(lifecycleHeadings).toEqual(['Failed', 'Downloading', 'Requested']);
     expect(text).toContain('Whisparr reported: The download is stalled with no connections');
@@ -326,7 +313,9 @@ describe('AcquisitionPageComponent', () => {
     expect(acquisitionService.getScenesFeed).toHaveBeenLastCalledWith(1, 24, 'FAILED');
     expect(fixture.nativeElement.textContent).toContain('Failed Scene');
     expect(fixture.nativeElement.textContent).not.toContain('Downloading Scene');
-    expect(fixture.nativeElement.querySelector('[data-testid="lifecycle-section-FAILED"]')).toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="lifecycle-section-FAILED"]'),
+    ).toBeTruthy();
   });
 
   it('renders acquisition-specific degraded messaging and a strong empty state', async () => {
@@ -354,16 +343,14 @@ describe('AcquisitionPageComponent', () => {
     expect(emptyState?.textContent).toContain('Open Library');
   });
 
-  it('shows the acquisition degraded alert when runtime health refresh reports a new Whisparr outage', async () => {
-    const { fixture, runtimeHealthService, refreshRequests, setRuntimeHealth } =
-      await renderPage();
+  it('shows the acquisition degraded alert when shared runtime health reports a new Whisparr outage', async () => {
+    const { fixture, setRuntimeHealth } = await renderPage();
 
     expect(
       fixture.nativeElement.querySelector('[data-testid="acquisition-degraded-state"]'),
     ).toBeNull();
 
     setRuntimeHealth(buildWhisparrDegradedRuntimeHealth());
-    refreshRequests.next();
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -372,37 +359,33 @@ describe('AcquisitionPageComponent', () => {
       '[data-testid="acquisition-degraded-state"]',
     ) as HTMLElement | null;
 
-    expect(runtimeHealthService.refreshStatus).toHaveBeenCalledTimes(2);
     expect(degradedState?.textContent).toContain('Whisparr needs attention');
     expect(degradedState?.textContent).toContain(
       'Queue state, failures, and request progression may be stale',
     );
   });
 
-  it('clears the acquisition degraded alert when runtime health refresh reports recovery', async () => {
-    const { fixture, runtimeHealthService, refreshRequests, setRuntimeHealth } =
-      await renderPage({
-        runtimeHealth: buildWhisparrDegradedRuntimeHealth(),
-      });
+  it('clears the acquisition degraded alert when shared runtime health reports recovery', async () => {
+    const { fixture, setRuntimeHealth } = await renderPage({
+      runtimeHealth: buildWhisparrDegradedRuntimeHealth(),
+    });
 
     expect(
       fixture.nativeElement.querySelector('[data-testid="acquisition-degraded-state"]'),
     ).toBeTruthy();
 
     setRuntimeHealth(buildRuntimeHealth());
-    refreshRequests.next();
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(runtimeHealthService.refreshStatus).toHaveBeenCalledTimes(2);
     expect(
       fixture.nativeElement.querySelector('[data-testid="acquisition-degraded-state"]'),
     ).toBeNull();
   });
 
   it('keeps setup degradation ahead of refreshed runtime outage messaging', async () => {
-    const { fixture, refreshRequests, setRuntimeHealth } = await renderPage({
+    const { fixture, setRuntimeHealth } = await renderPage({
       setupStatus: buildSetupStatus({
         setupComplete: false,
         required: {
@@ -430,7 +413,6 @@ describe('AcquisitionPageComponent', () => {
         },
       }),
     );
-    refreshRequests.next();
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -442,37 +424,6 @@ describe('AcquisitionPageComponent', () => {
     expect(degradedState?.textContent).toContain('Repair Required');
     expect(degradedState?.textContent).toContain('Whisparr needs attention');
     expect(degradedState?.textContent).not.toContain('Stash import visibility is degraded');
-  });
-
-  it('polls runtime health while mounted and stops refreshing after destroy', async () => {
-    vi.useFakeTimers();
-
-    try {
-      const { fixture, runtimeHealthService, refreshRequests, setRuntimeHealth } =
-        await renderPage();
-
-      expect(runtimeHealthService.refreshStatus).toHaveBeenCalledTimes(1);
-
-      setRuntimeHealth(buildWhisparrDegradedRuntimeHealth());
-      await vi.advanceTimersByTimeAsync(30_000);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      expect(runtimeHealthService.refreshStatus).toHaveBeenCalledTimes(2);
-      expect(
-        fixture.nativeElement.querySelector('[data-testid="acquisition-degraded-state"]'),
-      ).toBeTruthy();
-
-      fixture.destroy();
-      setRuntimeHealth(buildRuntimeHealth());
-      refreshRequests.next();
-      await vi.advanceTimersByTimeAsync(30_000);
-
-      expect(runtimeHealthService.refreshStatus).toHaveBeenCalledTimes(2);
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it('renders a filter-specific empty state when a focused lifecycle has no items', async () => {

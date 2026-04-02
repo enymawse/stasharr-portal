@@ -1,6 +1,7 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { Subject, of } from 'rxjs';
+import { of } from 'rxjs';
 import { RuntimeHealthService } from '../../core/api/runtime-health.service';
 import { RuntimeHealthResponse } from '../../core/api/runtime-health.types';
 import { SetupService } from '../../core/api/setup.service';
@@ -8,9 +9,7 @@ import { SetupStatusResponse } from '../../core/api/setup.types';
 import { AppShellLayoutComponent } from './app-shell-layout.component';
 
 describe('AppShellLayoutComponent', () => {
-  function buildSetupStatus(
-    overrides: Partial<SetupStatusResponse> = {},
-  ): SetupStatusResponse {
+  function buildSetupStatus(overrides: Partial<SetupStatusResponse> = {}): SetupStatusResponse {
     const required = {
       stash: true,
       catalog: true,
@@ -71,13 +70,14 @@ describe('AppShellLayoutComponent', () => {
     setupStatus = buildSetupStatus(),
     runtimeHealth = buildRuntimeHealth(),
   ) {
-    const refreshRequests = new Subject<void>();
+    const runtimeHealthState = signal(runtimeHealth);
     const setupService = {
       getStatus: vi.fn().mockReturnValue(of(setupStatus)),
     };
     const runtimeHealthService = {
-      refreshStatus: vi.fn().mockReturnValue(of(runtimeHealth)),
-      refreshRequested$: refreshRequests.asObservable(),
+      ensureStarted: vi.fn(),
+      requestRefresh: vi.fn(),
+      status: runtimeHealthState.asReadonly(),
     };
 
     await TestBed.configureTestingModule({
@@ -100,7 +100,11 @@ describe('AppShellLayoutComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    return { fixture, setupService, runtimeHealthService, refreshRequests };
+    return {
+      fixture,
+      runtimeHealthService,
+      setRuntimeHealth: (next: RuntimeHealthResponse) => runtimeHealthState.set(next),
+    };
   }
 
   afterEach(() => {
@@ -108,7 +112,7 @@ describe('AppShellLayoutComponent', () => {
   });
 
   it('renders the consolidated primary navigation labels without a degraded warning when all required services are ready', async () => {
-    const { fixture } = await renderComponent();
+    const { fixture, runtimeHealthService } = await renderComponent();
     const navLinks = Array.from(
       fixture.nativeElement.querySelectorAll('a.nav-item') as NodeListOf<HTMLAnchorElement>,
     );
@@ -116,6 +120,7 @@ describe('AppShellLayoutComponent', () => {
       .map((link) => link.textContent?.replace(/\s+/g, ' ').trim())
       .filter((label): label is string => Boolean(label));
 
+    expect(runtimeHealthService.ensureStarted).toHaveBeenCalledTimes(1);
     expect(navLabels).toEqual([
       'Home',
       'Scenes',
@@ -125,11 +130,13 @@ describe('AppShellLayoutComponent', () => {
       'Studios',
       'Settings',
     ]);
-    expect(navLinks.find((link) => link.textContent?.includes('Scenes'))?.getAttribute('href')).toContain(
-      '/scenes',
-    );
+    expect(
+      navLinks.find((link) => link.textContent?.includes('Scenes'))?.getAttribute('href'),
+    ).toContain('/scenes');
     expect(fixture.nativeElement.querySelector('[data-testid="degraded-banner"]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-indicator"]')).toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="settings-nav-indicator"]'),
+    ).toBeNull();
   });
 
   it('renders a runtime Whisparr outage warning with a Settings repair action', async () => {
@@ -153,7 +160,9 @@ describe('AppShellLayoutComponent', () => {
       }),
     );
 
-    const banner = fixture.nativeElement.querySelector('[data-testid="degraded-banner"]') as HTMLElement | null;
+    const banner = fixture.nativeElement.querySelector(
+      '[data-testid="degraded-banner"]',
+    ) as HTMLElement | null;
     const repairLink = fixture.nativeElement.querySelector(
       '[data-testid="repair-integrations-link"]',
     ) as HTMLAnchorElement | null;
@@ -190,144 +199,47 @@ describe('AppShellLayoutComponent', () => {
       }),
     );
 
-    const banner = fixture.nativeElement.querySelector('[data-testid="degraded-banner"]') as HTMLElement | null;
+    const banner = fixture.nativeElement.querySelector(
+      '[data-testid="degraded-banner"]',
+    ) as HTMLElement | null;
 
     expect(banner).toBeTruthy();
     expect(banner?.textContent).toContain('Stash is currently unavailable.');
     expect(banner?.textContent).toContain('Library and availability data may be degraded.');
   });
 
-  it('clears a runtime outage warning after the next healthy poll', async () => {
-    vi.useFakeTimers();
-
-    try {
-      const refreshRequests = new Subject<void>();
-      const setupService = {
-        getStatus: vi.fn().mockReturnValue(of(buildSetupStatus())),
-      };
-      const runtimeHealthService = {
-        refreshStatus: vi
-          .fn()
-          .mockReturnValueOnce(
-            of(
-              buildRuntimeHealth({
-                degraded: true,
-                services: {
-                  ...buildRuntimeHealth().services,
-                  whisparr: {
-                    service: 'WHISPARR',
-                    status: 'DEGRADED',
-                    degraded: true,
-                    consecutiveFailures: 2,
-                    lastHealthyAt: '2026-04-02T00:00:00.000Z',
-                    lastFailureAt: '2026-04-02T00:01:00.000Z',
-                    lastErrorMessage: 'Failed to reach Whisparr provider endpoint.',
-                    degradedAt: '2026-04-02T00:01:00.000Z',
-                  },
-                },
-              }),
-            ),
-          )
-          .mockReturnValueOnce(of(buildRuntimeHealth())),
-        refreshRequested$: refreshRequests.asObservable(),
-      };
-
-      await TestBed.configureTestingModule({
-        imports: [AppShellLayoutComponent],
-        providers: [
-          provideRouter([]),
-          {
-            provide: SetupService,
-            useValue: setupService,
+  it('clears a runtime outage warning when shared runtime health recovers', async () => {
+    const { fixture, setRuntimeHealth } = await renderComponent(
+      buildSetupStatus(),
+      buildRuntimeHealth({
+        degraded: true,
+        services: {
+          ...buildRuntimeHealth().services,
+          whisparr: {
+            service: 'WHISPARR',
+            status: 'DEGRADED',
+            degraded: true,
+            consecutiveFailures: 2,
+            lastHealthyAt: '2026-04-02T00:00:00.000Z',
+            lastFailureAt: '2026-04-02T00:01:00.000Z',
+            lastErrorMessage: 'Failed to reach Whisparr provider endpoint.',
+            degradedAt: '2026-04-02T00:01:00.000Z',
           },
-          {
-            provide: RuntimeHealthService,
-            useValue: runtimeHealthService,
-          },
-        ],
-      }).compileComponents();
-
-      const fixture = TestBed.createComponent(AppShellLayoutComponent);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      expect(fixture.nativeElement.querySelector('[data-testid="degraded-banner"]')).toBeTruthy();
-      expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-indicator"]')).toBeTruthy();
-
-      await vi.advanceTimersByTimeAsync(30_000);
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      expect(fixture.nativeElement.querySelector('[data-testid="degraded-banner"]')).toBeNull();
-      expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-indicator"]')).toBeNull();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('clears a runtime outage warning as soon as runtime health is refreshed', async () => {
-    const refreshRequests = new Subject<void>();
-      const setupService = {
-        getStatus: vi.fn().mockReturnValue(of(buildSetupStatus())),
-      };
-      const runtimeHealthService = {
-        refreshStatus: vi
-          .fn()
-          .mockReturnValueOnce(
-            of(
-            buildRuntimeHealth({
-              degraded: true,
-              services: {
-                ...buildRuntimeHealth().services,
-                whisparr: {
-                  service: 'WHISPARR',
-                  status: 'DEGRADED',
-                  degraded: true,
-                  consecutiveFailures: 2,
-                  lastHealthyAt: '2026-04-02T00:00:00.000Z',
-                  lastFailureAt: '2026-04-02T00:01:00.000Z',
-                  lastErrorMessage: 'Failed to reach Whisparr provider endpoint.',
-                  degradedAt: '2026-04-02T00:01:00.000Z',
-                },
-              },
-            }),
-          ),
-        )
-        .mockReturnValueOnce(of(buildRuntimeHealth())),
-      refreshRequested$: refreshRequests.asObservable(),
-    };
-
-    await TestBed.configureTestingModule({
-      imports: [AppShellLayoutComponent],
-      providers: [
-        provideRouter([]),
-        {
-          provide: SetupService,
-          useValue: setupService,
         },
-        {
-          provide: RuntimeHealthService,
-          useValue: runtimeHealthService,
-        },
-      ],
-    }).compileComponents();
-
-    const fixture = TestBed.createComponent(AppShellLayoutComponent);
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
+      }),
+    );
 
     expect(fixture.nativeElement.querySelector('[data-testid="degraded-banner"]')).toBeTruthy();
 
-    refreshRequests.next();
+    setRuntimeHealth(buildRuntimeHealth());
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('[data-testid="degraded-banner"]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-indicator"]')).toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="settings-nav-indicator"]'),
+    ).toBeNull();
   });
 
   it('keeps setup degradation messaging ahead of runtime outage messaging', async () => {
@@ -358,7 +270,9 @@ describe('AppShellLayoutComponent', () => {
       }),
     );
 
-    const banner = fixture.nativeElement.querySelector('[data-testid="degraded-banner"]') as HTMLElement | null;
+    const banner = fixture.nativeElement.querySelector(
+      '[data-testid="degraded-banner"]',
+    ) as HTMLElement | null;
 
     expect(banner).toBeTruthy();
     expect(banner?.textContent).toContain('Repair needed');
