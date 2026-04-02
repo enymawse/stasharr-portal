@@ -25,6 +25,7 @@ interface ShellDegradedState {
   styleUrl: './app-shell-layout.component.scss',
 })
 export class AppShellLayoutComponent implements OnInit {
+  private static readonly RUNTIME_HEALTH_POLL_INTERVAL_MS = 30_000;
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly setupService = inject(SetupService);
@@ -65,13 +66,18 @@ export class AppShellLayoutComponent implements OnInit {
       this.router.events.pipe(
         filter((event): event is NavigationEnd => event instanceof NavigationEnd),
       ),
-      timer(60_000, 60_000),
+      timer(
+        AppShellLayoutComponent.RUNTIME_HEALTH_POLL_INTERVAL_MS,
+        AppShellLayoutComponent.RUNTIME_HEALTH_POLL_INTERVAL_MS,
+      ),
     )
       .pipe(
         switchMap(() =>
           forkJoin({
             setupStatus: this.setupService.getStatus().pipe(catchError(() => of(null))),
-            runtimeHealth: this.runtimeHealthService.getStatus().pipe(catchError(() => of(null))),
+            runtimeHealth: this.runtimeHealthService
+              .refreshStatus()
+              .pipe(catchError(() => of(null))),
           }),
         ),
         takeUntilDestroyed(this.destroyRef),

@@ -1,6 +1,7 @@
 import {
   AfterViewInit,
   Component,
+  DestroyRef,
   ElementRef,
   OnDestroy,
   OnInit,
@@ -9,8 +10,9 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { catchError, finalize, of, Subscription } from 'rxjs';
+import { catchError, finalize, merge, of, Subscription, switchMap, timer } from 'rxjs';
 import { Message } from 'primeng/message';
 import { ProgressSpinner } from 'primeng/progressspinner';
 import { AcquisitionService } from '../../core/api/acquisition.service';
@@ -62,6 +64,7 @@ interface AcquisitionPageAlert {
 })
 export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly PAGE_SIZE = 24;
+  private static readonly RUNTIME_HEALTH_POLL_INTERVAL_MS = 30_000;
   private static readonly EMPTY_COUNTS: AcquisitionCountsByLifecycle = {
     REQUESTED: 0,
     DOWNLOADING: 0,
@@ -76,6 +79,7 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
   ];
 
   private readonly acquisitionService = inject(AcquisitionService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly runtimeHealthService = inject(RuntimeHealthService);
   private readonly setupStatusStore = inject(SetupStatusStore);
   private readonly route = inject(ActivatedRoute);
@@ -217,7 +221,7 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
 
   ngOnInit(): void {
     this.setupUrlStateSync();
-    this.loadRuntimeHealth();
+    this.setupRuntimeHealthSync();
   }
 
   ngAfterViewInit(): void {
@@ -241,7 +245,7 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
       return;
     }
 
-    this.loadRuntimeHealth();
+    this.runtimeHealthService.requestRefresh();
     this.error.set(null);
     this.loadNextPage();
   }
@@ -526,13 +530,26 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
     };
   }
 
-  private loadRuntimeHealth(): void {
-    this.runtimeHealthService
-      .getStatus()
-      .pipe(catchError(() => of(null)))
+  private setupRuntimeHealthSync(): void {
+    merge(
+      of(null),
+      this.runtimeHealthService.refreshRequested$,
+      timer(
+        AcquisitionPageComponent.RUNTIME_HEALTH_POLL_INTERVAL_MS,
+        AcquisitionPageComponent.RUNTIME_HEALTH_POLL_INTERVAL_MS,
+      ),
+    )
+      .pipe(
+        switchMap(() => this.loadRuntimeHealth()),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe((status) => {
         this.runtimeHealth.set(status);
       });
+  }
+
+  private loadRuntimeHealth() {
+    return this.runtimeHealthService.refreshStatus().pipe(catchError(() => of(null)));
   }
 
   private loadNextPage(): void {

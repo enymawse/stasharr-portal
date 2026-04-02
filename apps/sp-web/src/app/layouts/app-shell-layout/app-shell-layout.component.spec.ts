@@ -76,7 +76,7 @@ describe('AppShellLayoutComponent', () => {
       getStatus: vi.fn().mockReturnValue(of(setupStatus)),
     };
     const runtimeHealthService = {
-      getStatus: vi.fn().mockReturnValue(of(runtimeHealth)),
+      refreshStatus: vi.fn().mockReturnValue(of(runtimeHealth)),
       refreshRequested$: refreshRequests.asObservable(),
     };
 
@@ -206,7 +206,7 @@ describe('AppShellLayoutComponent', () => {
         getStatus: vi.fn().mockReturnValue(of(buildSetupStatus())),
       };
       const runtimeHealthService = {
-        getStatus: vi
+        refreshStatus: vi
           .fn()
           .mockReturnValueOnce(
             of(
@@ -255,7 +255,7 @@ describe('AppShellLayoutComponent', () => {
       expect(fixture.nativeElement.querySelector('[data-testid="degraded-banner"]')).toBeTruthy();
       expect(fixture.nativeElement.querySelector('[data-testid="settings-nav-indicator"]')).toBeTruthy();
 
-      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(30_000);
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
@@ -269,14 +269,14 @@ describe('AppShellLayoutComponent', () => {
 
   it('clears a runtime outage warning as soon as runtime health is refreshed', async () => {
     const refreshRequests = new Subject<void>();
-    const setupService = {
-      getStatus: vi.fn().mockReturnValue(of(buildSetupStatus())),
-    };
-    const runtimeHealthService = {
-      getStatus: vi
-        .fn()
-        .mockReturnValueOnce(
-          of(
+      const setupService = {
+        getStatus: vi.fn().mockReturnValue(of(buildSetupStatus())),
+      };
+      const runtimeHealthService = {
+        refreshStatus: vi
+          .fn()
+          .mockReturnValueOnce(
+            of(
             buildRuntimeHealth({
               degraded: true,
               services: {

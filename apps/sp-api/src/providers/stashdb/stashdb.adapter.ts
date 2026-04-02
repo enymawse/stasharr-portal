@@ -556,13 +556,24 @@ export class StashdbAdapter {
   constructor(private readonly runtimeHealthService: RuntimeHealthService) {}
 
   async testConnection(config: StashdbAdapterBaseConfig): Promise<void> {
+    await this.checkConnection(config, false);
+  }
+
+  async probeConnection(config: StashdbAdapterBaseConfig): Promise<void> {
+    await this.checkConnection(config, true);
+  }
+
+  private async checkConnection(
+    config: StashdbAdapterBaseConfig,
+    trackRuntimeHealth: boolean,
+  ): Promise<void> {
     const query = `
       query ConnectivityCheck {
         __typename
       }
     `;
 
-    await this.executeQuery(config, query, undefined, false);
+    await this.executeQuery(config, query, undefined, trackRuntimeHealth);
   }
 
   async getScenesSortedByDate(

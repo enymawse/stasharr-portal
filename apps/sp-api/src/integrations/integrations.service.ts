@@ -25,12 +25,14 @@ import {
   CATALOG_PROVIDER_KEYS,
   type CatalogProviderIntegrationType,
   buildCatalogProviderSelectionConfig,
+  configuredCatalogProviderTypeFromIntegrations,
   getCatalogProviderLabel,
   instanceCatalogProviderTypeFromIntegrations,
   isCatalogProviderIntegrationType,
 } from '../providers/catalog/catalog-provider.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { RuntimeHealthService } from '../runtime-health/runtime-health.service';
+import { RuntimeHealthResponse } from '../runtime-health/runtime-health.types';
 import { runtimeHealthServiceForIntegration } from './integration-runtime-health.util';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
 
@@ -290,6 +292,26 @@ export class IntegrationsService {
     return resetRecords.sort((a, b) => a.type.localeCompare(b.type));
   }
 
+  async refreshRuntimeHealth(): Promise<RuntimeHealthResponse> {
+    const integrations = await this.findAll();
+    const activeCatalogProviderType =
+      configuredCatalogProviderTypeFromIntegrations(integrations);
+    const probes = integrations
+      .filter((integration) =>
+        this.shouldProbeRuntimeHealth(integration, activeCatalogProviderType),
+      )
+      .map((integration) =>
+        this.probeRuntimeHealthForIntegration(
+          integration.type,
+          this.resolveTestConfig(integration),
+        ),
+      );
+
+    await Promise.allSettled(probes);
+
+    return this.runtimeHealthService.getSummary();
+  }
+
   private resetPayload() {
     return {
       enabled: true,
@@ -482,6 +504,53 @@ export class IntegrationsService {
     await this.runtimeHealthService.clearService(
       runtimeHealthServiceForIntegration(type),
     );
+  }
+
+  private shouldProbeRuntimeHealth(
+    integration: IntegrationConfig,
+    activeCatalogProviderType: CatalogProviderIntegrationType | null,
+  ): boolean {
+    if (
+      !integration.enabled ||
+      integration.status !== IntegrationStatus.CONFIGURED ||
+      !integration.baseUrl?.trim()
+    ) {
+      return false;
+    }
+
+    if (
+      isCatalogProviderIntegrationType(integration.type) &&
+      integration.type !== activeCatalogProviderType
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private async probeRuntimeHealthForIntegration(
+    type: IntegrationType,
+    config:
+      | StashAdapterBaseConfig
+      | StashdbAdapterBaseConfig
+      | WhisparrAdapterBaseConfig,
+  ): Promise<void> {
+    switch (type) {
+      case IntegrationType.STASH:
+        await this.stashAdapter.probeConnection(config as StashAdapterBaseConfig);
+        return;
+      case IntegrationType.STASHDB:
+      case IntegrationType.FANSDB:
+        await this.stashdbAdapter.probeConnection(
+          config as StashdbAdapterBaseConfig,
+        );
+        return;
+      case IntegrationType.WHISPARR:
+        await this.whisparrAdapter.probeConnection(
+          config as WhisparrAdapterBaseConfig,
+        );
+        return;
+    }
   }
 
   private mergeNormalizedInput(

@@ -19,11 +19,15 @@ describe('IntegrationsService', () => {
   const findUnique = jest.fn();
   const transaction = jest.fn();
   const stashTestConnection = jest.fn();
+  const stashProbeConnection = jest.fn();
   const stashdbTestConnection = jest.fn();
+  const stashdbProbeConnection = jest.fn();
   const whisparrTestConnection = jest.fn();
+  const whisparrProbeConnection = jest.fn();
   const clearRuntimeHealth = jest.fn();
   const clearAllRuntimeHealth = jest.fn();
   const recordManualRecovery = jest.fn();
+  const getRuntimeHealthSummary = jest.fn();
 
   const prisma = {
     integrationConfig: {
@@ -37,20 +41,24 @@ describe('IntegrationsService', () => {
 
   const stashAdapter = {
     testConnection: stashTestConnection,
+    probeConnection: stashProbeConnection,
   } as unknown as StashAdapter;
 
   const stashdbAdapter = {
     testConnection: stashdbTestConnection,
+    probeConnection: stashdbProbeConnection,
   } as unknown as StashdbAdapter;
 
   const whisparrAdapter = {
     testConnection: whisparrTestConnection,
+    probeConnection: whisparrProbeConnection,
   } as unknown as WhisparrAdapter;
 
   const runtimeHealthService = {
     clearService: clearRuntimeHealth,
     clearAllServices: clearAllRuntimeHealth,
     recordManualRecovery,
+    getSummary: getRuntimeHealthSummary,
   } as unknown as RuntimeHealthService;
 
   let service: IntegrationsService;
@@ -497,5 +505,107 @@ describe('IntegrationsService', () => {
     expect(whisparrUpsertCall.update.lastErrorMessage).toBe('bad credentials');
     expect(clearRuntimeHealth).toHaveBeenCalledWith(RuntimeHealthServiceKey.WHISPARR);
     expect(recordManualRecovery).not.toHaveBeenCalled();
+  });
+
+  it('actively probes configured runtime integrations and returns the refreshed summary', async () => {
+    findMany.mockResolvedValue([
+      {
+        type: IntegrationType.STASH,
+        enabled: true,
+        status: IntegrationStatus.CONFIGURED,
+        baseUrl: 'http://stash.local',
+        apiKey: 'stash-token',
+        lastHealthyAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+      {
+        type: IntegrationType.STASHDB,
+        enabled: true,
+        status: IntegrationStatus.CONFIGURED,
+        baseUrl: 'http://stashdb.local/graphql',
+        apiKey: null,
+        lastHealthyAt: new Date('2026-04-01T00:00:00.000Z'),
+        config: buildCatalogProviderSelectionConfig(),
+      },
+      {
+        type: IntegrationType.FANSDB,
+        enabled: true,
+        status: IntegrationStatus.CONFIGURED,
+        baseUrl: 'http://fansdb.local/graphql',
+        apiKey: null,
+        lastHealthyAt: new Date('2026-04-01T00:00:00.000Z'),
+        config: null,
+      },
+      {
+        type: IntegrationType.WHISPARR,
+        enabled: true,
+        status: IntegrationStatus.CONFIGURED,
+        baseUrl: 'http://whisparr.local',
+        apiKey: 'whisparr-token',
+        lastHealthyAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+    ]);
+    stashProbeConnection.mockResolvedValue(undefined);
+    stashdbProbeConnection.mockResolvedValue(undefined);
+    whisparrProbeConnection.mockRejectedValue(new Error('Whisparr offline'));
+    getRuntimeHealthSummary.mockResolvedValue({
+      degraded: true,
+      failureThreshold: 2,
+      services: {
+        catalog: {
+          service: RuntimeHealthServiceKey.CATALOG,
+          status: 'HEALTHY',
+          degraded: false,
+          consecutiveFailures: 0,
+          lastHealthyAt: null,
+          lastFailureAt: null,
+          lastErrorMessage: null,
+          degradedAt: null,
+        },
+        stash: {
+          service: RuntimeHealthServiceKey.STASH,
+          status: 'HEALTHY',
+          degraded: false,
+          consecutiveFailures: 0,
+          lastHealthyAt: null,
+          lastFailureAt: null,
+          lastErrorMessage: null,
+          degradedAt: null,
+        },
+        whisparr: {
+          service: RuntimeHealthServiceKey.WHISPARR,
+          status: 'DEGRADED',
+          degraded: true,
+          consecutiveFailures: 2,
+          lastHealthyAt: null,
+          lastFailureAt: '2026-04-02T00:00:00.000Z',
+          lastErrorMessage: 'Whisparr offline',
+          degradedAt: '2026-04-02T00:00:00.000Z',
+        },
+      },
+    });
+
+    await expect(service.refreshRuntimeHealth()).resolves.toMatchObject({
+      degraded: true,
+      services: {
+        whisparr: {
+          degraded: true,
+          lastErrorMessage: 'Whisparr offline',
+        },
+      },
+    });
+
+    expect(stashProbeConnection).toHaveBeenCalledWith({
+      baseUrl: 'http://stash.local',
+      apiKey: 'stash-token',
+    });
+    expect(stashdbProbeConnection).toHaveBeenCalledWith({
+      baseUrl: 'http://stashdb.local/graphql',
+      apiKey: null,
+    });
+    expect(whisparrProbeConnection).toHaveBeenCalledWith({
+      baseUrl: 'http://whisparr.local',
+      apiKey: 'whisparr-token',
+    });
+    expect(getRuntimeHealthSummary).toHaveBeenCalledTimes(1);
   });
 });

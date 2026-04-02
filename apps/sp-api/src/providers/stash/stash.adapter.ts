@@ -248,13 +248,24 @@ export class StashAdapter {
   constructor(private readonly runtimeHealthService: RuntimeHealthService) {}
 
   async testConnection(config: StashAdapterBaseConfig): Promise<void> {
+    await this.checkConnection(config, false);
+  }
+
+  async probeConnection(config: StashAdapterBaseConfig): Promise<void> {
+    await this.checkConnection(config, true);
+  }
+
+  private async checkConnection(
+    config: StashAdapterBaseConfig,
+    trackRuntimeHealth: boolean,
+  ): Promise<void> {
     const query = `
       query ConnectivityCheck {
         __typename
       }
     `;
 
-    await this.executeQuery(config, query, undefined, false);
+    await this.executeQuery(config, query, undefined, trackRuntimeHealth);
   }
 
   async findScenesByStashId(

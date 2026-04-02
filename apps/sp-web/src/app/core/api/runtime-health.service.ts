@@ -16,6 +16,10 @@ export class RuntimeHealthService {
     return this.http.get<RuntimeHealthResponse>('/api/health/runtime');
   }
 
+  refreshStatus(): Observable<RuntimeHealthResponse> {
+    return this.http.post<RuntimeHealthResponse>('/api/health/runtime/refresh', {});
+  }
+
   requestRefresh(): void {
     this.refreshRequests.next();
   }

@@ -63,13 +63,24 @@ export class WhisparrAdapter {
   constructor(private readonly runtimeHealthService: RuntimeHealthService) {}
 
   async testConnection(config: WhisparrAdapterBaseConfig): Promise<void> {
+    await this.checkConnection(config, false);
+  }
+
+  async probeConnection(config: WhisparrAdapterBaseConfig): Promise<void> {
+    await this.checkConnection(config, true);
+  }
+
+  private async checkConnection(
+    config: WhisparrAdapterBaseConfig,
+    trackRuntimeHealth: boolean,
+  ): Promise<void> {
     await this.trackRuntimeHealth(
       () =>
         this.fetchJsonPayload(
           this.resolveSystemStatusEndpoint(config.baseUrl),
           config,
         ),
-      false,
+      trackRuntimeHealth,
     );
   }
 
