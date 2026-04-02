@@ -684,95 +684,18 @@
                 <div class="rail-viewport" #railViewport [attr.data-rail-id]="rail.id">
                   <div class="rail-track">
                     @for (item of rail.items; track item.id) {
-                      <article class="rail-card">
-                        <div class="media">
-                          @if (isInternalSceneRoute(item)) {
-                            <a
-                              class="media-link-stretch"
-                              [routerLink]="['/scene', item.id]"
-                              [queryParams]="{ returnTo: currentRouteUrl() }"
-                              [attr.aria-label]="item.title"
-                            ></a>
-                          } @else {
-                            <a
-                              class="media-link-stretch"
-                              [href]="item.viewUrl"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              [attr.aria-label]="item.title"
-                            ></a>
-                          }
-
-                          @if (railImageUrl(item); as imageUrl) {
-                            <img
-                              class="thumbnail"
-                              [src]="imageUrl"
-                              [alt]="item.title"
-                              loading="lazy"
-                            />
-                          } @else {
-                            <div class="thumbnail placeholder" aria-hidden="true"></div>
-                          }
-
-                          <div class="media-top">
-                            @if (item.studioImageUrl) {
-                              <div
-                                class="studio-badge logo-plaque"
-                                [title]="item.studio ?? 'Studio'"
-                              >
-                                <img
-                                  [src]="item.studioImageUrl"
-                                  [alt]="item.studio ?? 'Studio logo'"
-                                  loading="lazy"
-                                />
-                              </div>
-                            } @else if (item.studio) {
-                              <div class="studio-badge text-badge" [title]="item.studio">
-                                {{ item.studio }}
-                              </div>
-                            }
-
-                            @if (item.status.state !== 'NOT_REQUESTED') {
-                              <app-scene-status-badge
-                                class="status-icon"
-                                [status]="item.status"
-                                mode="icon"
-                              />
-                            }
-                          </div>
-
-                          <div class="media-bottom">
-                            <h3 class="media-title">{{ item.title }}</h3>
-                            <div class="media-meta-row">
-                              <p class="media-date">
-                                @if (item.releaseDate) {
-                                  <time [attr.datetime]="item.releaseDate">{{
-                                    item.releaseDate
-                                  }}</time>
-                                } @else {
-                                  <span class="media-date-placeholder">No date</span>
-                                }
-                              </p>
-                              <div class="media-action">
-                                @if (isRequestable(item)) {
-                                  <button
-                                    type="button"
-                                    class="request-cta"
-                                    (click)="openRequestModal(item)"
-                                  >
-                                    Request
-                                  </button>
-                                } @else {
-                                  <app-scene-status-badge
-                                    class="footer-status-badge"
-                                    [status]="item.status"
-                                  />
-                                }
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </article>
+                      <app-scene-card
+                        class="rail-card"
+                        [item]="item"
+                        [requestable]="isRequestable(item)"
+                        variant="rail"
+                        [primaryLinkMode]="isInternalSceneRoute(item) ? 'scene' : 'external'"
+                        [sceneQueryParams]="
+                          isInternalSceneRoute(item) ? { returnTo: currentRouteUrl() } : null
+                        "
+                        [externalHref]="isInternalSceneRoute(item) ? null : item.viewUrl"
+                        (request)="openRequestModal($event)"
+                      />
                     }
                   </div>
                 </div>

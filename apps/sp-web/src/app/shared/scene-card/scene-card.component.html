@@ -1,0 +1,70 @@
+<app-scene-card-shell
+  [item]="item"
+  [variant]="shellVariant()"
+  [primaryLink]="primaryLink()"
+  [studioBadgeLink]="studioBadgeLink()"
+>
+  @if (statusIcon(); as statusIcon) {
+    <app-scene-status-badge
+      sceneCardTopRight
+      class="status-icon"
+      [status]="statusIcon"
+      mode="icon"
+    ></app-scene-status-badge>
+  }
+
+  @for (badge of topBadges; track badge.label) {
+    <span sceneCardTopRight class="top-badge">{{ badge.label }}</span>
+  }
+
+  <div sceneCardMediaFooter class="media-footer">
+    @if (variant === 'rail') {
+      <h3 class="media-title">{{ item.title }}</h3>
+    } @else {
+      <h2 class="media-title">{{ item.title }}</h2>
+    }
+
+    <div class="media-meta-row">
+      <p class="media-date">
+        @if (item.releaseDate) {
+          <time [attr.datetime]="item.releaseDate">{{ item.releaseDate }}</time>
+        } @else {
+          <span class="media-date-placeholder">No date</span>
+        }
+      </p>
+
+      <div class="media-action">
+        @if (requestable) {
+          <button type="button" class="request-cta" (click)="requestScene($event)">Request</button>
+        } @else if (footerLinkText(); as label) {
+          @if (footerLinkIsExternal()) {
+            <a
+              class="footer-link"
+              [attr.href]="footerExternalHref()"
+              target="_blank"
+              rel="noopener noreferrer"
+              (click)="$event.stopPropagation()"
+            >
+              {{ label }}
+            </a>
+          } @else if (footerLinkRouterCommands(); as commands) {
+            <a
+              class="footer-link"
+              [routerLink]="commands"
+              [queryParams]="footerLinkQueryParams()"
+              (click)="$event.stopPropagation()"
+            >
+              {{ label }}
+            </a>
+          }
+        } @else if (footerBadgeText(); as footerBadgeText) {
+          <span class="footer-pill">{{ footerBadgeText }}</span>
+        } @else {
+          @if (footerStatus(); as footerStatus) {
+            <app-scene-status-badge class="footer-status-badge" [status]="footerStatus" />
+          }
+        }
+      </div>
+    </div>
+  </div>
+</app-scene-card-shell>

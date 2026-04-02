@@ -130,6 +130,27 @@ describe('ScenesPageComponent', () => {
     expect(pageText).not.toContain('Favorite Tags');
   });
 
+  it('renders discovery results through the shared scene card and forwards request actions', async () => {
+    const { fixture } = await renderPage();
+    const component = fixture.componentInstance as any;
+    const cards = fixture.nativeElement.querySelectorAll('app-scene-card');
+    const requestButton = fixture.nativeElement.querySelector('.request-cta') as
+      | HTMLButtonElement
+      | null;
+
+    expect(cards).toHaveLength(1);
+    expect(component.requestModalOpen()).toBe(false);
+
+    requestButton?.click();
+
+    expect(component.requestModalOpen()).toBe(true);
+    expect(component.requestContext()).toEqual({
+      id: 'scene-1',
+      title: 'Scene Title',
+      imageUrl: 'http://cdn.local/image.jpg',
+    });
+  });
+
   it('clears active filters back to the default trending discovery state', async () => {
     const { fixture, discoverService, navigateSpy } = await renderPage({
       sort: 'DATE',

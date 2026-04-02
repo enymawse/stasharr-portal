@@ -266,4 +266,27 @@ describe('HomePageComponent', () => {
 
     expect(hybridLink).toBeNull();
   });
+
+  it('renders Home rails through the shared scene card and preserves request routing', async () => {
+    const { fixture } = await renderPage();
+    const component = fixture.componentInstance as any;
+    const cards = fixture.nativeElement.querySelectorAll('app-scene-card');
+    const discoverySection = railSectionByTitle(fixture, 'Discovery Rail');
+    const librarySection = railSectionByTitle(fixture, 'Library Rail');
+    const requestButton = discoverySection.querySelector('.request-cta') as HTMLButtonElement | null;
+    const libraryLink = librarySection.querySelector('.media-link-stretch') as HTMLAnchorElement | null;
+
+    expect(cards).toHaveLength(3);
+    expect(libraryLink?.getAttribute('href')).toBe('http://stash.local/scenes/local-scene-1');
+    expect(component.requestModalOpen()).toBe(false);
+
+    requestButton?.click();
+
+    expect(component.requestModalOpen()).toBe(true);
+    expect(component.requestContext()).toEqual({
+      id: 'stashdb-scene-1',
+      title: 'Discovery Scene',
+      imageUrl: 'http://cdn.local/discovery.jpg',
+    });
+  });
 });

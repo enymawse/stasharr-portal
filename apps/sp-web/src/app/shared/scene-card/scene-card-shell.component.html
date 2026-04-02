@@ -1,0 +1,102 @@
+<article class="card">
+  <div class="media">
+    @if (primaryLinkIsExternal()) {
+      <a
+        class="media-link-stretch"
+        [attr.href]="primaryExternalHref()"
+        target="_blank"
+        rel="noopener noreferrer"
+        [attr.aria-label]="primaryLinkLabel()"
+      ></a>
+    } @else if (primaryRouterCommands(); as commands) {
+      <a
+        class="media-link-stretch"
+        [routerLink]="commands"
+        [queryParams]="primaryQueryParams()"
+        [attr.aria-label]="primaryLinkLabel()"
+      ></a>
+    }
+
+    @if (thumbnailUrl(); as imageUrl) {
+      <img class="thumbnail" [src]="imageUrl" [alt]="item.title" loading="lazy" />
+    } @else {
+      <div class="thumbnail placeholder" aria-hidden="true">
+        <ng-content select="[sceneCardPlaceholder]"></ng-content>
+      </div>
+    }
+
+    @if (hasMediaTop()) {
+      <div class="media-top">
+        @if (item.studioImageUrl) {
+          @if (studioBadgeLinkIsExternal()) {
+            <a
+              class="studio-badge-link"
+              [attr.href]="studioBadgeExternalHref()"
+              target="_blank"
+              rel="noopener noreferrer"
+              [attr.aria-label]="studioBadgeAriaLabel()"
+            >
+              <div class="studio-badge logo-plaque" [title]="studioBadgeLabel()">
+                <img [src]="item.studioImageUrl" [alt]="studioBadgeLabel() + ' logo'" loading="lazy" />
+              </div>
+            </a>
+          } @else if (studioBadgeRouterCommands(); as commands) {
+            <a
+              class="studio-badge-link"
+              [routerLink]="commands"
+              [queryParams]="studioBadgeQueryParams()"
+              [attr.aria-label]="studioBadgeAriaLabel()"
+            >
+              <div class="studio-badge logo-plaque" [title]="studioBadgeLabel()">
+                <img [src]="item.studioImageUrl" [alt]="studioBadgeLabel() + ' logo'" loading="lazy" />
+              </div>
+            </a>
+          } @else {
+            <div class="studio-badge logo-plaque" [title]="studioBadgeLabel()">
+              <img [src]="item.studioImageUrl" [alt]="studioBadgeLabel() + ' logo'" loading="lazy" />
+            </div>
+          }
+        } @else if (item.studio) {
+          @if (studioBadgeLinkIsExternal()) {
+            <a
+              class="studio-badge-link"
+              [attr.href]="studioBadgeExternalHref()"
+              target="_blank"
+              rel="noopener noreferrer"
+              [attr.aria-label]="studioBadgeAriaLabel()"
+            >
+              <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+            </a>
+          } @else if (studioBadgeRouterCommands(); as commands) {
+            <a
+              class="studio-badge-link"
+              [routerLink]="commands"
+              [queryParams]="studioBadgeQueryParams()"
+              [attr.aria-label]="studioBadgeAriaLabel()"
+            >
+              <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+            </a>
+          } @else {
+            <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+          }
+        }
+
+        @if (hasTopRightSlot()) {
+          <div class="media-top-right">
+            <ng-content select="[sceneCardTopRight]"></ng-content>
+          </div>
+        }
+      </div>
+    }
+
+    @if (hasMediaFooter()) {
+      <div class="media-bottom">
+        <ng-content select="[sceneCardMediaFooter]"></ng-content>
+      </div>
+    }
+  </div>
+
+  @if (hasBody()) {
+    <ng-content select="[sceneCardBody]"></ng-content>
+  }
+</article>

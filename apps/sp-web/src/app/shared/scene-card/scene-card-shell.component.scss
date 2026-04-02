@@ -1,0 +1,193 @@
+:host {
+  display: block;
+  --scene-card-card-radius: 8px;
+  --scene-card-card-border: 0;
+  --scene-card-card-background: transparent;
+  --scene-card-card-shadow: none;
+  --scene-card-card-overflow: visible;
+  --scene-card-media-radius: 7px;
+  --scene-card-media-shadow: none;
+  --scene-card-top-padding: 0.55rem;
+  --scene-card-top-gap: 0.5rem;
+  --scene-card-text-badge-max-width: min(5.8rem, 37%);
+  --scene-card-text-badge-min-width: 1.75rem;
+  --scene-card-text-badge-height: 1.15rem;
+  --scene-card-text-badge-padding: 0.1rem 0.3rem;
+  --scene-card-text-badge-radius: 0.55rem;
+  --scene-card-text-badge-font-size: 0.56rem;
+  --scene-card-text-badge-font-weight: 600;
+  --scene-card-logo-min-width: 1.75rem;
+  --scene-card-logo-height: 1.15rem;
+  --scene-card-logo-padding: 0.12rem 0.28rem;
+  --scene-card-logo-radius: 0.55rem;
+  --scene-card-placeholder-background:
+    linear-gradient(
+      130deg,
+      color-mix(in srgb, var(--surface-2) 88%, #fff),
+      color-mix(in srgb, var(--surface-2) 78%, #9fb3c8)
+    ),
+    radial-gradient(circle at 18% 25%, rgb(255 255 255 / 45%), transparent 55%);
+}
+
+:host(.scene-card-shell-variant-rail) {
+  --scene-card-card-radius: 12px;
+  --scene-card-media-radius: 12px;
+  --scene-card-media-shadow: 0 12px 28px rgb(5 10 17 / 28%);
+  --scene-card-top-padding: 0.6rem;
+  --scene-card-text-badge-max-width: min(5.8rem, 40%);
+}
+
+.card {
+  border-radius: var(--scene-card-card-radius);
+  border: var(--scene-card-card-border);
+  padding: 0;
+  background: var(--scene-card-card-background);
+  box-shadow: var(--scene-card-card-shadow);
+  overflow: var(--scene-card-card-overflow);
+  display: grid;
+  gap: 0;
+}
+
+.media {
+  position: relative;
+  aspect-ratio: 10 / 7;
+  border-radius: var(--scene-card-media-radius);
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: var(--scene-card-media-shadow);
+}
+
+.media-link-stretch {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: var(--scene-card-card-radius);
+}
+
+.media-link-stretch:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnail.placeholder {
+  background: var(--scene-card-placeholder-background);
+}
+
+.media-top {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: var(--scene-card-top-gap);
+  padding: var(--scene-card-top-padding);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.media-top-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  pointer-events: auto;
+}
+
+.studio-badge {
+  border: 1px solid color-mix(in srgb, var(--border-strong) 65%, transparent);
+  box-shadow:
+    0 4px 12px rgb(12 22 33 / 26%),
+    inset 0 1px 0 rgb(255 255 255 / 25%);
+  backdrop-filter: blur(7px);
+}
+
+.studio-badge-link {
+  display: inline-flex;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.studio-badge-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--scene-card-text-badge-radius);
+}
+
+.logo-plaque {
+  min-width: var(--scene-card-logo-min-width);
+  height: var(--scene-card-logo-height);
+  border-radius: var(--scene-card-logo-radius);
+  padding: var(--scene-card-logo-padding);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-elevated) 92%, #fff),
+      color-mix(in srgb, var(--surface-2) 88%, transparent)
+    ),
+    rgb(21 34 48 / 24%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-plaque img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: left center;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 25%));
+  display: block;
+}
+
+.text-badge {
+  max-width: var(--scene-card-text-badge-max-width);
+  min-width: var(--scene-card-text-badge-min-width);
+  height: var(--scene-card-text-badge-height);
+  padding: var(--scene-card-text-badge-padding);
+  border-radius: var(--scene-card-text-badge-radius);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-elevated) 92%, #fff),
+      color-mix(in srgb, var(--surface-2) 85%, transparent)
+    ),
+    rgb(17 27 38 / 52%);
+  color: var(--text-primary);
+  font-size: var(--scene-card-text-badge-font-size);
+  font-weight: var(--scene-card-text-badge-font-weight);
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 0 rgb(255 255 255 / 35%);
+}
+
+.media-bottom {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+@media (max-width: 560px) {
+  .media {
+    aspect-ratio: 16 / 10;
+  }
+
+  .text-badge {
+    max-width: 40%;
+  }
+
+  .logo-plaque,
+  .text-badge {
+    height: 1.05rem;
+  }
+}

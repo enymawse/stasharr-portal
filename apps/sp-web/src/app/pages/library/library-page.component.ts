@@ -38,6 +38,11 @@ import {
   LibraryTagMatchMode,
   LibraryTagOption,
 } from '../../core/api/library.types';
+import {
+  SceneCardBadge,
+  SceneCardComponent,
+} from '../../shared/scene-card/scene-card.component';
+import { SceneCardShellLink } from '../../shared/scene-card/scene-card-shell.component';
 
 interface MultiSelectOption {
   label: string;
@@ -57,7 +62,15 @@ interface LibraryPageAlert {
 
 @Component({
   selector: 'app-library-page',
-  imports: [RouterLink, FormsModule, Message, ProgressSpinner, Select, MultiSelect],
+  imports: [
+    RouterLink,
+    FormsModule,
+    Message,
+    ProgressSpinner,
+    Select,
+    MultiSelect,
+    SceneCardComponent,
+  ],
   templateUrl: './library-page.component.html',
   styleUrl: './library-page.component.scss',
 })
@@ -67,9 +80,6 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly DEFAULT_SORT: LibrarySceneSort = 'RELEASE_DATE';
   private static readonly DEFAULT_DIRECTION: LibrarySortDirection = 'DESC';
   private static readonly DEFAULT_TAG_MODE: LibraryTagMatchMode = 'OR';
-  private static readonly DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-  });
   private static readonly DATE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -90,6 +100,7 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     { value: 'OR', label: 'OR (Any)' },
     { value: 'AND', label: 'AND (All)' },
   ];
+  private static readonly LOCAL_CARD_BADGES: readonly SceneCardBadge[] = [{ label: 'Local' }];
 
   private readonly libraryService = inject(LibraryService);
   private readonly runtimeHealthService = inject(RuntimeHealthService);
@@ -165,6 +176,7 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly studioSearchError = signal<string | null>(null);
   protected readonly sortOptions = LibraryPageComponent.SORT_OPTIONS;
   protected readonly tagMatchOptions = LibraryPageComponent.TAG_MATCH_OPTIONS;
+  protected readonly localCardBadges = LibraryPageComponent.LOCAL_CARD_BADGES;
   protected readonly pageAlert = computed<LibraryPageAlert | null>(() => {
     const setupStatus = this.setupStatusStore.status();
     if (setupStatus && !setupStatus.required.stash) {
@@ -550,69 +562,6 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.onFavoriteTagsOnlyChanged(false);
   }
 
-  protected sceneDetailsAvailable(item: LibrarySceneItem): boolean {
-    return typeof item.activeCatalogSceneId === 'string' && item.activeCatalogSceneId.length > 0;
-  }
-
-  protected mediaAriaLabel(item: LibrarySceneItem): string {
-    return this.sceneDetailsAvailable(item)
-      ? `Open scene details for ${item.title}`
-      : `View ${item.title} in Stash`;
-  }
-
-  protected performerPreview(item: LibrarySceneItem): string[] {
-    return item.performerNames.slice(0, 3);
-  }
-
-  protected performerOverflowCount(item: LibrarySceneItem): number {
-    const overflow = item.performerNames.length - 3;
-    return overflow > 0 ? overflow : 0;
-  }
-
-  protected performerRouteQueryParams(name: string): Record<string, string> {
-    return {
-      q: name,
-    };
-  }
-
-  protected studioRouteQueryParams(item: LibrarySceneItem): Record<string, string> | null {
-    if (!item.studio) {
-      return null;
-    }
-
-    return {
-      q: item.studio,
-    };
-  }
-
-  protected localAddedLabel(value: string | null): string | null {
-    if (!value) {
-      return null;
-    }
-
-    return `Added ${this.formatDate(value, true)}`;
-  }
-
-  protected formattedReleaseDate(value: string | null): string | null {
-    return this.formatDate(value, false);
-  }
-
-  protected formattedDuration(durationSeconds: number | null): string | null {
-    if (!durationSeconds || durationSeconds <= 0) {
-      return null;
-    }
-
-    const totalMinutes = Math.floor(durationSeconds / 60);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-
-    if (hours > 0) {
-      return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
-    }
-
-    return `${minutes}m`;
-  }
-
   protected onTagFilterChanged(nextValue: string | null | undefined): void {
     const nextTerm = (nextValue ?? '').trimStart();
     this.tagSearchTerm.set(nextTerm);
@@ -756,14 +705,15 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.router.url;
   }
 
-  protected studioBadgeQueryParams(item: LibrarySceneItem): Record<string, string> | null {
-    if (!item.studioId || !item.studio) {
+  protected libraryFooterLink(item: LibrarySceneItem): SceneCardShellLink | null {
+    if (!item.activeCatalogSceneId) {
       return null;
     }
 
     return {
-      studios: item.studioId,
-      studioNames: item.studio,
+      kind: 'external',
+      href: item.viewUrl,
+      ariaLabel: `View ${item.title} in Stash`,
     };
   }
 
@@ -778,22 +728,6 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     return LibraryPageComponent.DATE_TIME_FORMATTER.format(parsed);
-  }
-
-  private formatDate(value: string | null, includesTime: boolean): string | null {
-    if (!value) {
-      return null;
-    }
-
-    const parsed = includesTime
-      ? new Date(value)
-      : new Date(`${value}T12:00:00Z`);
-
-    if (Number.isNaN(parsed.getTime())) {
-      return value;
-    }
-
-    return LibraryPageComponent.DATE_FORMATTER.format(parsed);
   }
 
   private loadNextPage(): void {

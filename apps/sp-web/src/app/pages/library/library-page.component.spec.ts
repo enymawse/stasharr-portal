@@ -188,6 +188,10 @@ describe('LibraryPageComponent', () => {
     }).compileComponents();
 
     const router = TestBed.inject(Router);
+    Object.defineProperty(router, 'url', {
+      configurable: true,
+      get: () => '/library',
+    });
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
     const fixture = TestBed.createComponent(LibraryPageComponent);
@@ -368,7 +372,7 @@ describe('LibraryPageComponent', () => {
     expect(text).not.toContain('Search stays local to the library projection');
   });
 
-  it('renders local-first card actions and connected performer and studio navigation', async () => {
+  it('renders the shared compact scene card with minimal library-specific actions and badges', async () => {
     const { fixture } = await renderPage({
       feedResponse: buildFeedResponse([
         buildScene({ id: '411', activeCatalogSceneId: 'stash-411' }),
@@ -380,17 +384,32 @@ describe('LibraryPageComponent', () => {
       ]),
     });
 
+    expect(fixture.nativeElement.querySelectorAll('app-scene-card')).toHaveLength(2);
+
     const articles = Array.from(
       fixture.nativeElement.querySelectorAll('article.card'),
     ) as HTMLElement[];
 
-    expect(articles[0]?.querySelector('.card-actions a.primary-link')?.getAttribute('href')).toContain(
+    expect(articles[0]?.querySelector('.media-link-stretch')?.getAttribute('href')).toContain(
       '/scene/stash-411',
     );
-    expect(articles[0]?.querySelector('a[href*="/performers?q=Performer%20One"]')).toBeTruthy();
-    expect(articles[0]?.querySelector('a[href*="/studios?q=Archive"]')).toBeTruthy();
-    expect(articles[1]?.querySelector('.card-actions a.primary-link')?.getAttribute('href')).toBe(
+    expect(articles[0]?.querySelector('.media-link-stretch')?.getAttribute('href')).toContain(
+      'returnTo=%2Flibrary',
+    );
+    expect(articles[0]?.querySelector('.studio-badge-link')?.getAttribute('href')).toContain(
+      '/library',
+    );
+    expect(articles[0]?.querySelector('.top-badge')?.textContent).toContain('Local');
+    expect(articles[0]?.querySelector('.footer-link')?.getAttribute('href')).toBe(
+      'http://stash.local/scenes/411',
+    );
+    expect(articles[0]?.querySelector('.card-actions')).toBeNull();
+    expect(articles[0]?.querySelector('.card-links')).toBeNull();
+    expect(articles[0]?.querySelector('.card-stat-pills')).toBeNull();
+
+    expect(articles[1]?.querySelector('.media-link-stretch')?.getAttribute('href')).toBe(
       'http://stash.local/scenes/412',
     );
+    expect(articles[1]?.querySelector('.footer-pill')?.textContent).toContain('Local only');
   });
 });

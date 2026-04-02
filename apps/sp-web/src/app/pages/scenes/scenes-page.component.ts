@@ -10,7 +10,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   Subject,
   Subscription,
@@ -38,8 +38,8 @@ import {
   SceneTagOption,
   isSceneStatusRequestable,
 } from '../../core/api/discover.types';
+import { SceneCardComponent } from '../../shared/scene-card/scene-card.component';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
-import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
 type FavoritesFilterOption = 'NONE' | SceneFavoritesFilter;
 interface MultiSelectOption {
@@ -60,13 +60,12 @@ interface SelectedStudioChip {
 @Component({
   selector: 'app-scenes-page',
   imports: [
-    RouterLink,
     FormsModule,
     Message,
     ProgressSpinner,
     Select,
     MultiSelect,
-    SceneStatusBadgeComponent,
+    SceneCardComponent,
     SceneRequestModalComponent,
   ],
   templateUrl: './scenes-page.component.html',
@@ -224,16 +223,8 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return item.requestable && isSceneStatusRequestable(item.status);
   }
 
-  protected openRequestModal(item: SceneExplorerItem): void {
-    if (!this.isRequestable(item)) {
-      return;
-    }
-
-    this.requestContext.set({
-      id: item.id,
-      title: item.title,
-      imageUrl: item.imageUrl,
-    });
+  protected openRequestModal(item: SceneRequestContext): void {
+    this.requestContext.set(item);
     this.requestModalOpen.set(true);
   }
 
@@ -486,17 +477,6 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
   protected currentRouteUrl(): string {
     return this.router.url;
-  }
-
-  protected studioBadgeQueryParams(item: SceneExplorerItem): Record<string, string> | null {
-    if (!item.studioId || !item.studio) {
-      return null;
-    }
-
-    return {
-      studios: item.studioId,
-      studioNames: item.studio,
-    };
   }
 
   private loadNextPage(): void {

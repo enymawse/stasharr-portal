@@ -51,8 +51,8 @@ import {
   HomeRailViewSummary,
   SaveHomeRailPayload,
 } from '../../core/api/home.types';
+import { SceneCardComponent } from '../../shared/scene-card/scene-card.component';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
-import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
 type HomeRailView = HomeRailConfig & {
   items: HomeRailItem[];
@@ -95,7 +95,7 @@ type RailFavoritesOption = SceneFavoritesFilter | 'NONE';
     MultiSelect,
     ProgressSpinner,
     Select,
-    SceneStatusBadgeComponent,
+    SceneCardComponent,
     SceneRequestModalComponent,
   ],
   templateUrl: './home-page.component.html',
@@ -769,10 +769,6 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return 'No matching studios.';
   }
 
-  protected railImageUrl(item: HomeRailItem): string | null {
-    return item.cardImageUrl ?? item.imageUrl;
-  }
-
   protected currentRouteUrl(): string {
     return this.router.url;
   }
@@ -781,16 +777,8 @@ export class HomePageComponent implements OnInit, OnDestroy {
     return item.requestable && isSceneStatusRequestable(item.status);
   }
 
-  protected openRequestModal(item: HomeRailItem): void {
-    if (!this.isRequestable(item)) {
-      return;
-    }
-
-    this.requestContext.set({
-      id: item.id,
-      title: item.title,
-      imageUrl: item.imageUrl,
-    });
+  protected openRequestModal(item: SceneRequestContext): void {
+    this.requestContext.set(item);
     this.requestModalOpen.set(true);
   }
 

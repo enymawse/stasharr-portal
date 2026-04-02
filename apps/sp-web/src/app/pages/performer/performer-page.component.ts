@@ -40,8 +40,8 @@ import {
   SceneTagOption,
   isSceneStatusRequestable,
 } from '../../core/api/discover.types';
+import { SceneCardComponent } from '../../shared/scene-card/scene-card.component';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
-import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
 
 interface SelectedStudioChip {
   id: string;
@@ -68,7 +68,7 @@ interface MultiSelectGroup {
     Message,
     ProgressSpinner,
     MultiSelect,
-    SceneStatusBadgeComponent,
+    SceneCardComponent,
     SceneRequestModalComponent,
   ],
   templateUrl: './performer-page.component.html',
@@ -301,16 +301,8 @@ export class PerformerPageComponent implements OnInit, AfterViewInit, OnDestroy 
     return isSceneStatusRequestable(item.status);
   }
 
-  protected openRequestModal(item: DiscoverItem): void {
-    if (!this.isRequestable(item)) {
-      return;
-    }
-
-    this.requestContext.set({
-      id: item.id,
-      title: item.title,
-      imageUrl: item.imageUrl,
-    });
+  protected openRequestModal(item: SceneRequestContext): void {
+    this.requestContext.set(item);
     this.requestModalOpen.set(true);
   }
 
@@ -579,17 +571,6 @@ export class PerformerPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
   protected currentRouteUrl(): string {
     return this.router.url;
-  }
-
-  protected studioBadgeQueryParams(item: DiscoverItem): Record<string, string> | null {
-    if (!item.studioId || !item.studio) {
-      return null;
-    }
-
-    return {
-      studios: item.studioId,
-      studioNames: item.studio,
-    };
   }
 
   private loadPerformer(): void {
