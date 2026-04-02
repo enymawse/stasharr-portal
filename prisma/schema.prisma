@@ -207,6 +207,17 @@ enum IntegrationStatus {
   ERROR
 }
 
+enum RuntimeHealthServiceKey {
+  CATALOG
+  STASH
+  WHISPARR
+}
+
+enum RuntimeHealthStatus {
+  HEALTHY
+  DEGRADED
+}
+
 model IntegrationConfig {
   id      String            @id @default(cuid())
   type    IntegrationType   @unique
@@ -225,4 +236,16 @@ model IntegrationConfig {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model RuntimeIntegrationHealth {
+  service             RuntimeHealthServiceKey @id
+  status              RuntimeHealthStatus     @default(HEALTHY)
+  consecutiveFailures Int                     @default(0)
+  lastHealthyAt       DateTime?
+  lastFailureAt       DateTime?
+  lastErrorMessage    String?
+  degradedAt          DateTime?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
 }

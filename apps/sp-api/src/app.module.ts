@@ -11,6 +11,7 @@ import { MediaModule } from './media/media.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PerformersModule } from './performers/performers.module';
 import { RequestsModule } from './requests/requests.module';
+import { RuntimeHealthModule } from './runtime-health/runtime-health.module';
 import { ScenesModule } from './scenes/scenes.module';
 import { SetupModule } from './setup/setup.module';
 import { StudiosModule } from './studios/studios.module';
@@ -24,6 +25,7 @@ import { StudiosModule } from './studios/studios.module';
     ScheduleModule.forRoot(),
     PrismaModule,
     HealthModule,
+    RuntimeHealthModule,
     HomeModule,
     MediaModule,
     LibraryModule,

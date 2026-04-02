@@ -1,4 +1,6 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
+import { RuntimeHealthServiceKey } from '@prisma/client';
+import { RuntimeHealthService } from '../../runtime-health/runtime-health.service';
 
 export interface WhisparrAdapterBaseConfig {
   baseUrl: string;
@@ -58,10 +60,16 @@ export class WhisparrAdapter {
   private static readonly MAX_QUEUE_PAGES = 200;
   private readonly logger = new Logger(WhisparrAdapter.name);
 
+  constructor(private readonly runtimeHealthService: RuntimeHealthService) {}
+
   async testConnection(config: WhisparrAdapterBaseConfig): Promise<void> {
-    await this.fetchJsonPayload(
-      this.resolveSystemStatusEndpoint(config.baseUrl),
-      config,
+    await this.trackRuntimeHealth(
+      () =>
+        this.fetchJsonPayload(
+          this.resolveSystemStatusEndpoint(config.baseUrl),
+          config,
+        ),
+      false,
     );
   }
 
@@ -77,51 +85,53 @@ export class WhisparrAdapter {
       return null;
     }
 
-    this.logger.debug(
-      `Looking up Whisparr movie by stashId: ${this.safeJson({
-        stashId: normalizedStashId,
-        baseUrl: config.baseUrl,
-        hasApiKey: Boolean(config.apiKey?.trim()),
-      })}`,
-    );
-
-    const payload = await this.fetchArrayPayload(
-      this.resolveMovieLookupEndpoint(config.baseUrl, normalizedStashId),
-      config,
-    );
-
-    this.logger.debug(
-      `Whisparr movie lookup raw payload: ${this.summarizeArrayPayload(payload)}`,
-    );
-
-    const matches = payload
-      .map((entry) => this.parseMovieLookupEntry(entry))
-      .filter(
-        (entry): entry is WhisparrMovieLookupResult =>
-          entry !== null && entry.stashId === normalizedStashId,
+    return this.trackRuntimeHealth(async () => {
+      this.logger.debug(
+        `Looking up Whisparr movie by stashId: ${this.safeJson({
+          stashId: normalizedStashId,
+          baseUrl: config.baseUrl,
+          hasApiKey: Boolean(config.apiKey?.trim()),
+        })}`,
       );
 
-    this.logger.debug(
-      `Whisparr movie lookup normalized matches: ${this.safeJson({
-        stashId: normalizedStashId,
-        matches,
-      })}`,
-    );
-
-    if (matches.length === 0) {
-      return null;
-    }
-
-    if (matches.length > 1) {
-      this.logger.warn(
-        `Whisparr returned multiple movie matches for stashId="${normalizedStashId}"; refusing ambiguous result.`,
+      const payload = await this.fetchArrayPayload(
+        this.resolveMovieLookupEndpoint(config.baseUrl, normalizedStashId),
+        config,
       );
-      throw new BadGatewayException(
-        'Whisparr provider returned multiple movie matches for a stashId lookup.',
-      );
-    }
 
-    return matches[0];
+      this.logger.debug(
+        `Whisparr movie lookup raw payload: ${this.summarizeArrayPayload(payload)}`,
+      );
+
+      const matches = payload
+        .map((entry) => this.parseMovieLookupEntry(entry))
+        .filter(
+          (entry): entry is WhisparrMovieLookupResult =>
+            entry !== null && entry.stashId === normalizedStashId,
+        );
+
+      this.logger.debug(
+        `Whisparr movie lookup normalized matches: ${this.safeJson({
+          stashId: normalizedStashId,
+          matches,
+        })}`,
+      );
+
+      if (matches.length === 0) {
+        return null;
+      }
+
+      if (matches.length > 1) {
+        this.logger.warn(
+          `Whisparr returned multiple movie matches for stashId="${normalizedStashId}"; refusing ambiguous result.`,
+        );
+        throw new BadGatewayException(
+          'Whisparr provider returned multiple movie matches for a stashId lookup.',
+        );
+      }
+
+      return matches[0];
+    });
   }
 
   async findMovieById(
@@ -137,185 +147,250 @@ export class WhisparrAdapter {
       return null;
     }
 
-    this.logger.debug(
-      `Looking up Whisparr movie by movieId: ${this.safeJson({
-        movieId,
-        baseUrl: config.baseUrl,
-        hasApiKey: Boolean(config.apiKey?.trim()),
-      })}`,
-    );
-
-    const payload = await this.fetchJsonPayload(
-      this.resolveMovieByIdEndpoint(config.baseUrl, movieId),
-      config,
-    );
-
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-      this.logger.error(
-        `Whisparr movie-by-id payload has unexpected shape: ${this.safeJson({
+    return this.trackRuntimeHealth(async () => {
+      this.logger.debug(
+        `Looking up Whisparr movie by movieId: ${this.safeJson({
           movieId,
-          payloadShape: this.describePayloadShape(payload),
-          payloadPreview: this.previewPayload(payload),
+          baseUrl: config.baseUrl,
+          hasApiKey: Boolean(config.apiKey?.trim()),
         })}`,
       );
-      throw new BadGatewayException(
-        'Whisparr provider returned an unexpected movie-by-id response shape.',
+
+      const payload = await this.fetchJsonPayload(
+        this.resolveMovieByIdEndpoint(config.baseUrl, movieId),
+        config,
       );
-    }
 
-    this.logger.debug(
-      `Whisparr movie-by-id raw payload: ${this.safeJson(payload)}`,
-    );
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        this.logger.error(
+          `Whisparr movie-by-id payload has unexpected shape: ${this.safeJson({
+            movieId,
+            payloadShape: this.describePayloadShape(payload),
+            payloadPreview: this.previewPayload(payload),
+          })}`,
+        );
+        throw new BadGatewayException(
+          'Whisparr provider returned an unexpected movie-by-id response shape.',
+        );
+      }
 
-    const movie = this.parseMovieLookupEntry(payload);
-    if (!movie) {
-      this.logger.warn(
-        `Whisparr movie-by-id payload could not be normalized: ${this.safeJson({
-          movieId,
-          payloadPreview: this.previewPayload(payload),
-        })}`,
+      this.logger.debug(
+        `Whisparr movie-by-id raw payload: ${this.safeJson(payload)}`,
       );
-      return null;
-    }
 
-    if (movie.movieId !== movieId) {
-      this.logger.warn(
-        `Whisparr movie-by-id response mismatch: ${this.safeJson({
-          requestedMovieId: movieId,
-          responseMovieId: movie.movieId,
-        })}`,
+      const movie = this.parseMovieLookupEntry(payload);
+      if (!movie) {
+        this.logger.warn(
+          `Whisparr movie-by-id payload could not be normalized: ${this.safeJson({
+            movieId,
+            payloadPreview: this.previewPayload(payload),
+          })}`,
+        );
+        return null;
+      }
+
+      if (movie.movieId !== movieId) {
+        this.logger.warn(
+          `Whisparr movie-by-id response mismatch: ${this.safeJson({
+            requestedMovieId: movieId,
+            responseMovieId: movie.movieId,
+          })}`,
+        );
+        return null;
+      }
+
+      this.logger.debug(
+        `Whisparr movie-by-id normalized result: ${this.safeJson(movie)}`,
       );
-      return null;
-    }
 
-    this.logger.debug(
-      `Whisparr movie-by-id normalized result: ${this.safeJson(movie)}`,
-    );
-
-    return movie;
+      return movie;
+    });
   }
 
   async getQueueSnapshot(
     config: WhisparrAdapterBaseConfig,
   ): Promise<WhisparrQueueSnapshotItem[]> {
-    this.logger.debug(
-      `Fetching Whisparr queue snapshot: ${this.safeJson({
-        baseUrl: config.baseUrl,
-        hasApiKey: Boolean(config.apiKey?.trim()),
-      })}`,
-    );
+    return this.trackRuntimeHealth(async () => {
+      this.logger.debug(
+        `Fetching Whisparr queue snapshot: ${this.safeJson({
+          baseUrl: config.baseUrl,
+          hasApiKey: Boolean(config.apiKey?.trim()),
+        })}`,
+      );
 
-    const queueRecords = await this.fetchAllQueueRecords(config);
+      const queueRecords = await this.fetchAllQueueRecords(config);
 
-    const normalized = queueRecords
-      .map((entry) => this.parseQueueEntry(entry))
-      .filter((entry): entry is WhisparrQueueSnapshotItem => entry !== null);
+      const normalized = queueRecords
+        .map((entry) => this.parseQueueEntry(entry))
+        .filter((entry): entry is WhisparrQueueSnapshotItem => entry !== null);
 
-    this.logger.debug(
-      `Whisparr queue normalized snapshot: ${this.safeJson({
-        count: normalized.length,
-        sample: normalized.slice(0, 5),
-      })}`,
-    );
+      this.logger.debug(
+        `Whisparr queue normalized snapshot: ${this.safeJson({
+          count: normalized.length,
+          sample: normalized.slice(0, 5),
+        })}`,
+      );
 
-    return normalized;
+      return normalized;
+    });
   }
 
   async getMovieSnapshot(
     config: WhisparrAdapterBaseConfig,
   ): Promise<WhisparrMovieLookupResult[]> {
-    this.logger.debug(
-      `Fetching Whisparr movie snapshot: ${this.safeJson({
-        baseUrl: config.baseUrl,
-        hasApiKey: Boolean(config.apiKey?.trim()),
-      })}`,
-    );
+    return this.trackRuntimeHealth(async () => {
+      this.logger.debug(
+        `Fetching Whisparr movie snapshot: ${this.safeJson({
+          baseUrl: config.baseUrl,
+          hasApiKey: Boolean(config.apiKey?.trim()),
+        })}`,
+      );
 
-    const payload = await this.fetchJsonPayload(
-      this.resolveMovieCollectionEndpoint(config.baseUrl),
-      config,
-    );
-    const records = this.extractCollectionRecords(payload, 'movie');
-    const normalized = records
-      .map((entry) => this.parseMovieLookupEntry(entry))
-      .filter((entry): entry is WhisparrMovieLookupResult => entry !== null);
+      const payload = await this.fetchJsonPayload(
+        this.resolveMovieCollectionEndpoint(config.baseUrl),
+        config,
+      );
+      const records = this.extractCollectionRecords(payload, 'movie');
+      const normalized = records
+        .map((entry) => this.parseMovieLookupEntry(entry))
+        .filter((entry): entry is WhisparrMovieLookupResult => entry !== null);
 
-    this.logger.debug(
-      `Whisparr movie normalized snapshot: ${this.safeJson({
-        count: normalized.length,
-        sample: normalized.slice(0, 5),
-      })}`,
-    );
+      this.logger.debug(
+        `Whisparr movie normalized snapshot: ${this.safeJson({
+          count: normalized.length,
+          sample: normalized.slice(0, 5),
+        })}`,
+      );
 
-    return normalized;
+      return normalized;
+    });
   }
 
   async getRootFolders(
     config: WhisparrAdapterBaseConfig,
   ): Promise<WhisparrRootFolderOption[]> {
-    const payload = await this.fetchArrayPayload(
-      this.resolveRootFoldersEndpoint(config.baseUrl),
-      config,
-    );
+    return this.trackRuntimeHealth(async () => {
+      const payload = await this.fetchArrayPayload(
+        this.resolveRootFoldersEndpoint(config.baseUrl),
+        config,
+      );
 
-    return payload
-      .map((entry) => this.parseRootFolderEntry(entry))
-      .filter((entry): entry is WhisparrRootFolderOption => entry !== null);
+      return payload
+        .map((entry) => this.parseRootFolderEntry(entry))
+        .filter((entry): entry is WhisparrRootFolderOption => entry !== null);
+    });
   }
 
   async getQualityProfiles(
     config: WhisparrAdapterBaseConfig,
   ): Promise<WhisparrQualityProfileOption[]> {
-    const payload = await this.fetchArrayPayload(
-      this.resolveQualityProfilesEndpoint(config.baseUrl),
-      config,
-    );
+    return this.trackRuntimeHealth(async () => {
+      const payload = await this.fetchArrayPayload(
+        this.resolveQualityProfilesEndpoint(config.baseUrl),
+        config,
+      );
 
-    return payload
-      .map((entry) => this.parseQualityProfileEntry(entry))
-      .filter((entry): entry is WhisparrQualityProfileOption => entry !== null);
+      return payload
+        .map((entry) => this.parseQualityProfileEntry(entry))
+        .filter((entry): entry is WhisparrQualityProfileOption => entry !== null);
+    });
   }
 
   async getTags(
     config: WhisparrAdapterBaseConfig,
   ): Promise<WhisparrTagOption[]> {
-    const payload = await this.fetchArrayPayload(
-      this.resolveTagsEndpoint(config.baseUrl),
-      config,
-    );
+    return this.trackRuntimeHealth(async () => {
+      const payload = await this.fetchArrayPayload(
+        this.resolveTagsEndpoint(config.baseUrl),
+        config,
+      );
 
-    return payload
-      .map((entry) => this.parseTagEntry(entry))
-      .filter((entry): entry is WhisparrTagOption => entry !== null);
+      return payload
+        .map((entry) => this.parseTagEntry(entry))
+        .filter((entry): entry is WhisparrTagOption => entry !== null);
+    });
   }
 
   async createMovie(
     input: WhisparrCreateMovieInput,
     config: WhisparrAdapterBaseConfig,
   ): Promise<WhisparrCreateMovieResult> {
-    const payload = await this.fetchJsonPayload(
-      this.resolveMovieCollectionEndpoint(config.baseUrl),
-      config,
-      {
-        method: 'POST',
-        body: input,
-      },
-    );
-
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-      this.logger.error(
-        `Whisparr create movie payload has unexpected shape: ${this.safeJson({
-          payloadShape: this.describePayloadShape(payload),
-          payloadPreview: this.previewPayload(payload),
-        })}`,
+    return this.trackRuntimeHealth(async () => {
+      const payload = await this.fetchJsonPayload(
+        this.resolveMovieCollectionEndpoint(config.baseUrl),
+        config,
+        {
+          method: 'POST',
+          body: input,
+        },
       );
-      throw new BadGatewayException(
-        'Whisparr provider returned an unexpected create-movie response shape.',
+
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        this.logger.error(
+          `Whisparr create movie payload has unexpected shape: ${this.safeJson({
+            payloadShape: this.describePayloadShape(payload),
+            payloadPreview: this.previewPayload(payload),
+          })}`,
+        );
+        throw new BadGatewayException(
+          'Whisparr provider returned an unexpected create-movie response shape.',
+        );
+      }
+
+      const movieId = this.readNumber((payload as Record<string, unknown>).id);
+      return { movieId };
+    });
+  }
+
+  private async trackRuntimeHealth<T>(
+    operation: () => Promise<T>,
+    trackRuntimeHealth = true,
+  ): Promise<T> {
+    try {
+      const result = await operation();
+      if (trackRuntimeHealth) {
+        await this.reportRuntimeSuccess();
+      }
+      return result;
+    } catch (error) {
+      if (trackRuntimeHealth) {
+        await this.reportRuntimeFailure(error);
+      }
+      throw error;
+    }
+  }
+
+  private async reportRuntimeSuccess(): Promise<void> {
+    try {
+      await this.runtimeHealthService.recordSuccess(
+        RuntimeHealthServiceKey.WHISPARR,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record Whisparr runtime recovery: ${this.errorMessage(error)}`,
       );
     }
+  }
 
-    const movieId = this.readNumber((payload as Record<string, unknown>).id);
-    return { movieId };
+  private async reportRuntimeFailure(error: unknown): Promise<void> {
+    try {
+      await this.runtimeHealthService.recordFailure(
+        RuntimeHealthServiceKey.WHISPARR,
+        error,
+      );
+    } catch (reportingError) {
+      this.logger.warn(
+        `Failed to record Whisparr runtime failure: ${this.errorMessage(reportingError)}`,
+      );
+    }
+  }
+
+  private errorMessage(error: unknown): string {
+    if (error instanceof Error && error.message.trim().length > 0) {
+      return error.message;
+    }
+
+    return 'unknown error';
   }
 
   private async fetchAllQueueRecords(

@@ -1,8 +1,13 @@
 import { BadGatewayException } from '@nestjs/common';
+import { RuntimeHealthService } from '../../runtime-health/runtime-health.service';
 import { StashAdapter } from './stash.adapter';
 
 describe('StashAdapter', () => {
   let adapter: StashAdapter;
+  let runtimeHealthService: {
+    recordSuccess: jest.Mock;
+    recordFailure: jest.Mock;
+  };
   let originalFetch: typeof fetch;
   const fetchMock: jest.MockedFunction<typeof fetch> = jest.fn();
 
@@ -17,7 +22,13 @@ describe('StashAdapter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    adapter = new StashAdapter();
+    runtimeHealthService = {
+      recordSuccess: jest.fn().mockResolvedValue(undefined),
+      recordFailure: jest.fn().mockResolvedValue(undefined),
+    };
+    adapter = new StashAdapter(
+      runtimeHealthService as unknown as RuntimeHealthService,
+    );
   });
 
   it('returns empty list when there are no matching scenes', async () => {
@@ -109,6 +120,7 @@ describe('StashAdapter', () => {
         },
       },
     });
+    expect(runtimeHealthService.recordSuccess).toHaveBeenCalledWith('STASH');
   });
 
   it('filters scene links to the requested catalog provider', async () => {
@@ -295,6 +307,10 @@ describe('StashAdapter', () => {
         baseUrl: 'http://stash.local',
       }),
     ).rejects.toBeInstanceOf(BadGatewayException);
+    expect(runtimeHealthService.recordFailure).toHaveBeenCalledWith(
+      'STASH',
+      expect.any(Error),
+    );
   });
 
   it('queries local scenes using created_at descending for recent library rails', async () => {

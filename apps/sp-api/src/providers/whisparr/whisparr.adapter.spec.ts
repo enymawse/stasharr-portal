@@ -1,8 +1,13 @@
 import { BadGatewayException, Logger } from '@nestjs/common';
+import { RuntimeHealthService } from '../../runtime-health/runtime-health.service';
 import { WhisparrAdapter } from './whisparr.adapter';
 
 describe('WhisparrAdapter', () => {
   let adapter: WhisparrAdapter;
+  let runtimeHealthService: {
+    recordSuccess: jest.Mock;
+    recordFailure: jest.Mock;
+  };
   let originalFetch: typeof fetch;
   const fetchMock = jest.fn();
 
@@ -17,7 +22,13 @@ describe('WhisparrAdapter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    adapter = new WhisparrAdapter();
+    runtimeHealthService = {
+      recordSuccess: jest.fn().mockResolvedValue(undefined),
+      recordFailure: jest.fn().mockResolvedValue(undefined),
+    };
+    adapter = new WhisparrAdapter(
+      runtimeHealthService as unknown as RuntimeHealthService,
+    );
   });
 
   describe('findMovieByStashId', () => {
@@ -67,6 +78,9 @@ describe('WhisparrAdapter', () => {
             'X-Api-Key': 'secret',
           },
         },
+      );
+      expect(runtimeHealthService.recordSuccess).toHaveBeenCalledWith(
+        'WHISPARR',
       );
     });
 
@@ -137,6 +151,10 @@ describe('WhisparrAdapter', () => {
           baseUrl: 'http://whisparr.local',
         }),
       ).rejects.toBeInstanceOf(BadGatewayException);
+      expect(runtimeHealthService.recordFailure).toHaveBeenCalledWith(
+        'WHISPARR',
+        expect.any(Error),
+      );
     });
   });
 

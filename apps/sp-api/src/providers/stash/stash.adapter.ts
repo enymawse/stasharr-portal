@@ -1,10 +1,12 @@
-import { BadGatewayException, Injectable } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
+import { RuntimeHealthServiceKey } from '@prisma/client';
 import {
   type CatalogProviderKey,
   findCatalogExternalIdForProvider,
   hasCatalogSceneRef,
   normalizeCatalogSceneRefs,
 } from '../catalog/catalog-provider.util';
+import { RuntimeHealthService } from '../../runtime-health/runtime-health.service';
 
 export interface StashAdapterBaseConfig {
   baseUrl: string;
@@ -241,6 +243,10 @@ interface StashGraphqlResponse {
 
 @Injectable()
 export class StashAdapter {
+  private readonly logger = new Logger(StashAdapter.name);
+
+  constructor(private readonly runtimeHealthService: RuntimeHealthService) {}
+
   async testConnection(config: StashAdapterBaseConfig): Promise<void> {
     const query = `
       query ConnectivityCheck {
@@ -248,7 +254,7 @@ export class StashAdapter {
       }
     `;
 
-    await this.executeQuery(config, query);
+    await this.executeQuery(config, query, undefined, false);
   }
 
   async findScenesByStashId(
@@ -686,21 +692,27 @@ export class StashAdapter {
     let response: Response;
     try {
       response = await fetch(resolvedUrl, { headers });
-    } catch {
+    } catch (error) {
+      await this.reportRuntimeFailure(error);
       throw new BadGatewayException('Failed to reach Stash provider endpoint.');
     }
 
     if (response.status === 404) {
+      await this.reportRuntimeSuccess();
       return null;
     }
 
     if (!response.ok) {
+      await this.reportRuntimeFailure(
+        `Stash provider returned ${response.status} for media request.`,
+      );
       throw new BadGatewayException(
         `Stash provider returned ${response.status} for media request.`,
       );
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
+    await this.reportRuntimeSuccess();
 
     return {
       body: buffer,
@@ -1194,6 +1206,7 @@ export class StashAdapter {
     config: StashAdapterBaseConfig,
     query: string,
     variables?: Record<string, unknown>,
+    trackRuntimeHealth = true,
   ): Promise<StashGraphqlResponse> {
     const endpoint = this.resolveGraphqlEndpoint(config.baseUrl);
     const headers: Record<string, string> = {
@@ -1212,12 +1225,20 @@ export class StashAdapter {
         headers,
         body: JSON.stringify({ query, variables }),
       });
-    } catch {
+    } catch (error) {
+      if (trackRuntimeHealth) {
+        await this.reportRuntimeFailure(error);
+      }
       throw new BadGatewayException('Failed to reach Stash provider endpoint.');
     }
 
     if (!response.ok) {
       const errorBody = await response.text();
+      if (trackRuntimeHealth) {
+        await this.reportRuntimeFailure(
+          `Stash provider returned ${response.status}: ${errorBody}`,
+        );
+      }
       throw new BadGatewayException(
         `Stash provider returned ${response.status}: ${errorBody}`,
       );
@@ -1231,10 +1252,48 @@ export class StashAdapter {
         typeof firstError === 'string' && firstError.length > 0
           ? firstError
           : 'Stash GraphQL request failed.';
+      if (trackRuntimeHealth) {
+        await this.reportRuntimeFailure(message);
+      }
       throw new BadGatewayException(message);
     }
 
+    if (trackRuntimeHealth) {
+      await this.reportRuntimeSuccess();
+    }
+
     return payload;
+  }
+
+  private async reportRuntimeSuccess(): Promise<void> {
+    try {
+      await this.runtimeHealthService.recordSuccess(RuntimeHealthServiceKey.STASH);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record Stash runtime recovery: ${this.errorMessage(error)}`,
+      );
+    }
+  }
+
+  private async reportRuntimeFailure(error: unknown): Promise<void> {
+    try {
+      await this.runtimeHealthService.recordFailure(
+        RuntimeHealthServiceKey.STASH,
+        error,
+      );
+    } catch (reportingError) {
+      this.logger.warn(
+        `Failed to record Stash runtime failure: ${this.errorMessage(reportingError)}`,
+      );
+    }
+  }
+
+  private errorMessage(error: unknown): string {
+    if (error instanceof Error && error.message.trim().length > 0) {
+      return error.message;
+    }
+
+    return 'unknown error';
   }
 
   private resolveGraphqlEndpoint(baseUrl: string): string {

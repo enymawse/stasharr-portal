@@ -1,7 +1,13 @@
+import { BadGatewayException } from '@nestjs/common';
+import { RuntimeHealthService } from '../../runtime-health/runtime-health.service';
 import { StashdbAdapter } from './stashdb.adapter';
 
 describe('StashdbAdapter', () => {
   let adapter: StashdbAdapter;
+  let runtimeHealthService: {
+    recordSuccess: jest.Mock;
+    recordFailure: jest.Mock;
+  };
   let originalFetch: typeof fetch;
   const fetchMock = jest.fn();
 
@@ -16,7 +22,26 @@ describe('StashdbAdapter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    adapter = new StashdbAdapter();
+    runtimeHealthService = {
+      recordSuccess: jest.fn().mockResolvedValue(undefined),
+      recordFailure: jest.fn().mockResolvedValue(undefined),
+    };
+    adapter = new StashdbAdapter(
+      runtimeHealthService as unknown as RuntimeHealthService,
+    );
+  });
+
+  it('does not record runtime health failures for setup connectivity checks', async () => {
+    fetchMock.mockRejectedValue(new Error('network failure'));
+
+    await expect(
+      adapter.testConnection({
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
+    ).rejects.toBeInstanceOf(BadGatewayException);
+
+    expect(runtimeHealthService.recordFailure).not.toHaveBeenCalled();
+    expect(runtimeHealthService.recordSuccess).not.toHaveBeenCalled();
   });
 
   it('requests studio images and normalizes studio badge URL from the widest image', async () => {
@@ -303,6 +328,7 @@ describe('StashdbAdapter', () => {
 
     expect(requestBody.query).toContain('sort: DATE');
     expect(requestBody.query).toContain('direction: DESC');
+    expect(runtimeHealthService.recordSuccess).toHaveBeenCalledWith('CATALOG');
   });
 
   it('passes through selected sort value for scene feeds', async () => {
@@ -337,6 +363,24 @@ describe('StashdbAdapter', () => {
 
     expect(requestBody.query).toContain('sort: UPDATED_AT');
     expect(requestBody.query).toContain('direction: DESC');
+  });
+
+  it('records catalog runtime failures when provider requests fail', async () => {
+    fetchMock.mockRejectedValue(new Error('network failure'));
+
+    await expect(
+      adapter.getScenesBySort({
+        baseUrl: 'http://stashdb.local/graphql',
+        page: 1,
+        perPage: 25,
+        sort: 'DATE',
+      }),
+    ).rejects.toBeInstanceOf(BadGatewayException);
+
+    expect(runtimeHealthService.recordFailure).toHaveBeenCalledWith(
+      'CATALOG',
+      expect.any(Error),
+    );
   });
 
   it('passes through requested scene direction', async () => {

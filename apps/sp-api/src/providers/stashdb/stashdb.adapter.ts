@@ -1,8 +1,11 @@
 import {
   BadGatewayException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { RuntimeHealthServiceKey } from '@prisma/client';
+import { RuntimeHealthService } from '../../runtime-health/runtime-health.service';
 
 export interface StashdbAdapterBaseConfig {
   baseUrl: string;
@@ -548,6 +551,10 @@ interface StashdbGraphqlResponse {
 
 @Injectable()
 export class StashdbAdapter {
+  private readonly logger = new Logger(StashdbAdapter.name);
+
+  constructor(private readonly runtimeHealthService: RuntimeHealthService) {}
+
   async testConnection(config: StashdbAdapterBaseConfig): Promise<void> {
     const query = `
       query ConnectivityCheck {
@@ -555,7 +562,7 @@ export class StashdbAdapter {
       }
     `;
 
-    await this.executeQuery(config, query);
+    await this.executeQuery(config, query, undefined, false);
   }
 
   async getScenesSortedByDate(
@@ -1233,12 +1240,19 @@ export class StashdbAdapter {
     const payload = await this.executeQueryRaw(config, query, {
       id: performerId,
     });
-    return this.normalizeFavoriteMutationResult(
-      payload,
-      'favoritePerformer',
-      'performer_favorites_unique_idx',
-      favorite,
-    );
+    try {
+      const result = this.normalizeFavoriteMutationResult(
+        payload,
+        'favoritePerformer',
+        'performer_favorites_unique_idx',
+        favorite,
+      );
+      await this.reportRuntimeSuccess();
+      return result;
+    } catch (error) {
+      await this.reportRuntimeFailure(error);
+      throw error;
+    }
   }
 
   async favoriteStudio(
@@ -1253,12 +1267,19 @@ export class StashdbAdapter {
     `;
 
     const payload = await this.executeQueryRaw(config, query, { id: studioId });
-    return this.normalizeFavoriteMutationResult(
-      payload,
-      'favoriteStudio',
-      'studio_favorites_unique_idx',
-      favorite,
-    );
+    try {
+      const result = this.normalizeFavoriteMutationResult(
+        payload,
+        'favoriteStudio',
+        'studio_favorites_unique_idx',
+        favorite,
+      );
+      await this.reportRuntimeSuccess();
+      return result;
+    } catch (error) {
+      await this.reportRuntimeFailure(error);
+      throw error;
+    }
   }
 
   private async getSceneFeed(
@@ -1598,11 +1619,12 @@ export class StashdbAdapter {
         typeof firstError === 'string' && firstError.length > 0
           ? firstError
           : 'StashDB GraphQL request failed.';
+      await this.reportRuntimeFailure(message);
       throw new BadGatewayException(message);
     }
 
     const data = payload.data as Record<string, unknown> | undefined;
-    return normalizedIds
+    const metadata = normalizedIds
       .map((_, index) =>
         this.normalizeSceneMetadata(
           (data?.[`scene_${index}`] as
@@ -1612,6 +1634,8 @@ export class StashdbAdapter {
         ),
       )
       .filter((scene): scene is StashdbSceneMetadata => scene !== null);
+    await this.reportRuntimeSuccess();
+    return metadata;
   }
 
   private selectPrimaryImage(
@@ -1957,8 +1981,14 @@ export class StashdbAdapter {
     config: StashdbAdapterBaseConfig,
     query: string,
     variables?: Record<string, unknown>,
+    trackRuntimeHealth = true,
   ): Promise<StashdbGraphqlResponse> {
-    const payload = await this.executeQueryRaw(config, query, variables);
+    const payload = await this.executeQueryRaw(
+      config,
+      query,
+      variables,
+      trackRuntimeHealth,
+    );
 
     if (payload.errors && payload.errors.length > 0) {
       const firstError = payload.errors[0]?.message;
@@ -1966,7 +1996,14 @@ export class StashdbAdapter {
         typeof firstError === 'string' && firstError.length > 0
           ? firstError
           : 'StashDB GraphQL request failed.';
+      if (trackRuntimeHealth) {
+        await this.reportRuntimeFailure(message);
+      }
       throw new BadGatewayException(message);
+    }
+
+    if (trackRuntimeHealth) {
+      await this.reportRuntimeSuccess();
     }
 
     return payload;
@@ -1976,6 +2013,7 @@ export class StashdbAdapter {
     config: StashdbAdapterBaseConfig,
     query: string,
     variables?: Record<string, unknown>,
+    trackRuntimeHealth = true,
   ): Promise<StashdbGraphqlResponse> {
     const endpoint = this.resolveGraphqlEndpoint(config.baseUrl);
     const headers: Record<string, string> = {
@@ -1996,7 +2034,10 @@ export class StashdbAdapter {
           variables,
         }),
       });
-    } catch {
+    } catch (error) {
+      if (trackRuntimeHealth) {
+        await this.reportRuntimeFailure(error);
+      }
       throw new BadGatewayException(
         'Failed to reach StashDB provider endpoint.',
       );
@@ -2004,6 +2045,11 @@ export class StashdbAdapter {
 
     if (!response.ok) {
       const errorBody = await response.text();
+      if (trackRuntimeHealth) {
+        await this.reportRuntimeFailure(
+          `StashDB provider returned ${response.status}: ${errorBody}`,
+        );
+      }
       throw new BadGatewayException(
         `StashDB provider returned ${response.status}: ${errorBody}`,
       );
@@ -2011,6 +2057,39 @@ export class StashdbAdapter {
 
     const payload = (await response.json()) as StashdbGraphqlResponse;
     return payload;
+  }
+
+  private async reportRuntimeSuccess(): Promise<void> {
+    try {
+      await this.runtimeHealthService.recordSuccess(
+        RuntimeHealthServiceKey.CATALOG,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record catalog runtime recovery: ${this.errorMessage(error)}`,
+      );
+    }
+  }
+
+  private async reportRuntimeFailure(error: unknown): Promise<void> {
+    try {
+      await this.runtimeHealthService.recordFailure(
+        RuntimeHealthServiceKey.CATALOG,
+        error,
+      );
+    } catch (reportingError) {
+      this.logger.warn(
+        `Failed to record catalog runtime failure: ${this.errorMessage(reportingError)}`,
+      );
+    }
+  }
+
+  private errorMessage(error: unknown): string {
+    if (error instanceof Error && error.message.trim().length > 0) {
+      return error.message;
+    }
+
+    return 'unknown error';
   }
 
   private resolveGraphqlEndpoint(baseUrl: string): string {

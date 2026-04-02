@@ -1,11 +1,22 @@
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { EMPTY, merge, of, switchMap, timer } from 'rxjs';
+import { forkJoin, merge, of, switchMap, timer } from 'rxjs';
 import { catchError, filter } from 'rxjs/operators';
+import { RuntimeHealthService } from '../../core/api/runtime-health.service';
+import {
+  RuntimeHealthResponse,
+  summarizeRuntimeDegradedState,
+} from '../../core/api/runtime-health.types';
 import { SetupService } from '../../core/api/setup.service';
 import { SetupStatusStore } from '../../core/api/setup-status.store';
 import { summarizeDegradedSetupState } from '../../core/api/setup.types';
+
+interface ShellDegradedState {
+  kind: 'setup' | 'runtime';
+  eyebrow: string;
+  message: string;
+}
 
 @Component({
   selector: 'app-shell-layout',
@@ -17,12 +28,35 @@ export class AppShellLayoutComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly setupService = inject(SetupService);
+  private readonly runtimeHealthService = inject(RuntimeHealthService);
   private readonly setupStatusStore = inject(SetupStatusStore);
 
   protected readonly collapsed = signal(false);
-  protected readonly degradedState = computed(() =>
-    summarizeDegradedSetupState(this.setupStatusStore.status()),
-  );
+  protected readonly runtimeHealth = signal<RuntimeHealthResponse | null>(null);
+  protected readonly degradedState = computed<ShellDegradedState | null>(() => {
+    const setupState = summarizeDegradedSetupState(this.setupStatusStore.status());
+    if (setupState) {
+      return {
+        kind: 'setup',
+        eyebrow: 'Repair needed',
+        message: setupState.message,
+      };
+    }
+
+    const runtimeState = summarizeRuntimeDegradedState(
+      this.runtimeHealth(),
+      this.setupStatusStore.status()?.catalogProvider ?? null,
+    );
+    if (!runtimeState) {
+      return null;
+    }
+
+    return {
+      kind: 'runtime',
+      eyebrow: 'Runtime outage',
+      message: runtimeState.message,
+    };
+  });
 
   ngOnInit(): void {
     merge(
@@ -34,11 +68,22 @@ export class AppShellLayoutComponent implements OnInit {
     )
       .pipe(
         switchMap(() =>
-          this.setupService.getStatus().pipe(catchError(() => EMPTY)),
+          forkJoin({
+            setupStatus: this.setupService.getStatus().pipe(catchError(() => of(null))),
+            runtimeHealth: this.runtimeHealthService.getStatus().pipe(catchError(() => of(null))),
+          }),
         ),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((status) => this.setupStatusStore.sync(status));
+      .subscribe(({ setupStatus, runtimeHealth }) => {
+        if (setupStatus) {
+          this.setupStatusStore.sync(setupStatus);
+        }
+
+        if (runtimeHealth) {
+          this.runtimeHealth.set(runtimeHealth);
+        }
+      });
   }
 
   protected toggleCollapsed(): void {

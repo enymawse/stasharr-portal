@@ -123,7 +123,7 @@
           aria-live="polite"
         >
           <div class="degraded-copy">
-            <p class="degraded-eyebrow">Degraded mode</p>
+            <p class="degraded-eyebrow">{{ degradedState.eyebrow }}</p>
             <p class="degraded-message">{{ degradedState.message }}</p>
           </div>
           <a
@@ -131,7 +131,7 @@
             class="degraded-action"
             data-testid="repair-integrations-link"
           >
-            Repair Integrations
+            Open Settings
           </a>
         </section>
       </div>
