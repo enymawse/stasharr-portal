@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   AfterViewInit,
   Component,
+  computed,
   ElementRef,
   OnDestroy,
   OnInit,
@@ -27,6 +28,8 @@ import { MultiSelect } from 'primeng/multiselect';
 import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { LibraryService } from '../../core/api/library.service';
+import { RuntimeHealthService } from '../../core/api/runtime-health.service';
+import { SetupStatusStore } from '../../core/api/setup-status.store';
 import {
   LibrarySceneItem,
   LibrarySceneSort,
@@ -46,6 +49,12 @@ interface SelectedChip {
   label: string;
 }
 
+interface LibraryPageAlert {
+  eyebrow: string;
+  title: string;
+  message: string;
+}
+
 @Component({
   selector: 'app-library-page',
   imports: [RouterLink, FormsModule, Message, ProgressSpinner, Select, MultiSelect],
@@ -58,6 +67,13 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private static readonly DEFAULT_SORT: LibrarySceneSort = 'RELEASE_DATE';
   private static readonly DEFAULT_DIRECTION: LibrarySortDirection = 'DESC';
   private static readonly DEFAULT_TAG_MODE: LibraryTagMatchMode = 'OR';
+  private static readonly DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+  });
+  private static readonly DATE_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
   protected static readonly SORT_OPTIONS: Array<{
     value: LibrarySceneSort;
     label: string;
@@ -76,6 +92,8 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
   ];
 
   private readonly libraryService = inject(LibraryService);
+  private readonly runtimeHealthService = inject(RuntimeHealthService);
+  private readonly setupStatusStore = inject(SetupStatusStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly queryTerms = new Subject<string>();
@@ -118,6 +136,7 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly page = signal(0);
   protected readonly hasMore = signal(true);
   protected readonly inFlight = signal(false);
+  protected readonly latestSyncAt = signal<string | null>(null);
   protected readonly items = signal<LibrarySceneItem[]>([]);
   protected readonly queryTerm = signal('');
   protected readonly selectedSort = signal<LibrarySceneSort>(LibraryPageComponent.DEFAULT_SORT);
@@ -146,8 +165,35 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly studioSearchError = signal<string | null>(null);
   protected readonly sortOptions = LibraryPageComponent.SORT_OPTIONS;
   protected readonly tagMatchOptions = LibraryPageComponent.TAG_MATCH_OPTIONS;
+  protected readonly pageAlert = computed<LibraryPageAlert | null>(() => {
+    const setupStatus = this.setupStatusStore.status();
+    if (setupStatus && !setupStatus.required.stash) {
+      return {
+        eyebrow: 'Repair Required',
+        title: 'Local library browsing needs attention',
+        message:
+          'Stash needs repair for this surface. Newly imported scenes, artwork, and local favorite overlays may be missing or stale until the integration is fixed.',
+      };
+    }
+
+    const runtimeStatus = this.runtimeHealthService.status();
+    if (!runtimeStatus?.services.stash.degraded) {
+      return null;
+    }
+
+    const freshnessHint = this.latestSyncAt()
+      ? `Currently showing projected library data synced through ${this.formatDateTime(this.latestSyncAt())}.`
+      : 'Currently showing projected library data with an unknown sync timestamp.';
+
+    return {
+      eyebrow: 'Runtime Outage',
+      title: 'Local library freshness is degraded',
+      message: `${freshnessHint} Newly imported scenes, refreshed metadata, and availability overlays may lag until Stash is healthy again.`,
+    };
+  });
 
   ngOnInit(): void {
+    this.runtimeHealthService.ensureStarted();
     this.setupQuerySearch();
     this.setupStudioSearch();
     this.setupTagSearch();
@@ -265,6 +311,10 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     );
   }
 
+  protected hasNarrowingFilters(): boolean {
+    return this.activeFilterCount() > 0;
+  }
+
   protected resetFilters(): void {
     if (!this.hasActiveFilters()) {
       return;
@@ -296,18 +346,271 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.resetFeedAndReload();
   }
 
-  protected libraryTotalLabel(): string {
-    return `Total scenes: ${this.total()}`;
+  protected totalSummaryValue(): string {
+    if (this.loading() && this.total() === 0) {
+      return 'Loading...';
+    }
+
+    return this.total().toLocaleString();
   }
 
-  protected libraryResultsNote(): string {
-    return 'This page is served from the local library projection in the app database and includes local-only favorite overlays.';
+  protected activeFilterCount(): number {
+    return (
+      (this.queryTerm().trim().length > 0 ? 1 : 0) +
+      this.selectedStudios().length +
+      this.selectedTags().length +
+      (this.favoritePerformersOnly() ? 1 : 0) +
+      (this.favoriteStudiosOnly() ? 1 : 0) +
+      (this.favoriteTagsOnly() ? 1 : 0)
+    );
+  }
+
+  protected viewSummaryValue(): string {
+    const count = this.activeFilterCount();
+    if (count === 0) {
+      return 'All scenes';
+    }
+
+    return `${count} filter${count === 1 ? '' : 's'}`;
+  }
+
+  protected viewSummaryMeta(): string {
+    return this.sortSummaryShort();
+  }
+
+  protected viewSummaryTooltip(): string {
+    const details = [`Sort: ${this.sortSummary()}.`];
+
+    if (this.selectedTags().length > 1) {
+      details.push(
+        this.selectedTagMode() === 'AND'
+          ? 'Selected tags must all match.'
+          : 'Selected tags can match in any combination.',
+      );
+    }
+
+    return details.join(' ');
+  }
+
+  protected freshnessSummaryValue(): string {
+    if (this.pageAlert()) {
+      return 'Needs attention';
+    }
+
+    const latestSyncAt = this.latestSyncAt();
+    if (latestSyncAt) {
+      return this.formatDateTime(latestSyncAt);
+    }
+
+    if (this.loading()) {
+      return 'Checking...';
+    }
+
+    return 'Awaiting sync';
+  }
+
+  protected freshnessSummaryTooltip(): string {
+    if (this.pageAlert()) {
+      return 'Stash is affecting how fresh this local view can be right now.';
+    }
+
+    const latestSyncAt = this.latestSyncAt();
+    if (latestSyncAt) {
+      return `Latest projection sync for this view: ${this.formatDateTime(latestSyncAt)}.`;
+    }
+
+    return 'Waiting for the local library projection to sync.';
+  }
+
+  protected indexedSummaryTooltip(): string {
+    return 'Scenes currently available in the local library projection.';
+  }
+
+  protected resultsHeading(): string {
+    if (this.loading()) {
+      return 'Loading local library';
+    }
+
+    if (this.error()) {
+      return 'Local library loading failed';
+    }
+
+    if (this.hasItems()) {
+      return 'Local scenes';
+    }
+
+    return this.emptyStateTitle();
+  }
+
+  protected resultsSummary(): string {
+    if (this.loading()) {
+      return 'Fetching scenes from the local library projection and applying the current local-first view.';
+    }
+
+    if (this.error()) {
+      return 'Retry the library feed to restore fast local browsing from the database-backed projection.';
+    }
+
+    if (this.hasItems()) {
+      return `${this.total().toLocaleString()} ${this.hasNarrowingFilters() ? 'matches' : 'scenes'} / ${this.sortSummaryShort()}`;
+    }
+
+    return this.emptyStateMessage();
+  }
+
+  protected emptyStateTitle(): string {
+    return this.hasNarrowingFilters()
+      ? 'Nothing matches the current library view'
+      : 'No local scenes are indexed yet';
   }
 
   protected emptyStateMessage(): string {
-    return this.hasActiveFilters()
-      ? 'No local scenes match the current filters.'
-      : 'No local library scenes are indexed yet.';
+    return this.hasNarrowingFilters()
+      ? 'Clear or adjust the current filters to bring local scenes back into view. If you just imported something, Stash or indexing may still be catching up.'
+      : 'This page only shows scenes that already exist in Stash. Import content, wait for indexing to finish, or browse discovery while your local library catches up.';
+  }
+
+  protected emptyStateEyebrow(): string {
+    return this.hasNarrowingFilters() ? 'Filtered View' : 'Library Empty';
+  }
+
+  protected sortSummary(): string {
+    switch (this.selectedSort()) {
+      case 'TITLE':
+        return this.selectedDirection() === 'ASC' ? 'title, A to Z' : 'title, Z to A';
+      case 'CREATED_AT':
+        return this.selectedDirection() === 'ASC'
+          ? 'recently added, oldest first'
+          : 'recently added, newest first';
+      case 'UPDATED_AT':
+        return this.selectedDirection() === 'ASC'
+          ? 'recently updated, oldest first'
+          : 'recently updated, newest first';
+      case 'RELEASE_DATE':
+      default:
+        return this.selectedDirection() === 'ASC'
+          ? 'release date, oldest first'
+          : 'release date, newest first';
+    }
+  }
+
+  protected sortSummaryShort(): string {
+    switch (this.selectedSort()) {
+      case 'TITLE':
+        return this.selectedDirection() === 'ASC' ? 'Title A-Z' : 'Title Z-A';
+      case 'CREATED_AT':
+        return this.selectedDirection() === 'ASC' ? 'Added oldest' : 'Added newest';
+      case 'UPDATED_AT':
+        return this.selectedDirection() === 'ASC' ? 'Updated oldest' : 'Updated newest';
+      case 'RELEASE_DATE':
+      default:
+        return this.selectedDirection() === 'ASC' ? 'Release oldest' : 'Release newest';
+    }
+  }
+
+  protected tagModeTooltip(): string {
+    if (this.selectedTags().length <= 1) {
+      return 'Choose multiple tags to use AND or OR matching.';
+    }
+
+    return this.selectedTagMode() === 'AND'
+      ? 'Scenes must include every selected tag.'
+      : 'Scenes can include any selected tag.';
+  }
+
+  protected favoriteOverlayTooltip(): string {
+    return 'Applies local Stash favorite overlays only.';
+  }
+
+  protected queryFilterLabel(): string {
+    return `Query: ${this.queryTerm().trim()}`;
+  }
+
+  protected clearQueryFilter(): void {
+    this.onQueryChanged('');
+  }
+
+  protected clearStudioFilter(studioId: string): void {
+    this.onStudioSelectionChanged(this.selectedStudioIds().filter((id) => id !== studioId));
+  }
+
+  protected clearTagFilter(tagId: string): void {
+    this.onTagSelectionChanged(this.selectedTagIds().filter((id) => id !== tagId));
+  }
+
+  protected clearFavoritePerformersFilter(): void {
+    this.onFavoritePerformersOnlyChanged(false);
+  }
+
+  protected clearFavoriteStudiosFilter(): void {
+    this.onFavoriteStudiosOnlyChanged(false);
+  }
+
+  protected clearFavoriteTagsFilter(): void {
+    this.onFavoriteTagsOnlyChanged(false);
+  }
+
+  protected sceneDetailsAvailable(item: LibrarySceneItem): boolean {
+    return typeof item.activeCatalogSceneId === 'string' && item.activeCatalogSceneId.length > 0;
+  }
+
+  protected mediaAriaLabel(item: LibrarySceneItem): string {
+    return this.sceneDetailsAvailable(item)
+      ? `Open scene details for ${item.title}`
+      : `View ${item.title} in Stash`;
+  }
+
+  protected performerPreview(item: LibrarySceneItem): string[] {
+    return item.performerNames.slice(0, 3);
+  }
+
+  protected performerOverflowCount(item: LibrarySceneItem): number {
+    const overflow = item.performerNames.length - 3;
+    return overflow > 0 ? overflow : 0;
+  }
+
+  protected performerRouteQueryParams(name: string): Record<string, string> {
+    return {
+      q: name,
+    };
+  }
+
+  protected studioRouteQueryParams(item: LibrarySceneItem): Record<string, string> | null {
+    if (!item.studio) {
+      return null;
+    }
+
+    return {
+      q: item.studio,
+    };
+  }
+
+  protected localAddedLabel(value: string | null): string | null {
+    if (!value) {
+      return null;
+    }
+
+    return `Added ${this.formatDate(value, true)}`;
+  }
+
+  protected formattedReleaseDate(value: string | null): string | null {
+    return this.formatDate(value, false);
+  }
+
+  protected formattedDuration(durationSeconds: number | null): string | null {
+    if (!durationSeconds || durationSeconds <= 0) {
+      return null;
+    }
+
+    const totalMinutes = Math.floor(durationSeconds / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
+    }
+
+    return `${minutes}m`;
   }
 
   protected onTagFilterChanged(nextValue: string | null | undefined): void {
@@ -464,6 +767,35 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     };
   }
 
+  private formatDateTime(value: string | null): string {
+    if (!value) {
+      return 'Unknown';
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+
+    return LibraryPageComponent.DATE_TIME_FORMATTER.format(parsed);
+  }
+
+  private formatDate(value: string | null, includesTime: boolean): string | null {
+    if (!value) {
+      return null;
+    }
+
+    const parsed = includesTime
+      ? new Date(value)
+      : new Date(`${value}T12:00:00Z`);
+
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+
+    return LibraryPageComponent.DATE_FORMATTER.format(parsed);
+  }
+
   private loadNextPage(): void {
     if (this.inFlight() || !this.hasMore()) {
       return;
@@ -526,6 +858,7 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
           this.total.set(response.total);
           this.page.set(response.page);
           this.hasMore.set(response.hasMore);
+          this.latestSyncAt.set(response.latestSyncAt);
           this.items.update((current) =>
             isInitialPage ? response.items : [...current, ...response.items],
           );
@@ -554,6 +887,7 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.page.set(0);
     this.total.set(0);
     this.hasMore.set(true);
+    this.latestSyncAt.set(null);
     this.items.set([]);
     this.loading.set(false);
     this.loadingMore.set(false);

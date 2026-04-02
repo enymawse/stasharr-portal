@@ -21,9 +21,11 @@ const librarySceneListSelect =
     studioId: true,
     studioName: true,
     studioImageUrl: true,
+    performerNames: true,
     releaseDate: true,
     duration: true,
     viewUrl: true,
+    localCreatedAt: true,
   });
 
 type LibrarySceneListRow = Prisma.LibrarySceneIndexGetPayload<{
@@ -63,7 +65,7 @@ export class LibrarySceneQueryService {
       normalizedFilters.sort,
       normalizedFilters.direction,
     );
-    const [rows, total] = await Promise.all([
+    const [rows, aggregate] = await Promise.all([
       this.prisma.librarySceneIndex.findMany({
         where,
         orderBy,
@@ -71,14 +73,24 @@ export class LibrarySceneQueryService {
         take: perPage,
         select: librarySceneListSelect,
       }),
-      this.prisma.librarySceneIndex.count({ where }),
+      this.prisma.librarySceneIndex.aggregate({
+        where,
+        _count: {
+          _all: true,
+        },
+        _max: {
+          lastSyncedAt: true,
+        },
+      }),
     ]);
+    const total = aggregate._count._all;
 
     return {
       total,
       page,
       perPage,
       hasMore: page * perPage < total,
+      latestSyncAt: aggregate._max.lastSyncedAt,
       items: rows.map((row) => this.toSceneFeedItem(row)),
     };
   }
@@ -236,8 +248,10 @@ export class LibrarySceneQueryService {
       studioId: row.studioId,
       studio: row.studioName,
       studioImageUrl: studioLogoUrl,
+      performerNames: row.performerNames,
       releaseDate: row.releaseDate,
       duration: row.duration,
+      localCreatedAt: row.localCreatedAt,
       type: 'SCENE',
       source: 'STASH',
       viewUrl: row.viewUrl,

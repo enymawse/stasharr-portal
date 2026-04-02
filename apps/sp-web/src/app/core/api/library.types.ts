@@ -27,8 +27,10 @@ export interface LibrarySceneItem {
   studioId: string | null;
   studio: string | null;
   studioImageUrl: string | null;
+  performerNames: string[];
   releaseDate: string | null;
   duration: number | null;
+  localCreatedAt: string | null;
   type: 'SCENE';
   source: 'STASH';
   viewUrl: string;
@@ -39,5 +41,6 @@ export interface LibraryScenesFeedResponse {
   page: number;
   perPage: number;
   hasMore: boolean;
+  latestSyncAt: string | null;
   items: LibrarySceneItem[];
 }

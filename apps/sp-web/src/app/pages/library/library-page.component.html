@@ -1,218 +1,434 @@
 <main>
-  <header>
-    <h1>Library</h1>
-    <p>
-      Browse scenes already indexed from your local Stash library and refine with local-only
-      filters.
-    </p>
-    @if (!loading() && !error()) {
-      <p class="state">{{ libraryTotalLabel() }}</p>
-    }
-  </header>
-
-  <section class="controls-shell" aria-label="Library controls">
-    <div class="controls-header">
-      <span class="controls-title">Local Stash Library</span>
-      <div class="controls-actions">
-        <button
-          type="button"
-          class="reset-filters-button"
-          [disabled]="!hasActiveFilters()"
-          title="Clear filters and return to the default library view"
-          (click)="resetFilters()"
-        >
-          Clear Filters
-        </button>
-      </div>
+  <header class="page-head">
+    <div class="page-copy">
+      <p class="eyebrow">Local Collection</p>
+      <h1>Library</h1>
+      <p>Browse scenes already indexed from your local Stash library.</p>
     </div>
 
-    <div class="controls-row">
-      <label class="control-field search-field">
-        <span>Text Query</span>
-        <input
-          type="search"
-          inputmode="search"
-          [ngModel]="queryTerm()"
-          (ngModelChange)="onQueryChanged($event)"
-          placeholder="Search titles, descriptions, or studios"
-        />
-      </label>
+    <div class="page-head-actions">
+      <a class="secondary-link small" [routerLink]="['/scenes']">Browse Scenes</a>
+      <a class="secondary-link small" [routerLink]="['/acquisition']">Track Imports</a>
+    </div>
+  </header>
 
-      <label class="control-field">
-        <span>Studio Filter</span>
-        <p-multiselect
-          inputId="library-studios"
-          [ngModel]="studioSelectedIdsModel()"
-          (ngModelChange)="onStudioSelectionChanged($event)"
-          (onFilter)="onStudioFilterChanged($event.filter)"
-          (onPanelHide)="onStudioFilterPanelHide()"
-          [filter]="true"
-          [filterValue]="studioSearchTerm()"
-          filterPlaceHolder="Search local studios"
-          [loading]="studioSearchLoading()"
-          [options]="studioSelectOptions()"
-          optionLabel="label"
-          optionValue="value"
-          [showToggleAll]="false"
-          display="chip"
-          [emptyMessage]="studioSelectEmptyMessage()"
-          [emptyFilterMessage]="studioSelectEmptyMessage()"
-          [resetFilterOnHide]="true"
-          [appendTo]="'body'"
-          panelStyleClass="library-filter-panel"
-          placeholder="Choose local studios"
-          scrollHeight="16rem"
-        />
-      </label>
+  <section class="summary-shell" aria-label="Library summary">
+    <article class="summary-card" [attr.title]="indexedSummaryTooltip()">
+      <span class="summary-card-label">Indexed Locally</span>
+      <strong class="summary-card-value">{{ totalSummaryValue() }}</strong>
+    </article>
 
-      <label class="control-field">
-        <span>Tag Filter</span>
-        <div class="tag-input-row">
+    <article class="summary-card" [attr.title]="viewSummaryTooltip()">
+      <span class="summary-card-label">Current View</span>
+      <strong class="summary-card-value">{{ viewSummaryValue() }}</strong>
+      <span class="summary-card-meta">{{ viewSummaryMeta() }}</span>
+    </article>
+
+    <article class="summary-card">
+      <div class="summary-card-head">
+        <span class="summary-card-label">Projection Freshness</span>
+        <span
+          class="info-hint pi pi-info-circle"
+          [attr.title]="freshnessSummaryTooltip()"
+          aria-hidden="true"
+        ></span>
+      </div>
+      <strong class="summary-card-value">{{ freshnessSummaryValue() }}</strong>
+    </article>
+  </section>
+
+  @if (pageAlert(); as alert) {
+    <section class="page-alert" data-testid="library-degraded-state" role="status">
+      <div class="page-alert-copy">
+        <p class="eyebrow">{{ alert.eyebrow }}</p>
+        <h2>{{ alert.title }}</h2>
+        <p>{{ alert.message }}</p>
+      </div>
+
+      <div class="page-alert-actions">
+        <a class="primary-link small" [routerLink]="['/settings']">Open Settings</a>
+        <a class="secondary-link small" [routerLink]="['/acquisition']">Track Imports</a>
+      </div>
+    </section>
+  }
+
+  <section class="controls-shell" aria-label="Library controls">
+    <div class="controls-overview">
+      <div>
+        <p class="eyebrow">Local Filters</p>
+        <h2>Refine the library</h2>
+      </div>
+
+      <button
+        type="button"
+        class="secondary-action"
+        [disabled]="!hasActiveFilters()"
+        title="Clear filters and return to the default library view"
+        (click)="resetFilters()"
+      >
+        Clear Filters
+      </button>
+    </div>
+
+    <div class="controls-grid">
+      <article class="control-card search-card">
+        <label class="control-field search-field">
+          <span>Text Query</span>
+          <input
+            type="search"
+            inputmode="search"
+            [ngModel]="queryTerm()"
+            (ngModelChange)="onQueryChanged($event)"
+            placeholder="Search titles, descriptions, or studios"
+          />
+        </label>
+      </article>
+
+      <article class="control-card">
+        <label class="control-field">
+          <span>Studio Filter</span>
           <p-multiselect
-            inputId="library-tags"
-            [ngModel]="selectedTagIdsModel()"
-            (ngModelChange)="onTagSelectionChanged($event)"
-            (onFilter)="onTagFilterChanged($event.filter)"
-            (onPanelHide)="onTagFilterPanelHide()"
+            inputId="library-studios"
+            [ngModel]="studioSelectedIdsModel()"
+            (ngModelChange)="onStudioSelectionChanged($event)"
+            (onFilter)="onStudioFilterChanged($event.filter)"
+            (onPanelHide)="onStudioFilterPanelHide()"
             [filter]="true"
-            [filterValue]="tagSearchTerm()"
-            filterPlaceHolder="Search local tags"
-            [loading]="tagSearchLoading()"
-            [options]="tagSelectOptions()"
+            [filterValue]="studioSearchTerm()"
+            filterPlaceHolder="Search local studios"
+            [loading]="studioSearchLoading()"
+            [options]="studioSelectOptions()"
             optionLabel="label"
             optionValue="value"
             [showToggleAll]="false"
             display="chip"
-            [emptyMessage]="tagSelectEmptyMessage()"
-            [emptyFilterMessage]="tagSelectEmptyMessage()"
+            [emptyMessage]="studioSelectEmptyMessage()"
+            [emptyFilterMessage]="studioSelectEmptyMessage()"
             [resetFilterOnHide]="true"
             [appendTo]="'body'"
             panelStyleClass="library-filter-panel"
-            placeholder="Select matching tags"
+            placeholder="Choose local studios"
             scrollHeight="16rem"
           />
-          <p-select
-            class="tag-mode-select"
-            inputId="library-tag-mode"
-            [ngModel]="selectedTagMode()"
-            (ngModelChange)="onTagMatchModeChanged($event)"
-            [options]="tagMatchOptions"
-            optionLabel="label"
-            optionValue="value"
-            [appendTo]="'body'"
-            panelStyleClass="library-filter-select-panel"
-          />
-        </div>
-      </label>
+        </label>
+      </article>
 
-      <div class="control-field">
-        <span>Sort By</span>
-        <div class="sort-with-direction">
-          <p-select
-            inputId="library-sort"
-            [ngModel]="selectedSort()"
-            (ngModelChange)="onSortChanged($event)"
-            [options]="sortOptions"
-            optionLabel="label"
-            optionValue="value"
-            [appendTo]="'body'"
-            panelStyleClass="library-filter-select-panel"
-          />
-          <button
-            type="button"
-            class="sort-direction-toggle"
-            [attr.aria-label]="sortDirectionToggleLabel()"
-            [attr.title]="sortDirectionToggleLabel()"
-            (click)="toggleSortDirection()"
-          >
-            <i [class]="sortDirectionIconClass()" aria-hidden="true"></i>
-          </button>
-        </div>
-      </div>
+      <article class="control-card">
+        <label class="control-field">
+          <span class="field-label-row">
+            <span>Tag Filter</span>
+            <span
+              class="info-hint pi pi-info-circle"
+              [attr.title]="tagModeTooltip()"
+              aria-hidden="true"
+            ></span>
+          </span>
+          <div class="tag-input-row">
+            <p-multiselect
+              inputId="library-tags"
+              [ngModel]="selectedTagIdsModel()"
+              (ngModelChange)="onTagSelectionChanged($event)"
+              (onFilter)="onTagFilterChanged($event.filter)"
+              (onPanelHide)="onTagFilterPanelHide()"
+              [filter]="true"
+              [filterValue]="tagSearchTerm()"
+              filterPlaceHolder="Search local tags"
+              [loading]="tagSearchLoading()"
+              [options]="tagSelectOptions()"
+              optionLabel="label"
+              optionValue="value"
+              [showToggleAll]="false"
+              display="chip"
+              [emptyMessage]="tagSelectEmptyMessage()"
+              [emptyFilterMessage]="tagSelectEmptyMessage()"
+              [resetFilterOnHide]="true"
+              [appendTo]="'body'"
+              panelStyleClass="library-filter-panel"
+              placeholder="Select matching tags"
+              scrollHeight="16rem"
+            />
+            <p-select
+              class="tag-mode-select"
+              inputId="library-tag-mode"
+              [ngModel]="selectedTagMode()"
+              (ngModelChange)="onTagMatchModeChanged($event)"
+              [options]="tagMatchOptions"
+              optionLabel="label"
+              optionValue="value"
+              [appendTo]="'body'"
+              panelStyleClass="library-filter-select-panel"
+            />
+          </div>
+        </label>
+      </article>
 
-      <div class="control-field local-favorites-field">
-        <span>Local Favorites</span>
-        <div class="local-favorites-toggles">
-          <label class="toggle-inline">
-            <input
-              type="checkbox"
-              [ngModel]="favoritePerformersOnly()"
-              (ngModelChange)="onFavoritePerformersOnlyChanged($event)"
+      <article class="control-card">
+        <div class="control-field">
+          <span class="field-label-row">
+            <span>Sort Order</span>
+            <span
+              class="info-hint pi pi-info-circle"
+              [attr.title]="'Current sort: ' + sortSummary()"
+              aria-hidden="true"
+            ></span>
+          </span>
+          <div class="sort-with-direction">
+            <p-select
+              inputId="library-sort"
+              [ngModel]="selectedSort()"
+              (ngModelChange)="onSortChanged($event)"
+              [options]="sortOptions"
+              optionLabel="label"
+              optionValue="value"
+              [appendTo]="'body'"
+              panelStyleClass="library-filter-select-panel"
             />
-            <span>Performers</span>
-          </label>
-          <label class="toggle-inline">
-            <input
-              type="checkbox"
-              [ngModel]="favoriteStudiosOnly()"
-              (ngModelChange)="onFavoriteStudiosOnlyChanged($event)"
-            />
-            <span>Studios</span>
-          </label>
-          <label class="toggle-inline">
-            <input
-              type="checkbox"
-              [ngModel]="favoriteTagsOnly()"
-              (ngModelChange)="onFavoriteTagsOnlyChanged($event)"
-            />
-            <span>Tags</span>
-          </label>
+            <button
+              type="button"
+              class="sort-direction-toggle"
+              [attr.aria-label]="sortDirectionToggleLabel()"
+              [attr.title]="sortDirectionToggleLabel()"
+              (click)="toggleSortDirection()"
+            >
+              <i [class]="sortDirectionIconClass()" aria-hidden="true"></i>
+            </button>
+          </div>
         </div>
-      </div>
+      </article>
+
+      <article class="control-card favorites-card">
+        <div class="control-field">
+          <span class="field-label-row">
+            <span>Local Favorite Overlays</span>
+            <span
+              class="info-hint pi pi-info-circle"
+              [attr.title]="favoriteOverlayTooltip()"
+              aria-hidden="true"
+            ></span>
+          </span>
+          <div class="local-favorites-toggles">
+            <button
+              type="button"
+              class="filter-toggle"
+              [class.is-active]="favoritePerformersOnly()"
+              [attr.aria-pressed]="favoritePerformersOnly()"
+              (click)="onFavoritePerformersOnlyChanged(!favoritePerformersOnly())"
+            >
+              Favorite performers
+            </button>
+            <button
+              type="button"
+              class="filter-toggle"
+              [class.is-active]="favoriteStudiosOnly()"
+              [attr.aria-pressed]="favoriteStudiosOnly()"
+              (click)="onFavoriteStudiosOnlyChanged(!favoriteStudiosOnly())"
+            >
+              Favorite studios
+            </button>
+            <button
+              type="button"
+              class="filter-toggle"
+              [class.is-active]="favoriteTagsOnly()"
+              [attr.aria-pressed]="favoriteTagsOnly()"
+              (click)="onFavoriteTagsOnlyChanged(!favoriteTagsOnly())"
+            >
+              Favorite tags
+            </button>
+          </div>
+        </div>
+      </article>
     </div>
-
-    <p class="controls-note">
-      {{ libraryResultsNote() }}
-    </p>
   </section>
 
-  @if (loading()) {
-    <div class="app-blocking-loader" role="status" aria-live="polite">
-      <p-progressspinner
-        styleClass="app-blocking-spinner"
-        strokeWidth="4"
-        [style]="{ width: '2.25rem', height: '2.25rem' }"
-      />
-      <p>Loading local library...</p>
+  <section class="results-shell">
+    <div class="results-head">
+      <div class="results-copy">
+        <p class="eyebrow">Local Results</p>
+        <h2>{{ resultsHeading() }}</h2>
+        <p>{{ resultsSummary() }}</p>
+      </div>
+
+      <div class="results-actions">
+        @if (hasActiveFilters()) {
+          <button type="button" class="secondary-action" (click)="resetFilters()">
+            Clear filters
+          </button>
+        }
+        <a class="secondary-link small" [routerLink]="['/scenes']">Browse Discovery</a>
+      </div>
     </div>
-  } @else if (error()) {
-    <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
-    <button type="button" class="retry-button" (click)="retryInitialLoad()">Retry</button>
-  } @else if (!hasItems()) {
-    <p class="state">{{ emptyStateMessage() }}</p>
-  } @else {
-    <section class="grid">
-      @for (item of items(); track item.id) {
-        <article class="card">
-          <div class="media">
-            <a
-              class="media-link-stretch"
-              [href]="item.viewUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              [attr.aria-label]="'View ' + item.title + ' in Stash'"
-            ></a>
 
-            @if (item.cardImageUrl || item.imageUrl) {
-              <img
-                class="thumbnail"
-                [src]="item.cardImageUrl ?? item.imageUrl"
-                [alt]="item.title"
-                loading="lazy"
-              />
-            } @else {
-              <div class="thumbnail placeholder" aria-hidden="true"></div>
+    @if (hasNarrowingFilters()) {
+      <div class="active-filters" data-testid="library-active-filters">
+        <span class="active-filters-label">Active filters</span>
+        <div class="active-filters-list">
+          @if (queryTerm().trim().length > 0) {
+            <button type="button" class="filter-chip is-active" (click)="clearQueryFilter()">
+              {{ queryFilterLabel() }}
+              <i class="pi pi-times" aria-hidden="true"></i>
+            </button>
+          }
+
+          @for (studio of selectedStudios(); track studio.id) {
+            <button
+              type="button"
+              class="filter-chip is-active"
+              (click)="clearStudioFilter(studio.id)"
+            >
+              Studio: {{ studio.label }}
+              <i class="pi pi-times" aria-hidden="true"></i>
+            </button>
+          }
+
+          @for (tag of selectedTags(); track tag.id) {
+            <button type="button" class="filter-chip is-active" (click)="clearTagFilter(tag.id)">
+              Tag: {{ tag.name }}
+              <i class="pi pi-times" aria-hidden="true"></i>
+            </button>
+          }
+
+          @if (favoritePerformersOnly()) {
+            <button
+              type="button"
+              class="filter-chip is-active"
+              (click)="clearFavoritePerformersFilter()"
+            >
+              Favorite performers
+              <i class="pi pi-times" aria-hidden="true"></i>
+            </button>
+          }
+
+          @if (favoriteStudiosOnly()) {
+            <button
+              type="button"
+              class="filter-chip is-active"
+              (click)="clearFavoriteStudiosFilter()"
+            >
+              Favorite studios
+              <i class="pi pi-times" aria-hidden="true"></i>
+            </button>
+          }
+
+          @if (favoriteTagsOnly()) {
+            <button
+              type="button"
+              class="filter-chip is-active"
+              (click)="clearFavoriteTagsFilter()"
+            >
+              Favorite tags
+              <i class="pi pi-times" aria-hidden="true"></i>
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    @if (loading()) {
+      <div class="app-blocking-loader" role="status" aria-live="polite">
+        <p-progressspinner
+          styleClass="app-blocking-spinner"
+          strokeWidth="4"
+          [style]="{ width: '2.25rem', height: '2.25rem' }"
+        />
+        <p>Loading local library...</p>
+      </div>
+    } @else if (error()) {
+      <section class="state-shell">
+        <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
+        <button type="button" class="secondary-action" (click)="retryInitialLoad()">Retry</button>
+      </section>
+    } @else if (!hasItems()) {
+      <section class="state-shell empty-shell" data-testid="library-empty-state">
+        <p class="eyebrow">{{ emptyStateEyebrow() }}</p>
+        <h2>{{ emptyStateTitle() }}</h2>
+        <p class="state-copy">{{ emptyStateMessage() }}</p>
+
+        <div class="state-actions">
+          @if (hasNarrowingFilters()) {
+            <button type="button" class="secondary-action" (click)="resetFilters()">
+              Clear filters
+            </button>
+            <a class="primary-link" [routerLink]="['/scenes']">Browse Scenes</a>
+            <a class="secondary-link" [routerLink]="['/acquisition']">Track Imports</a>
+          } @else {
+            <a class="primary-link" [routerLink]="['/acquisition']">Track Imports</a>
+            <a class="secondary-link" [routerLink]="['/scenes']">Browse Scenes</a>
+            @if (pageAlert()) {
+              <a class="secondary-link" [routerLink]="['/settings']">Open Settings</a>
             }
+          }
+        </div>
+      </section>
+    } @else {
+      <section class="grid">
+        @for (item of items(); track item.id) {
+          <article class="card">
+            <div class="media">
+              @if (sceneDetailsAvailable(item)) {
+                <a
+                  class="media-link"
+                  [routerLink]="['/scene', item.activeCatalogSceneId]"
+                  [queryParams]="{ returnTo: currentRouteUrl() }"
+                  [attr.aria-label]="mediaAriaLabel(item)"
+                >
+                  @if (item.cardImageUrl || item.imageUrl) {
+                    <img
+                      class="thumbnail"
+                      [src]="item.cardImageUrl ?? item.imageUrl"
+                      [alt]="item.title"
+                      loading="lazy"
+                    />
+                  } @else {
+                    <div class="thumbnail placeholder" aria-hidden="true">
+                      <div class="placeholder-copy">
+                        <strong>No artwork</strong>
+                      </div>
+                    </div>
+                  }
+                </a>
+              } @else {
+                <a
+                  class="media-link"
+                  [href]="item.viewUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  [attr.aria-label]="mediaAriaLabel(item)"
+                >
+                  @if (item.cardImageUrl || item.imageUrl) {
+                    <img
+                      class="thumbnail"
+                      [src]="item.cardImageUrl ?? item.imageUrl"
+                      [alt]="item.title"
+                      loading="lazy"
+                    />
+                  } @else {
+                    <div class="thumbnail placeholder" aria-hidden="true">
+                      <div class="placeholder-copy">
+                        <strong>No artwork</strong>
+                      </div>
+                    </div>
+                  }
+                </a>
+              }
 
-            <div class="media-top">
-              @if (item.studioImageUrl) {
-                @if (studioBadgeQueryParams(item); as studioParams) {
-                  <a
-                    class="studio-badge-link"
-                    [routerLink]="['/library']"
-                    [queryParams]="studioParams"
-                    [attr.aria-label]="'Filter library by studio ' + (item.studio ?? 'Unknown')"
-                  >
+              <div class="media-top">
+                @if (item.studioImageUrl) {
+                  @if (studioBadgeQueryParams(item); as studioParams) {
+                    <a
+                      class="studio-badge-link"
+                      [routerLink]="['/library']"
+                      [queryParams]="studioParams"
+                      [attr.aria-label]="'Filter library by studio ' + (item.studio ?? 'Unknown')"
+                    >
+                      <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
+                        <img
+                          [src]="item.studioImageUrl"
+                          [alt]="item.studio ?? 'Studio logo'"
+                          loading="lazy"
+                        />
+                      </div>
+                    </a>
+                  } @else {
                     <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
                       <img
                         [src]="item.studioImageUrl"
@@ -220,92 +436,154 @@
                         loading="lazy"
                       />
                     </div>
-                  </a>
-                } @else {
-                  <div class="studio-badge logo-plaque" [title]="item.studio ?? 'Studio'">
-                    <img
-                      [src]="item.studioImageUrl"
-                      [alt]="item.studio ?? 'Studio logo'"
-                      loading="lazy"
-                    />
-                  </div>
+                  }
+                } @else if (item.studio) {
+                  @if (studioBadgeQueryParams(item); as studioParams) {
+                    <a
+                      class="studio-badge-link"
+                      [routerLink]="['/library']"
+                      [queryParams]="studioParams"
+                      [attr.aria-label]="'Filter library by studio ' + item.studio"
+                    >
+                      <div class="studio-badge text-badge" [title]="item.studio">
+                        {{ item.studio }}
+                      </div>
+                    </a>
+                  } @else {
+                    <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
+                  }
                 }
-              } @else if (item.studio) {
-                @if (studioBadgeQueryParams(item); as studioParams) {
-                  <a
-                    class="studio-badge-link"
-                    [routerLink]="['/library']"
-                    [queryParams]="studioParams"
-                    [attr.aria-label]="'Filter library by studio ' + item.studio"
-                  >
-                    <div class="studio-badge text-badge" [title]="item.studio">
-                      {{ item.studio }}
-                    </div>
-                  </a>
-                } @else {
-                  <div class="studio-badge text-badge" [title]="item.studio">{{ item.studio }}</div>
-                }
-              }
 
-              <div class="media-flags">
-                <span class="library-badge">In Library</span>
-                @if (item.activeCatalogSceneId) {
-                  <a
-                    class="catalog-link"
-                    [routerLink]="['/scene', item.activeCatalogSceneId]"
-                    [queryParams]="{ returnTo: currentRouteUrl() }"
+                <div class="media-flags">
+                  <span class="library-badge">Local copy</span>
+                  <span
+                    class="connection-badge"
+                    [class.is-linked]="sceneDetailsAvailable(item)"
                   >
-                    Catalog
-                  </a>
-                }
+                    {{ sceneDetailsAvailable(item) ? 'Catalog linked' : 'Local only' }}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div class="media-bottom">
-              <h2 class="media-title">{{ item.title }}</h2>
-              <div class="media-meta-row">
-                <p class="media-date">
-                  @if (item.releaseDate) {
-                    <time [attr.datetime]="item.releaseDate">{{ item.releaseDate }}</time>
-                  } @else {
-                    <span class="media-date-placeholder">No date</span>
-                  }
-                </p>
-                <div class="media-action">
+            <div class="card-body">
+              <h3 class="card-title">
+                @if (sceneDetailsAvailable(item)) {
                   <a
-                    class="view-cta"
+                    [routerLink]="['/scene', item.activeCatalogSceneId]"
+                    [queryParams]="{ returnTo: currentRouteUrl() }"
+                  >
+                    {{ item.title }}
+                  </a>
+                } @else {
+                  <a [href]="item.viewUrl" target="_blank" rel="noopener noreferrer">
+                    {{ item.title }}
+                  </a>
+                }
+              </h3>
+
+              @if (
+                localAddedLabel(item.localCreatedAt) ||
+                formattedReleaseDate(item.releaseDate) ||
+                formattedDuration(item.duration)
+              ) {
+                <div class="card-stat-pills">
+                  @if (localAddedLabel(item.localCreatedAt); as addedLabel) {
+                    <span class="detail-pill local">{{ addedLabel }}</span>
+                  }
+                  @if (formattedReleaseDate(item.releaseDate); as releaseDate) {
+                    <span class="detail-pill">Released {{ releaseDate }}</span>
+                  }
+                  @if (formattedDuration(item.duration); as duration) {
+                    <span class="detail-pill">{{ duration }}</span>
+                  }
+                </div>
+              }
+
+              @if (item.studio || item.performerNames.length > 0) {
+                <div class="card-links">
+                  @if (studioRouteQueryParams(item); as studioQueryParams) {
+                    <a
+                      class="meta-chip local"
+                      [routerLink]="['/studios']"
+                      [queryParams]="studioQueryParams"
+                      [attr.title]="'Browse studio ' + item.studio"
+                    >
+                      {{ item.studio }}
+                    </a>
+                  }
+
+                  @for (performerName of performerPreview(item); track performerName) {
+                    <a
+                      class="meta-chip"
+                      [routerLink]="['/performers']"
+                      [queryParams]="performerRouteQueryParams(performerName)"
+                    >
+                      {{ performerName }}
+                    </a>
+                  }
+
+                  @if (performerOverflowCount(item) > 0) {
+                    <span class="meta-chip muted">
+                      +{{ performerOverflowCount(item) }} more performers
+                    </span>
+                  }
+                </div>
+              }
+
+              <div class="card-actions">
+                @if (sceneDetailsAvailable(item)) {
+                  <a
+                    class="primary-link small"
+                    [routerLink]="['/scene', item.activeCatalogSceneId]"
+                    [queryParams]="{ returnTo: currentRouteUrl() }"
+                  >
+                    Scene details
+                  </a>
+
+                  <a
+                    class="secondary-link small"
                     [href]="item.viewUrl"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
                     View in Stash
                   </a>
-                </div>
+                } @else {
+                  <a
+                    class="primary-link small"
+                    [href]="item.viewUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    View in Stash
+                  </a>
+                }
               </div>
             </div>
-          </div>
-        </article>
+          </article>
+        }
+      </section>
+
+      <div #loadMoreSentinel class="load-sentinel"></div>
+
+      @if (loadingMore()) {
+        <div class="app-blocking-loader inline" role="status" aria-live="polite">
+          <p-progressspinner
+            styleClass="app-blocking-spinner"
+            strokeWidth="4"
+            [style]="{ width: '2rem', height: '2rem' }"
+          />
+          <p>Loading more local scenes...</p>
+        </div>
       }
-    </section>
 
-    <div #loadMoreSentinel class="load-sentinel"></div>
-
-    @if (loadingMore()) {
-      <div class="app-blocking-loader inline" role="status" aria-live="polite">
-        <p-progressspinner
-          styleClass="app-blocking-spinner"
-          strokeWidth="4"
-          [style]="{ width: '2rem', height: '2rem' }"
-        />
-        <p>Loading more scenes...</p>
-      </div>
+      @if (loadMoreError()) {
+        <div class="load-more-error">
+          <p-message severity="error" styleClass="app-page-message">{{ loadMoreError() }}</p-message>
+          <button type="button" class="secondary-action" (click)="retryLoadMore()">Retry</button>
+        </div>
+      }
     }
-
-    @if (loadMoreError()) {
-      <p-message severity="error" styleClass="app-page-message load-more-error">
-        {{ loadMoreError() }}
-      </p-message>
-      <button type="button" class="retry-button" (click)="retryLoadMore()">Retry</button>
-    }
-  }
+  </section>
 </main>

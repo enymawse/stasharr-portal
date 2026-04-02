@@ -11,9 +11,11 @@ const librarySceneListSelect = {
   studioId: true,
   studioName: true,
   studioImageUrl: true,
+  performerNames: true,
   releaseDate: true,
   duration: true,
   viewUrl: true,
+  localCreatedAt: true,
 };
 
 function buildLibraryRow(overrides: Record<string, unknown> = {}) {
@@ -48,13 +50,13 @@ function buildLibraryRow(overrides: Record<string, unknown> = {}) {
 
 describe('LibraryService', () => {
   const librarySceneIndexFindManyMock = jest.fn();
-  const librarySceneIndexCountMock = jest.fn();
+  const librarySceneIndexAggregateMock = jest.fn();
   const queryRawMock = jest.fn();
 
   const prismaService = {
     librarySceneIndex: {
       findMany: librarySceneIndexFindManyMock,
-      count: librarySceneIndexCountMock,
+      aggregate: librarySceneIndexAggregateMock,
     },
     $queryRaw: queryRawMock,
   } as unknown as PrismaService;
@@ -68,7 +70,10 @@ describe('LibraryService', () => {
       new LibrarySceneQueryService(prismaService),
     );
     librarySceneIndexFindManyMock.mockResolvedValue([buildLibraryRow()]);
-    librarySceneIndexCountMock.mockResolvedValue(3);
+    librarySceneIndexAggregateMock.mockResolvedValue({
+      _count: { _all: 3 },
+      _max: { lastSyncedAt: new Date('2026-03-30T00:00:00.000Z') },
+    });
     queryRawMock.mockResolvedValue([]);
   });
 
@@ -77,6 +82,7 @@ describe('LibraryService', () => {
 
     expect(result.total).toBe(3);
     expect(result.hasMore).toBe(true);
+    expect(result.latestSyncAt).toEqual(new Date('2026-03-30T00:00:00.000Z'));
     expect(result.items).toEqual([
       {
         id: '411',
@@ -88,8 +94,10 @@ describe('LibraryService', () => {
         studioId: 'studio-1',
         studio: 'Archive',
         studioImageUrl: '/api/media/stash/studios/studio-1/logo',
+        performerNames: ['Performer One'],
         releaseDate: '2026-03-24',
         duration: 1800,
+        localCreatedAt: new Date('2026-03-23T00:00:00.000Z'),
         type: 'SCENE',
         source: 'STASH',
         viewUrl: 'http://stash.local/scenes/411',
@@ -108,6 +116,15 @@ describe('LibraryService', () => {
         take: 2,
       }),
     );
+    expect(librarySceneIndexAggregateMock).toHaveBeenCalledWith({
+      where: {},
+      _count: {
+        _all: true,
+      },
+      _max: {
+        lastSyncedAt: true,
+      },
+    });
   });
 
   it('loads a preview-sized projection slice without counting the full result set', async () => {
@@ -135,8 +152,10 @@ describe('LibraryService', () => {
         studioId: 'studio-1',
         studio: 'Archive',
         studioImageUrl: '/api/media/stash/studios/studio-1/logo',
+        performerNames: ['Performer One'],
         releaseDate: '2026-03-24',
         duration: 1800,
+        localCreatedAt: new Date('2026-03-23T00:00:00.000Z'),
         type: 'SCENE',
         source: 'STASH',
         viewUrl: 'http://stash.local/scenes/411',
@@ -174,7 +193,7 @@ describe('LibraryService', () => {
       select: librarySceneListSelect,
       take: 12,
     });
-    expect(librarySceneIndexCountMock).not.toHaveBeenCalled();
+    expect(librarySceneIndexAggregateMock).not.toHaveBeenCalled();
   });
 
   it('does not expose a catalog link id when the projection lacks an active-provider match', async () => {
@@ -184,7 +203,10 @@ describe('LibraryService', () => {
         linkedCatalogRefs: ['FANSDB|stash-411'],
       }),
     ]);
-    librarySceneIndexCountMock.mockResolvedValue(1);
+    librarySceneIndexAggregateMock.mockResolvedValue({
+      _count: { _all: 1 },
+      _max: { lastSyncedAt: new Date('2026-03-30T00:00:00.000Z') },
+    });
 
     const result = await service.getScenesFeed(1, 1);
 

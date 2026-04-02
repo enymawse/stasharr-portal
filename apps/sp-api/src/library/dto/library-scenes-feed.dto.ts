@@ -8,8 +8,10 @@ export class LibrarySceneFeedItemDto {
   studioId!: string | null;
   studio!: string | null;
   studioImageUrl!: string | null;
+  performerNames!: string[];
   releaseDate!: string | null;
   duration!: number | null;
+  localCreatedAt!: Date | null;
   type!: 'SCENE';
   source!: 'STASH';
   viewUrl!: string;
@@ -20,5 +22,6 @@ export class LibraryScenesFeedDto {
   page!: number;
   perPage!: number;
   hasMore!: boolean;
+  latestSyncAt!: Date | null;
   items!: LibrarySceneFeedItemDto[];
 }
