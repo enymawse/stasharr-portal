@@ -22,6 +22,9 @@ export class AcquisitionSceneItemDto {
   type!: 'SCENE';
   source!: CatalogProviderKey;
   status!: SceneStatusDto;
+  queueStatus!: string | null;
+  queueState!: string | null;
+  errorMessage!: string | null;
   whisparrViewUrl!: string | null;
 }
 

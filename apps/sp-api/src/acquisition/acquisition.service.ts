@@ -208,6 +208,9 @@ export class AcquisitionService {
       type: 'SCENE',
       source,
       status: this.indexingService.toSceneStatus(row),
+      queueStatus: row.whisparrQueueStatus,
+      queueState: row.whisparrQueueState,
+      errorMessage: row.whisparrErrorMessage,
       whisparrViewUrl:
         whisparrBaseUrl && row.whisparrMovieId !== null
           ? this.whisparrAdapter.buildSceneViewUrl(

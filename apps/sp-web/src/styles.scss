@@ -44,6 +44,41 @@
   --badge-failed-bg: #fdeced;
   --badge-failed-border: #efbcc1;
   --badge-failed-text: #972536;
+  --acquisition-alert-bg: color-mix(in srgb, var(--warning-bg) 54%, var(--surface-elevated));
+  --acquisition-alert-border: color-mix(in srgb, var(--warning-border) 82%, var(--border-strong));
+  --acquisition-overview-bg: color-mix(in srgb, var(--surface-raised) 82%, var(--surface-elevated));
+  --acquisition-overview-border: color-mix(in srgb, var(--border-strong) 56%, transparent);
+  --acquisition-attention-bg: color-mix(in srgb, var(--badge-failed-bg) 48%, var(--surface-elevated));
+  --acquisition-attention-border: color-mix(
+    in srgb,
+    var(--badge-failed-border) 78%,
+    var(--border-strong)
+  );
+  --acquisition-attention-copy: color-mix(in srgb, var(--badge-failed-text) 82%, var(--text-primary));
+  --acquisition-pending-bg: color-mix(in srgb, var(--badge-import-pending-bg) 42%, var(--surface-elevated));
+  --acquisition-pending-border: color-mix(
+    in srgb,
+    var(--badge-import-pending-border) 78%,
+    var(--border-strong)
+  );
+  --acquisition-active-bg: color-mix(in srgb, var(--badge-downloading-bg) 42%, var(--surface-elevated));
+  --acquisition-active-border: color-mix(
+    in srgb,
+    var(--badge-downloading-border) 78%,
+    var(--border-strong)
+  );
+  --acquisition-passive-bg: color-mix(in srgb, var(--badge-requested-bg) 42%, var(--surface-elevated));
+  --acquisition-passive-border: color-mix(
+    in srgb,
+    var(--badge-requested-border) 76%,
+    var(--border-strong)
+  );
+  --acquisition-chip-bg: color-mix(in srgb, var(--chip-bg) 84%, var(--surface-elevated));
+  --acquisition-chip-border: color-mix(in srgb, var(--chip-border) 82%, transparent);
+  --acquisition-chip-text: var(--chip-text);
+  --acquisition-card-bg: color-mix(in srgb, var(--surface-elevated) 94%, var(--surface-1));
+  --acquisition-card-border: color-mix(in srgb, var(--border-strong) 46%, transparent);
+  --acquisition-placeholder-end: color-mix(in srgb, var(--surface-raised) 66%, var(--border-subtle));
   --shadow-sm: 0 6px 16px rgb(8 16 27 / 12%);
 
   /* PrimeNG token bridge: keep framework controls aligned with app surfaces/colors. */

@@ -164,6 +164,9 @@ describe('AcquisitionService', () => {
       'http://whisparr.local/movie/40',
     );
     expect(result.items[0]?.source).toBe('STASHDB');
+    expect(result.items[0]?.queueStatus).toBe('failed');
+    expect(result.items[0]?.queueState).toBe('warning');
+    expect(result.items[0]?.errorMessage).toBeNull();
     expect(sceneIndexFindManyMock).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {

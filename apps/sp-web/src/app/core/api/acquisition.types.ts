@@ -11,6 +11,9 @@ export interface AcquisitionCountsByLifecycle {
 }
 
 export interface AcquisitionSceneItem extends DiscoverItem {
+  queueStatus: string | null;
+  queueState: string | null;
+  errorMessage: string | null;
   whisparrViewUrl: string | null;
 }
 
