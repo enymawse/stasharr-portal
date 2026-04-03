@@ -27,6 +27,12 @@ The release workflow runs on pushes to `main` and expects a dedicated `RELEASE_P
 
 Bootstrap the first official release as `v0.1.0` by merging the PR that introduces this setup with `Release-As: 0.1.0` in the final commit body. The repo starts at `0.0.0` in `version.txt` to represent "no official release yet"; the initial Release PR is what moves the product to `0.1.0`. After that first release, keep feature work flowing through PRs into `main` and prefer squash merges with Conventional Commit messages so version bumps stay predictable: `feat:` bumps minor, `fix:` bumps patch, and `!` marks a major release. Development builds from `main` stay separate from official SemVer releases, which come from release tags.
 
+## Container Images
+
+Stasharr publishes one production app image to GHCR at `ghcr.io/<owner>/stasharr-portal`. Pushes to `main` publish development tags `edge` and `sha-<shortsha>`. Pushes of release tags matching `vX.Y.Z` publish release tags `vX.Y.Z`, `vX.Y`, `vX`, and `latest`. `latest` tracks the newest stable tagged release, not the tip of `main`.
+
+The GHCR publish workflow must already be merged to `main` before merging the current `release-please` PR for `v0.1.0`. `release-please` creates the Git tag, and that tag push is what triggers the release image publish automatically. The workflow uses metadata-action to keep the GHCR image name normalized and to attach OCI labels for source, revision, and version metadata.
+
 ## Local Development
 
 - Copy `.env.example` to `.env` for local credentials and the local `DATABASE_URL`.
