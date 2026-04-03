@@ -1,11 +1,14 @@
+x-db-env: &db-env
+  POSTGRES_DB: stasharr
+  POSTGRES_USER: stasharr
+  # Change this once before your first start.
+  POSTGRES_PASSWORD: change-this-password
+
 services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: stasharr
-      POSTGRES_USER: stasharr
-      # Change this before your first start.
-      POSTGRES_PASSWORD: change-this-password
+      <<: *db-env
     volumes:
       - stasharr_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -23,9 +26,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      POSTGRES_DB: stasharr
-      POSTGRES_USER: stasharr
-      POSTGRES_PASSWORD: change-this-password
+      <<: *db-env
       DATABASE_HOST: postgres
       DATABASE_URL: ""
       HOST: 0.0.0.0
