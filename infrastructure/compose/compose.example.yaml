@@ -1,0 +1,43 @@
+x-db-env: &db-env
+  POSTGRES_DB: stasharr
+  POSTGRES_USER: stasharr
+  # Change this once before your first start.
+  POSTGRES_PASSWORD: change-this-password
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      <<: *db-env
+    volumes:
+      - stasharr_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  app:
+    # Change latest to an exact release like v0.1.0 if you want to pin upgrades.
+    image: ghcr.io/enymawse/stasharr-portal:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *db-env
+      DATABASE_HOST: postgres
+      DATABASE_URL: ""
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_MIGRATION_MAX_ATTEMPTS: 30
+      DATABASE_MIGRATION_RETRY_DELAY_SECONDS: 2
+    ports:
+      # Change the left side if port 3000 is already in use on the host.
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  stasharr_postgres_data:
+    name: stasharr_postgres_data
