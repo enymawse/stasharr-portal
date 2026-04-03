@@ -17,7 +17,6 @@ importers:
       pg:
         specifier: ^8.20.0
         version: 8.20.0
-    devDependencies:
       prisma:
         specifier: ^7.4.2
         version: 7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)

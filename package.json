@@ -9,14 +9,13 @@
     "test": "pnpm -r test",
     "format": "pnpm -r format",
     "web": "pnpm --filter ./apps/sp-web start",
-    "backend": "pnpm --filter ./apps/sp-api start:dev"
-  },
-  "devDependencies": {
-    "prisma": "^7.4.2"
+    "backend": "pnpm --filter ./apps/sp-api start:dev",
+    "dev:db": "docker compose -f infrastructure/compose/docker-compose.yml up -d postgres"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "prisma": "^7.4.2"
   }
 }

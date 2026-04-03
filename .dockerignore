@@ -1,0 +1,13 @@
+.git
+.github
+.vscode
+.codex
+node_modules
+**/node_modules
+.angular
+**/dist
+coverage
+tmp
+.env
+.env.codex
+infrastructure/compose/.env
