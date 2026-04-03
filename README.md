@@ -19,6 +19,14 @@ Stasharr-Portal (SP) is a single-user orchestration console for managing Whispar
 - `prisma` — Prisma schema and migrations
 - `infrastructure` — Docker and deployment assets
 
+## Release Management
+
+Stasharr uses one repo-level product version for the whole repository. The canonical version source is the root `version.txt`, release tags use `vX.Y.Z`, GitHub Releases are created from those tags, and `release-please` maintains the root `CHANGELOG.md`.
+
+The release workflow runs on pushes to `main` and expects a dedicated `RELEASE_PLEASE_TOKEN` repository secret. Commits land on `main`, `release-please` opens or updates a Release PR, and merging that Release PR updates `version.txt` and `CHANGELOG.md`, creates the `vX.Y.Z` tag, and publishes the GitHub Release.
+
+Bootstrap the first official release as `v0.1.0` by merging the PR that introduces this setup with `Release-As: 0.1.0` in the final commit body. The repo starts at `0.0.0` in `version.txt` to represent "no official release yet"; the initial Release PR is what moves the product to `0.1.0`. After that first release, keep feature work flowing through PRs into `main` and prefer squash merges with Conventional Commit messages so version bumps stay predictable: `feat:` bumps minor, `fix:` bumps patch, and `!` marks a major release. Development builds from `main` stay separate from official SemVer releases, which come from release tags.
+
 ## Local Development
 
 - Copy `.env.example` to `.env` for local credentials and the local `DATABASE_URL`.
