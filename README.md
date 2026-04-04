@@ -130,6 +130,7 @@ On container startup, `infrastructure/docker/start-app.sh` derives the container
 - Set `SESSION_SECRET` in root `.env` before running the backend locally.
 - Start Postgres only with `docker compose -f infrastructure/compose/docker-compose.yml up -d postgres`.
 - Use the existing local app workflow with `pnpm run backend` and `pnpm run web`.
+- If an older local database says migration `20260402142846` was modified after it was applied, run `pnpm run db:repair-runtime-health-migration` once, then rerun `pnpm prisma migrate dev`.
 - The root `.env` is now the single source of truth for `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`.
 - The local `DATABASE_URL` in root `.env` points at `localhost:5432`.
 
