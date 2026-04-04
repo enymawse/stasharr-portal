@@ -10,6 +10,7 @@ import { SessionCookieService } from './session-cookie.service';
 
 interface AdminUserRecord {
   id: string;
+  singletonKey: number;
   username: string;
   normalizedUsername: string;
   passwordHash: string;
@@ -97,6 +98,23 @@ describe('AuthService', () => {
         {
           username: 'AnotherAdmin',
           password: 'another-strong-password',
+        },
+        createRequest(),
+        createResponse(),
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('treats create-time bootstrap conflicts as setup already completed', async () => {
+    (prisma.adminUser.create as jest.Mock).mockRejectedValueOnce(
+      createUniqueConstraintError(),
+    );
+
+    await expect(
+      service.bootstrapAdmin(
+        {
+          username: 'LocalAdmin',
+          password: 'this-is-a-strong-password',
         },
         createRequest(),
         createResponse(),
@@ -233,8 +251,27 @@ describe('AuthService', () => {
       adminUser: {
         count: jest.fn(async () => adminUsers.length),
         create: jest.fn(async ({ data }) => {
+          if (
+            adminUsers.some(
+              (candidate) =>
+                candidate.singletonKey === (data.singletonKey ?? 1),
+            )
+          ) {
+            throw createUniqueConstraintError();
+          }
+
+          if (
+            adminUsers.some(
+              (candidate) =>
+                candidate.normalizedUsername === data.normalizedUsername,
+            )
+          ) {
+            throw createUniqueConstraintError();
+          }
+
           const record: AdminUserRecord = {
             id: `user-${adminUsers.length + 1}`,
+            singletonKey: data.singletonKey ?? 1,
             username: data.username,
             normalizedUsername: data.normalizedUsername,
             passwordHash: data.passwordHash,
@@ -374,6 +411,7 @@ async function createAdminUser(
 ): Promise<AdminUserRecord> {
   return {
     id: `user-${username}`,
+    singletonKey: 1,
     username,
     normalizedUsername: username.toLowerCase(),
     passwordHash: await argon2.hash(password, {
@@ -418,4 +456,10 @@ function matchesSessionDelete(
   }
 
   return false;
+}
+
+function createUniqueConstraintError(): { code: string } {
+  return {
+    code: 'P2002',
+  };
 }

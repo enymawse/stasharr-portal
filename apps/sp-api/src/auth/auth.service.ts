@@ -43,19 +43,27 @@ export class AuthService {
     request: Request,
     response: Response,
   ): Promise<AuthStatusResponse> {
-    if ((await this.prisma.adminUser.count()) > 0) {
-      throw new ConflictException('Bootstrap is no longer available.');
-    }
-
-    const user = await this.prisma.adminUser.create({
-      data: {
-        username: dto.username.trim(),
-        normalizedUsername: normalizeUsername(dto.username),
-        passwordHash: await argon2.hash(dto.password, {
-          type: argon2.argon2id,
-        }),
-      },
+    const passwordHash = await argon2.hash(dto.password, {
+      type: argon2.argon2id,
     });
+
+    let user;
+    try {
+      user = await this.prisma.adminUser.create({
+        data: {
+          singletonKey: 1,
+          username: dto.username.trim(),
+          normalizedUsername: normalizeUsername(dto.username),
+          passwordHash,
+        },
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ConflictException('Bootstrap is no longer available.');
+      }
+
+      throw error;
+    }
 
     const sessionId = await this.startSession(
       user.id,
@@ -512,4 +520,13 @@ export class AuthService {
 
 function normalizeUsername(username: string): string {
   return username.trim().toLowerCase();
+}
+
+function isUniqueConstraintError(error: unknown): error is { code: string } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'P2002'
+  );
 }

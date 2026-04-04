@@ -16,6 +16,7 @@ model Request {
 
 model AdminUser {
   id                 String         @id @default(cuid())
+  singletonKey       Int            @unique @default(1)
   username           String
   normalizedUsername String         @unique
   passwordHash       String
