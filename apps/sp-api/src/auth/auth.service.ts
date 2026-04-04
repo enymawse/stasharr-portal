@@ -485,14 +485,7 @@ export class AuthService {
   }
 
   private getRequestIp(request: Request): string {
-    const forwardedForHeader = request.headers['x-forwarded-for'];
-    if (
-      typeof forwardedForHeader === 'string' &&
-      forwardedForHeader.trim().length > 0
-    ) {
-      return forwardedForHeader.split(',')[0]?.trim() || 'unknown';
-    }
-
+    // Express applies trust-proxy rules to request.ip when configured.
     return request.ip || request.socket.remoteAddress || 'unknown';
   }
 

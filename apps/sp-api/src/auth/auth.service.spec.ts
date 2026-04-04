@@ -128,6 +128,34 @@ describe('AuthService', () => {
     expect(sessionCookieService.setSessionCookie).toHaveBeenCalledTimes(1);
   });
 
+  it('uses the observed client ip for login throttling instead of forwarded headers', async () => {
+    adminUsers.push(
+      await createAdminUser('local-admin', 'correct-password-123'),
+    );
+
+    await service.login(
+      {
+        username: 'Local-Admin',
+        password: 'correct-password-123',
+      },
+      createRequest({
+        forwardedFor: '203.0.113.55',
+        ip: '10.0.0.42',
+        remoteAddress: '10.0.0.42',
+      }),
+      createResponse(),
+    );
+
+    expect(loginAttemptService.assertAllowed).toHaveBeenNthCalledWith(
+      1,
+      'ip:10.0.0.42',
+    );
+    expect(loginAttemptService.assertAllowed).toHaveBeenNthCalledWith(
+      2,
+      'login:10.0.0.42:local-admin',
+    );
+  });
+
   it('fails login with a generic error when the password is incorrect', async () => {
     adminUsers.push(
       await createAdminUser('local-admin', 'correct-password-123'),
@@ -308,12 +336,27 @@ describe('AuthService', () => {
   }
 });
 
-function createRequest(options: { cookie?: string } = {}): Request {
+function createRequest(
+  options: {
+    cookie?: string;
+    forwardedFor?: string;
+    ip?: string;
+    remoteAddress?: string;
+  } = {},
+): Request {
+  const headers: Record<string, string> = {};
+  if (options.cookie) {
+    headers.cookie = options.cookie;
+  }
+  if (options.forwardedFor) {
+    headers['x-forwarded-for'] = options.forwardedFor;
+  }
+
   return {
-    headers: options.cookie ? { cookie: options.cookie } : {},
-    ip: '127.0.0.1',
+    headers,
+    ip: options.ip ?? '127.0.0.1',
     socket: {
-      remoteAddress: '127.0.0.1',
+      remoteAddress: options.remoteAddress ?? '127.0.0.1',
     },
   } as unknown as Request;
 }
