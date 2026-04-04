@@ -22,6 +22,8 @@ services:
       - .env
     environment:
       DATABASE_URL: ""
+    volumes:
+      - sp_app_data:/var/lib/stasharr
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     depends_on:
@@ -32,3 +34,5 @@ services:
 volumes:
   sp_postgres_data:
     name: sp_postgres_data
+  sp_app_data:
+    name: sp_app_data

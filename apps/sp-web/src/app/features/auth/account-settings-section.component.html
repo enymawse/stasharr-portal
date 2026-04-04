@@ -1,0 +1,65 @@
+<section class="account-card">
+  <div class="card-head">
+    <div>
+      <p class="eyebrow">Account security</p>
+      <h2>Change admin password</h2>
+    </div>
+    <div class="identity-pill">
+      {{ authStatus()?.username ?? 'Admin' }}
+    </div>
+  </div>
+
+  <p class="summary">
+    Update the single local admin password used to protect Stasharr on your LAN.
+  </p>
+
+  <form [formGroup]="form" (ngSubmit)="submit()">
+    <label class="field">
+      <span>Current password</span>
+      <input
+        pInputText
+        type="password"
+        formControlName="currentPassword"
+        autocomplete="current-password"
+      />
+    </label>
+
+    <label class="field">
+      <span>New password</span>
+      <input
+        pInputText
+        type="password"
+        formControlName="newPassword"
+        autocomplete="new-password"
+      />
+    </label>
+
+    <label class="field">
+      <span>Confirm new password</span>
+      <input
+        pInputText
+        type="password"
+        formControlName="confirmPassword"
+        autocomplete="new-password"
+      />
+    </label>
+
+    @if (passwordMismatch()) {
+      <p-message severity="error" styleClass="inline-message">
+        New password and confirmation must match.
+      </p-message>
+    }
+
+    @if (successMessage()) {
+      <p-message severity="success" styleClass="inline-message">{{ successMessage() }}</p-message>
+    }
+
+    @if (errorMessage()) {
+      <p-message severity="error" styleClass="inline-message">{{ errorMessage() }}</p-message>
+    }
+
+    <button pButton type="submit" [disabled]="submitting()">
+      {{ submitting() ? 'Updating password...' : 'Change password' }}
+    </button>
+  </form>
+</section>

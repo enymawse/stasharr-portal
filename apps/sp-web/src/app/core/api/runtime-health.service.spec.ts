@@ -8,6 +8,8 @@ import { RuntimeHealthService } from './runtime-health.service';
 import { SetupService } from './setup.service';
 import { SetupStatusStore } from './setup-status.store';
 import { SetupStatusResponse } from './setup.types';
+import { AuthService } from './auth.service';
+import { AppNotificationsService } from '../notifications/app-notifications.service';
 import { AppShellLayoutComponent } from '../../layouts/app-shell-layout/app-shell-layout.component';
 import { AcquisitionPageComponent } from '../../pages/acquisition/acquisition-page.component';
 
@@ -196,6 +198,18 @@ describe('RuntimeHealthService', () => {
         }),
       ),
     };
+    const authService = {
+      status: () => ({
+        bootstrapRequired: false,
+        authenticated: true,
+        username: 'admin',
+      }),
+      logout: vi.fn(),
+      clearStatus: vi.fn(),
+    };
+    const notifications = {
+      info: vi.fn(),
+    };
     const activatedRoute = {
       queryParamMap: of(convertToParamMap({})),
       snapshot: {
@@ -220,6 +234,14 @@ describe('RuntimeHealthService', () => {
         {
           provide: AcquisitionService,
           useValue: acquisitionService,
+        },
+        {
+          provide: AuthService,
+          useValue: authService,
+        },
+        {
+          provide: AppNotificationsService,
+          useValue: notifications,
         },
         {
           provide: ActivatedRoute,

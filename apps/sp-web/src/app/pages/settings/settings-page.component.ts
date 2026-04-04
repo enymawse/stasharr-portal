@@ -28,6 +28,7 @@ import { SetupStatusStore } from '../../core/api/setup-status.store';
 import { SetupStatusResponse } from '../../core/api/setup.types';
 import { RuntimeHealthService } from '../../core/api/runtime-health.service';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
+import { AccountSettingsSectionComponent } from '../../features/auth/account-settings-section.component';
 import { IntegrationFormFieldsComponent } from '../../shared/integration-form-fields/integration-form-fields.component';
 
 type ServiceTab = IntegrationType;
@@ -46,6 +47,7 @@ type SettingsTab = ServiceTab | 'ABOUT';
     ButtonDirective,
     Message,
     ProgressSpinner,
+    AccountSettingsSectionComponent,
     IntegrationFormFieldsComponent,
   ],
   templateUrl: './settings-page.component.html',

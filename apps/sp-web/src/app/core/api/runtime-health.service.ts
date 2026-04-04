@@ -3,6 +3,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import {
   Observable,
   Subject,
+  Subscription,
   catchError,
   exhaustMap,
   finalize,
@@ -24,7 +25,7 @@ export class RuntimeHealthService {
   private readonly refreshRequests = new Subject<void>();
   private readonly statusState = signal<RuntimeHealthResponse | null>(null);
   private inFlightRefresh$: Observable<RuntimeHealthResponse> | null = null;
-  private started = false;
+  private pollSubscription: Subscription | null = null;
 
   readonly status = this.statusState.asReadonly();
 
@@ -52,13 +53,11 @@ export class RuntimeHealthService {
   }
 
   ensureStarted(): void {
-    if (this.started) {
+    if (this.pollSubscription) {
       return;
     }
 
-    this.started = true;
-
-    merge(
+    this.pollSubscription = merge(
       of(void 0),
       this.refreshRequests,
       timer(RuntimeHealthService.POLL_INTERVAL_MS, RuntimeHealthService.POLL_INTERVAL_MS),
@@ -70,5 +69,10 @@ export class RuntimeHealthService {
   requestRefresh(): void {
     this.ensureStarted();
     this.refreshRequests.next();
+  }
+
+  stop(): void {
+    this.pollSubscription?.unsubscribe();
+    this.pollSubscription = null;
   }
 }

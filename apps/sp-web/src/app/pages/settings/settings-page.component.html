@@ -12,6 +12,8 @@
     <a class="page-link" [routerLink]="['/settings/indexing']">Open indexing operations</a>
   </section>
 
+  <app-account-settings-section />
+
   @if (loading()) {
     <div class="app-blocking-loader" role="status" aria-live="polite">
       <p-progressspinner

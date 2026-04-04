@@ -25,6 +25,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - stasharr_app_data:/var/lib/stasharr
     environment:
       <<: *db-env
       DATABASE_HOST: postgres
@@ -33,6 +35,11 @@ services:
       PORT: 3000
       DATABASE_MIGRATION_MAX_ATTEMPTS: 30
       DATABASE_MIGRATION_RETRY_DELAY_SECONDS: 2
+      # Optional advanced override. Leave unset to let Stasharr generate and persist
+      # a unique session secret for this install in the app data volume.
+      # SESSION_SECRET: your-own-long-random-secret
+      # Optional: set to true when serving Stasharr over HTTPS.
+      SESSION_COOKIE_SECURE: "false"
     ports:
       # Change the left side if port 3000 is already in use on the host.
       - "3000:3000"
@@ -41,3 +48,5 @@ services:
 volumes:
   stasharr_postgres_data:
     name: stasharr_postgres_data
+  stasharr_app_data:
+    name: stasharr_app_data

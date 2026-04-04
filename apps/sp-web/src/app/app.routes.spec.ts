@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { routes } from './app.routes';
 
 describe('app routes', () => {
+  it('exposes the public auth routes before the protected shell', () => {
+    expect(routes.slice(0, 3).map((route) => route.path)).toEqual(['bootstrap', 'login', 'setup']);
+  });
+
   it('keeps the canonical app-shell routes aligned with the consolidated discovery model', () => {
     const appShellChildren = routes.find((route) => route.path === '')?.children ?? [];
     const paths = appShellChildren.map((route) => route.path);

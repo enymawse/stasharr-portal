@@ -1,0 +1,56 @@
+<main class="auth-page">
+  <section class="auth-card">
+    <p class="eyebrow">First-run protection</p>
+    <h1>Create the Stasharr admin account</h1>
+    <p class="lead">
+      Before anyone on your LAN can use Stasharr, create the single local admin account that
+      protects this instance.
+    </p>
+
+    <div class="auth-note">
+      <p>This account signs into the app, unlocks setup, and can change its password later.</p>
+      <p>Use a strong password now even if this is a private home network install.</p>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <label class="field">
+        <span>Username</span>
+        <input pInputText type="text" formControlName="username" autocomplete="username" />
+      </label>
+
+      <label class="field">
+        <span>Password</span>
+        <input
+          pInputText
+          type="password"
+          formControlName="password"
+          autocomplete="new-password"
+        />
+      </label>
+
+      <label class="field">
+        <span>Confirm password</span>
+        <input
+          pInputText
+          type="password"
+          formControlName="confirmPassword"
+          autocomplete="new-password"
+        />
+      </label>
+
+      @if (passwordMismatch()) {
+        <p-message severity="error" styleClass="state-message">
+          New password and confirmation must match.
+        </p-message>
+      }
+
+      @if (errorMessage()) {
+        <p-message severity="error" styleClass="state-message">{{ errorMessage() }}</p-message>
+      }
+
+      <button pButton type="submit" [disabled]="submitting()">
+        {{ submitting() ? 'Creating admin...' : 'Create admin account' }}
+      </button>
+    </form>
+  </section>
+</main>

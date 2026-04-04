@@ -1,9 +1,16 @@
 import { Routes } from '@angular/router';
 import {
+  bootstrapOnlyWhenRequiredGuard,
+  loginOnlyWhenLoggedOutGuard,
+  requireAuthenticatedGuard,
+} from './core/guards/auth-route.guard';
+import {
   requireSetupCompleteGuard,
   setupOnlyWhenIncompleteGuard,
 } from './core/guards/setup-route.guard';
 import { AppShellLayoutComponent } from './layouts/app-shell-layout/app-shell-layout.component';
+import { BootstrapPageComponent } from './features/auth/bootstrap-page.component';
+import { LoginPageComponent } from './features/auth/login-page.component';
 import { SetupPageComponent } from './features/setup/setup-page.component';
 import { AcquisitionPageComponent } from './pages/acquisition/acquisition-page.component';
 import { LibraryPageComponent } from './pages/library/library-page.component';
@@ -18,14 +25,24 @@ import { StudioPageComponent } from './pages/studio/studio-page.component';
 
 export const routes: Routes = [
   {
+    path: 'bootstrap',
+    component: BootstrapPageComponent,
+    canActivate: [bootstrapOnlyWhenRequiredGuard],
+  },
+  {
+    path: 'login',
+    component: LoginPageComponent,
+    canActivate: [loginOnlyWhenLoggedOutGuard],
+  },
+  {
     path: 'setup',
     component: SetupPageComponent,
-    canActivate: [setupOnlyWhenIncompleteGuard],
+    canActivate: [requireAuthenticatedGuard, setupOnlyWhenIncompleteGuard],
   },
   {
     path: '',
     component: AppShellLayoutComponent,
-    canActivate: [requireSetupCompleteGuard],
+    canActivate: [requireAuthenticatedGuard, requireSetupCompleteGuard],
     children: [
       {
         path: 'home',
