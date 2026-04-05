@@ -111,6 +111,15 @@
         }
       </a>
     </nav>
+
+    <section class="sidebar-footer">
+      @if (authStatus()?.username; as username) {
+        <p class="session-user">{{ username }}</p>
+      }
+      <button type="button" class="logout-btn" (click)="logout()">
+        {{ loggingOut() ? 'Signing out...' : 'Log out' }}
+      </button>
+    </section>
   </aside>
 
   <main class="content">

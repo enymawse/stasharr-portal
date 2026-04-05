@@ -14,6 +14,31 @@ model Request {
   updatedAt DateTime      @updatedAt
 }
 
+model AdminUser {
+  id                 String         @id @default(cuid())
+  singletonKey       Int            @unique @default(1)
+  username           String
+  normalizedUsername String         @unique
+  passwordHash       String
+  sessionVersion     Int            @default(1)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  sessions           AdminSession[]
+}
+
+model AdminSession {
+  id             String    @id @default(cuid())
+  userId         String
+  sessionVersion Int
+  expiresAt      DateTime
+  lastSeenAt     DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
 model SceneIndex {
   stashId                String                 @id
   requestStatus          RequestStatus?

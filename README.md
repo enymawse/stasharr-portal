@@ -4,7 +4,7 @@ Stasharr-Portal (SP) is a single-user orchestration console for managing Whispar
 
 ## Self-Hosted Quick Start
 
-Normal self-hosted installs do not require a repo checkout or a separate `.env` file. Create an empty folder, save the following as `compose.yaml`, change the password once in `x-db-env`, and optionally change the host port or pin the image tag. This snippet matches [`infrastructure/compose/compose.example.yaml`](infrastructure/compose/compose.example.yaml).
+Normal self-hosted installs do not require a repo checkout or a separate `.env` file. Create an empty folder, save the following as `compose.yaml`, change the database password once before first start, and optionally change the host port or pin the image tag. This snippet matches [`infrastructure/compose/compose.example.yaml`](infrastructure/compose/compose.example.yaml).
 
 ```yaml
 x-db-env: &db-env
@@ -34,6 +34,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - stasharr_app_data:/var/lib/stasharr
     environment:
       <<: *db-env
       DATABASE_HOST: postgres
@@ -42,6 +44,11 @@ services:
       PORT: 3000
       DATABASE_MIGRATION_MAX_ATTEMPTS: 30
       DATABASE_MIGRATION_RETRY_DELAY_SECONDS: 2
+      # Optional advanced override. Leave unset to let Stasharr generate and persist
+      # a unique session secret for this install in the app data volume.
+      # SESSION_SECRET: your-own-long-random-secret
+      # Optional: set to true when serving Stasharr over HTTPS.
+      SESSION_COOKIE_SECURE: "false"
     ports:
       # Change the left side if port 3000 is already in use on the host.
       - "3000:3000"
@@ -50,9 +57,11 @@ services:
 volumes:
   stasharr_postgres_data:
     name: stasharr_postgres_data
+  stasharr_app_data:
+    name: stasharr_app_data
 ```
 
-Both services reuse the same `POSTGRES_*` values from `x-db-env`, so you change the database password in one place only.
+Both services reuse the same `POSTGRES_*` values from `x-db-env`, so you change the database password in one place only. On first boot, Stasharr automatically generates a unique session secret for that install and persists it in the app data volume. You only need to set `SESSION_SECRET` yourself if you want an advanced manual override.
 
 Then start Stasharr with:
 
@@ -61,6 +70,8 @@ docker compose up -d
 ```
 
 Open `http://localhost:3000`.
+
+On the first visit, Stasharr now opens a first-run bootstrap screen instead of the normal app until you create the single local admin account. After that, unauthenticated visits land on the login screen and normal app/API usage requires that session.
 
 Tag guidance:
 
@@ -93,9 +104,10 @@ If an older image cannot start cleanly against the migrated schema, restore the 
 
 ## Backups
 
-Persistent PostgreSQL data lives in the named Docker volume from your compose file. The standalone example uses `stasharr_postgres_data`, and the repo-managed compose file uses `sp_postgres_data`. Back up that volume or take a logical database dump before upgrades. At minimum, preserve:
+Persistent PostgreSQL data lives in the named Docker volume from your compose file. The standalone example uses `stasharr_postgres_data`, and the repo-managed compose file uses `sp_postgres_data`. The app container also uses a small data volume for the generated session secret: `stasharr_app_data` in the standalone example and `sp_app_data` in the repo-managed compose file. Back up the database volume or take a logical database dump before upgrades. For a full restore, preserve:
 
 - the `stasharr_postgres_data` Docker volume
+- the `stasharr_app_data` Docker volume
 - your `compose.yaml`
 
 One practical logical backup command is:
@@ -110,28 +122,32 @@ The production stack has exactly two services:
 
 The published `ghcr.io/enymawse/stasharr-portal:<tag>` image is built from the repo-root `Dockerfile`. It installs the workspace, generates the Prisma client, builds the Nest API and Angular frontend, then copies the built runtime artifacts and required workspace `node_modules` into a separate runtime stage that serves both `/api/...` routes and the built SPA.
 
-On container startup, `infrastructure/docker/start-app.sh` derives the container `DATABASE_URL` from the shared root `POSTGRES_*` values plus `DATABASE_HOST=postgres`, retries `prisma migrate deploy` until Postgres is reachable, then launches the Nest production server. The frontend is served from the same container in production; local development still runs the backend and Angular dev server separately.
+On container startup, `infrastructure/docker/start-app.sh` derives the container `DATABASE_URL` from the shared root `POSTGRES_*` values plus `DATABASE_HOST=postgres`, loads or generates a per-install session secret under `/var/lib/stasharr`, retries `prisma migrate deploy` until Postgres is reachable, then launches the Nest production server. The frontend is served from the same container in production; local development still runs the backend and Angular dev server separately.
 
 ## Local Development
 
 - Copy `.env.example` to `.env` for local credentials and the local `DATABASE_URL`.
+- Set `SESSION_SECRET` in root `.env` before running the backend locally.
 - Start Postgres only with `docker compose -f infrastructure/compose/docker-compose.yml up -d postgres`.
 - Use the existing local app workflow with `pnpm run backend` and `pnpm run web`.
+- If an older local database says migration `20260402142846` was modified after it was applied, run `pnpm run db:repair-runtime-health-migration` once, then rerun `pnpm prisma migrate dev`.
 - The root `.env` is now the single source of truth for `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`.
 - The local `DATABASE_URL` in root `.env` points at `localhost:5432`.
 
 ## Deployment Notes
 
 - The primary self-hosted install path is the standalone `compose.yaml` shown above or [`infrastructure/compose/compose.example.yaml`](infrastructure/compose/compose.example.yaml), which runs directly from published images and does not require a repo checkout.
-- The deployment compose file uses a named volume, `sp_postgres_data`, so Postgres data survives container restarts.
+- The deployment compose file uses named volumes, `sp_postgres_data` and `sp_app_data`, so Postgres data and the generated session secret survive container recreation.
 - The deployment compose file now consumes the published GHCR image `ghcr.io/enymawse/stasharr-portal:${STASHARR_IMAGE_TAG:-latest}` instead of building locally.
 - Root `.env` owns the shared database identity: `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`.
+- Root `.env` still owns `SESSION_SECRET` for local development, where the backend runs directly instead of through the container startup script.
 - Root `.env` also owns the local-development `DATABASE_URL`, which points at `localhost`.
 - `infrastructure/compose/docker-compose.yml` plus [`infrastructure/compose/.env.example`](infrastructure/compose/.env.example) remain available as a secondary repo-checkout deployment path for contributors or operators who want checked-in compose assets.
-- `infrastructure/compose/.env` owns deployment-specific app settings such as `STASHARR_IMAGE_TAG`, `DATABASE_HOST=postgres`, `HOST`, `PORT`, and migration retry values.
+- `infrastructure/compose/.env` owns deployment-specific app settings such as `STASHARR_IMAGE_TAG`, `DATABASE_HOST=postgres`, `HOST`, `PORT`, and migration retry values. `SESSION_SECRET` remains available there as an advanced override, but the default compose path no longer requires it.
 - The compose app container intentionally starts with an empty `DATABASE_URL`; the startup script rebuilds it with host `postgres`, which keeps the DB identity centralized while still allowing a context-specific hostname.
 - The shipped compose stack exposes the app on host port `${PORT}` and passes `HOST` and `PORT` directly into the app container.
 - The published app image now carries its own Docker `HEALTHCHECK` against `GET /api/v1/status`, which verifies both the API process and database connectivity without repeating inline healthcheck logic in compose files.
+- `GET /api/v1/status` remains public for Docker and external health probes. Normal app pages, integration APIs, indexing APIs, and other product routes require the signed admin session once bootstrap is complete.
 
 ## Stack
 

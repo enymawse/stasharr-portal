@@ -1,0 +1,68 @@
+:host {
+  display: block;
+}
+
+.account-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-radius: 1.25rem;
+  background: color-mix(in srgb, var(--surface-0) 95%, white 5%);
+  border: 1px solid color-mix(in srgb, var(--surface-300) 70%, transparent);
+}
+
+.card-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--p-primary-color);
+}
+
+h2,
+.summary {
+  margin: 0;
+}
+
+.summary {
+  color: var(--text-color-secondary);
+}
+
+.identity-pill {
+  padding: 0.55rem 0.8rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-100) 75%, transparent);
+  font-weight: 700;
+}
+
+form {
+  display: grid;
+  gap: 1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.field span {
+  font-weight: 600;
+}
+
+input {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .card-head {
+    flex-direction: column;
+  }
+}

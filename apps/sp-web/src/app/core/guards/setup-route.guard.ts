@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { of } from 'rxjs';
@@ -12,7 +13,13 @@ export const requireSetupCompleteGuard: CanActivateFn = (_route, state) => {
     map((status) =>
       status.setupComplete || isSettingsUrl(state.url) ? true : router.createUrlTree(['/setup']),
     ),
-    catchError(() => of(router.createUrlTree(['/setup']))),
+    catchError((error: unknown) =>
+      of(
+        error instanceof HttpErrorResponse && error.status === 401
+          ? router.createUrlTree(['/login'])
+          : router.createUrlTree(['/setup']),
+      ),
+    ),
   );
 };
 
@@ -22,7 +29,13 @@ export const setupOnlyWhenIncompleteGuard: CanActivateFn = () => {
 
   return setupService.getStatus().pipe(
     map((status) => (status.setupComplete ? router.createUrlTree(['/scenes']) : true)),
-    catchError(() => of(true)),
+    catchError((error: unknown) =>
+      of(
+        error instanceof HttpErrorResponse && error.status === 401
+          ? router.createUrlTree(['/login'])
+          : true,
+      ),
+    ),
   );
 };
 

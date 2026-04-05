@@ -1,0 +1,38 @@
+<main class="auth-page">
+  <section class="auth-card">
+    <p class="eyebrow">Protected local access</p>
+    <h1>Sign in to Stasharr</h1>
+    <p class="lead">
+      Local app pages and protected API routes now require the configured admin account.
+    </p>
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <label class="field">
+        <span>Username</span>
+        <input pInputText type="text" formControlName="username" autocomplete="username" />
+      </label>
+
+      <label class="field">
+        <span>Password</span>
+        <input
+          pInputText
+          type="password"
+          formControlName="password"
+          autocomplete="current-password"
+        />
+      </label>
+
+      @if (errorMessage()) {
+        <p-message severity="error" styleClass="state-message">{{ errorMessage() }}</p-message>
+      }
+
+      <button pButton type="submit" [disabled]="submitting()">
+        {{ submitting() ? 'Signing in...' : 'Sign in' }}
+      </button>
+    </form>
+
+    <p class="support-copy">
+      Fresh install? <a routerLink="/bootstrap">Create the first admin account</a>
+    </p>
+  </section>
+</main>

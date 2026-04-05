@@ -1,6 +1,35 @@
 #!/bin/sh
 set -eu
 
+APP_DATA_DIR="${APP_DATA_DIR:-/var/lib/stasharr}"
+SESSION_SECRET_FILE="${SESSION_SECRET_FILE:-${APP_DATA_DIR%/}/session-secret}"
+
+if [ -z "${SESSION_SECRET:-}" ]; then
+  session_secret_dir="$(dirname "$SESSION_SECRET_FILE")"
+  mkdir -p "$session_secret_dir"
+  chmod 700 "$session_secret_dir"
+
+  if [ -s "$SESSION_SECRET_FILE" ]; then
+    export SESSION_SECRET="$(tr -d '\r\n' < "$SESSION_SECRET_FILE")"
+
+    if [ -z "$SESSION_SECRET" ]; then
+      echo "Persisted session secret file is empty: $SESSION_SECRET_FILE" >&2
+      exit 1
+    fi
+
+    echo "Loaded persisted session secret from $SESSION_SECRET_FILE"
+  else
+    session_secret_tmp_file="${SESSION_SECRET_FILE}.tmp"
+    export SESSION_SECRET="$(openssl rand -base64 48 | tr -d '\r\n')"
+    printf '%s\n' "$SESSION_SECRET" > "$session_secret_tmp_file"
+    chmod 600 "$session_secret_tmp_file"
+    mv "$session_secret_tmp_file" "$SESSION_SECRET_FILE"
+    echo "Generated and persisted a session secret at $SESSION_SECRET_FILE"
+  fi
+else
+  echo "Using configured SESSION_SECRET from environment"
+fi
+
 if [ -z "${DATABASE_URL:-}" ]; then
   if [ -z "${POSTGRES_DB:-}" ] || [ -z "${POSTGRES_USER:-}" ] || [ -z "${POSTGRES_PASSWORD:-}" ] || [ -z "${DATABASE_HOST:-}" ]; then
     echo "DATABASE_URL is unset and POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, and DATABASE_HOST were not all provided" >&2

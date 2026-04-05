@@ -1,9 +1,11 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
+import { AuthService } from '../../core/api/auth.service';
 import { RuntimeHealthService } from '../../core/api/runtime-health.service';
 import { RuntimeHealthResponse } from '../../core/api/runtime-health.types';
+import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import { SetupService } from '../../core/api/setup.service';
 import { SetupStatusResponse } from '../../core/api/setup.types';
 import { AppShellLayoutComponent } from './app-shell-layout.component';
@@ -71,19 +73,43 @@ describe('AppShellLayoutComponent', () => {
     runtimeHealth = buildRuntimeHealth(),
   ) {
     const runtimeHealthState = signal(runtimeHealth);
+    const authStatus = signal({
+      bootstrapRequired: false,
+      authenticated: true,
+      username: 'admin',
+    });
     const setupService = {
       getStatus: vi.fn().mockReturnValue(of(setupStatus)),
+    };
+    const authService = {
+      status: authStatus.asReadonly(),
+      logout: vi.fn().mockReturnValue(
+        of({
+          bootstrapRequired: false,
+          authenticated: false,
+          username: null,
+        }),
+      ),
+      clearStatus: vi.fn(),
     };
     const runtimeHealthService = {
       ensureStarted: vi.fn(),
       requestRefresh: vi.fn(),
+      stop: vi.fn(),
       status: runtimeHealthState.asReadonly(),
+    };
+    const notifications = {
+      info: vi.fn(),
     };
 
     await TestBed.configureTestingModule({
       imports: [AppShellLayoutComponent],
       providers: [
         provideRouter([]),
+        {
+          provide: AuthService,
+          useValue: authService,
+        },
         {
           provide: SetupService,
           useValue: setupService,
@@ -92,16 +118,24 @@ describe('AppShellLayoutComponent', () => {
           provide: RuntimeHealthService,
           useValue: runtimeHealthService,
         },
+        {
+          provide: AppNotificationsService,
+          useValue: notifications,
+        },
       ],
     }).compileComponents();
 
     const fixture = TestBed.createComponent(AppShellLayoutComponent);
+    const router = TestBed.inject(Router);
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
 
     return {
       fixture,
+      authService,
+      notifications,
+      router,
       runtimeHealthService,
       setRuntimeHealth: (next: RuntimeHealthResponse) => runtimeHealthState.set(next),
     };
@@ -137,6 +171,19 @@ describe('AppShellLayoutComponent', () => {
     expect(
       fixture.nativeElement.querySelector('[data-testid="settings-nav-indicator"]'),
     ).toBeNull();
+  });
+
+  it('logs out from the shell and returns the admin to /login', async () => {
+    const { fixture, authService, notifications, router } = await renderComponent();
+    const navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    const logoutButton = fixture.nativeElement.querySelector('.logout-btn') as HTMLButtonElement;
+    logoutButton.click();
+    await fixture.whenStable();
+
+    expect(authService.logout).toHaveBeenCalledTimes(1);
+    expect(notifications.info).toHaveBeenCalledWith('Signed out');
+    expect(navigateSpy).toHaveBeenCalledWith('/login');
   });
 
   it('renders a runtime Whisparr outage warning with a Settings repair action', async () => {
