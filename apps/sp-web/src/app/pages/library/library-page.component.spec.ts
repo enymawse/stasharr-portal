@@ -134,14 +134,12 @@ describe('LibraryPageComponent', () => {
     TestBed.resetTestingModule();
   });
 
-  async function renderPage(
-    options?: {
-      initialQueryParams?: Record<string, string>;
-      feedResponse?: LibraryScenesFeedResponse;
-      runtimeHealth?: RuntimeHealthResponse;
-      setupStatus?: SetupStatusResponse;
-    },
-  ) {
+  async function renderPage(options?: {
+    initialQueryParams?: Record<string, string>;
+    feedResponse?: LibraryScenesFeedResponse;
+    runtimeHealth?: RuntimeHealthResponse;
+    setupStatus?: SetupStatusResponse;
+  }) {
     const queryParamMap = convertToParamMap(options?.initialQueryParams ?? {});
     const queryParamMap$ = new BehaviorSubject(queryParamMap);
     const libraryService = {
@@ -205,7 +203,7 @@ describe('LibraryPageComponent', () => {
   it('loads the default local-library view from the dedicated library API', async () => {
     const { fixture, libraryService, navigateSpy, runtimeHealthService } = await renderPage();
     const resetButton = fixture.nativeElement.querySelector(
-      '.controls-overview .secondary-action',
+      '.controls-header .reset-filters-button',
     ) as HTMLButtonElement | null;
 
     expect(runtimeHealthService.ensureStarted).toHaveBeenCalledTimes(1);
@@ -238,14 +236,14 @@ describe('LibraryPageComponent', () => {
       },
     });
     const resetButton = fixture.nativeElement.querySelector(
-      '.controls-overview .secondary-action',
+      '.controls-header .reset-filters-button',
     ) as HTMLButtonElement | null;
 
     expect(resetButton).toBeTruthy();
     expect(resetButton?.disabled).toBe(false);
-    expect(fixture.nativeElement.querySelector('[data-testid="library-active-filters"]')?.textContent).toContain(
-      'Query: archive',
-    );
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="library-active-filters"]')?.textContent,
+    ).toContain('Query: archive');
 
     resetButton?.click();
     fixture.detectChanges();
@@ -329,7 +327,9 @@ describe('LibraryPageComponent', () => {
     ) as HTMLElement | null;
 
     expect(degradedAlert?.textContent).toContain('Local library freshness is degraded');
-    expect(degradedAlert?.textContent).toContain('Currently showing projected library data synced through');
+    expect(degradedAlert?.textContent).toContain(
+      'Currently showing projected library data synced through',
+    );
     expect(degradedAlert?.textContent).toContain('Newly imported scenes');
   });
 
@@ -358,18 +358,23 @@ describe('LibraryPageComponent', () => {
     ).toContain('Clear filters');
   });
 
-  it('keeps the normal library browsing state visually quiet', async () => {
+  it('uses the compact scenes-style shell while preserving local-library controls', async () => {
     const { fixture } = await renderPage({
       feedResponse: buildFeedResponse([buildScene({ description: null })]),
     });
-    const text = fixture.nativeElement.textContent;
 
-    expect(fixture.nativeElement.querySelector('.summary-card-copy')).toBeNull();
-    expect(fixture.nativeElement.querySelector('.control-note')).toBeNull();
-    expect(fixture.nativeElement.querySelector('.results-note')).toBeNull();
-    expect(fixture.nativeElement.querySelector('.card-description')).toBeNull();
-    expect(text).not.toContain('Metadata is sparse in Stash');
-    expect(text).not.toContain('Search stays local to the library projection');
+    expect(fixture.nativeElement.querySelector('.summary-shell')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.results-shell')).toBeNull();
+    expect(fixture.nativeElement.querySelector('header .state')?.textContent).toContain(
+      '1 local scene / Release newest',
+    );
+    expect(fixture.nativeElement.querySelector('.controls-note')?.textContent).toContain(
+      'Filters apply to indexed local scenes',
+    );
+    expect(fixture.nativeElement.querySelector('.controls-row input[type="search"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelectorAll('p-multiselect')).toHaveLength(2);
+    expect(fixture.nativeElement.querySelectorAll('p-select')).toHaveLength(2);
+    expect(fixture.nativeElement.querySelector('.grid')).toBeTruthy();
   });
 
   it('renders the shared compact scene card with minimal library-specific actions and badges', async () => {
