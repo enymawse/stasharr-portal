@@ -38,10 +38,7 @@ import {
   LibraryTagMatchMode,
   LibraryTagOption,
 } from '../../core/api/library.types';
-import {
-  SceneCardBadge,
-  SceneCardComponent,
-} from '../../shared/scene-card/scene-card.component';
+import { SceneCardBadge, SceneCardComponent } from '../../shared/scene-card/scene-card.component';
 import { SceneCardShellLink } from '../../shared/scene-card/scene-card-shell.component';
 
 interface MultiSelectOption {
@@ -55,7 +52,6 @@ interface SelectedChip {
 }
 
 interface LibraryPageAlert {
-  eyebrow: string;
   title: string;
   message: string;
 }
@@ -181,7 +177,6 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     const setupStatus = this.setupStatusStore.status();
     if (setupStatus && !setupStatus.required.stash) {
       return {
-        eyebrow: 'Repair Required',
         title: 'Local library browsing needs attention',
         message:
           'Stash needs repair for this surface. Newly imported scenes, artwork, and local favorite overlays may be missing or stale until the integration is fixed.',
@@ -198,7 +193,6 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
       : 'Currently showing projected library data with an unknown sync timestamp.';
 
     return {
-      eyebrow: 'Runtime Outage',
       title: 'Local library freshness is degraded',
       message: `${freshnessHint} Newly imported scenes, refreshed metadata, and availability overlays may lag until Stash is healthy again.`,
     };
@@ -358,14 +352,6 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.resetFeedAndReload();
   }
 
-  protected totalSummaryValue(): string {
-    if (this.loading() && this.total() === 0) {
-      return 'Loading...';
-    }
-
-    return this.total().toLocaleString();
-  }
-
   protected activeFilterCount(): number {
     return (
       (this.queryTerm().trim().length > 0 ? 1 : 0) +
@@ -377,97 +363,17 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
     );
   }
 
-  protected viewSummaryValue(): string {
-    const count = this.activeFilterCount();
-    if (count === 0) {
-      return 'All scenes';
-    }
+  protected libraryStateLabel(): string {
+    const total = this.total();
+    const countLabel = this.hasNarrowingFilters()
+      ? `${total.toLocaleString()} ${total === 1 ? 'match' : 'matches'}`
+      : `${total.toLocaleString()} local scene${total === 1 ? '' : 's'}`;
 
-    return `${count} filter${count === 1 ? '' : 's'}`;
+    return `${countLabel} / ${this.sortSummaryShort()}`;
   }
 
-  protected viewSummaryMeta(): string {
-    return this.sortSummaryShort();
-  }
-
-  protected viewSummaryTooltip(): string {
-    const details = [`Sort: ${this.sortSummary()}.`];
-
-    if (this.selectedTags().length > 1) {
-      details.push(
-        this.selectedTagMode() === 'AND'
-          ? 'Selected tags must all match.'
-          : 'Selected tags can match in any combination.',
-      );
-    }
-
-    return details.join(' ');
-  }
-
-  protected freshnessSummaryValue(): string {
-    if (this.pageAlert()) {
-      return 'Needs attention';
-    }
-
-    const latestSyncAt = this.latestSyncAt();
-    if (latestSyncAt) {
-      return this.formatDateTime(latestSyncAt);
-    }
-
-    if (this.loading()) {
-      return 'Checking...';
-    }
-
-    return 'Awaiting sync';
-  }
-
-  protected freshnessSummaryTooltip(): string {
-    if (this.pageAlert()) {
-      return 'Stash is affecting how fresh this local view can be right now.';
-    }
-
-    const latestSyncAt = this.latestSyncAt();
-    if (latestSyncAt) {
-      return `Latest projection sync for this view: ${this.formatDateTime(latestSyncAt)}.`;
-    }
-
-    return 'Waiting for the local library projection to sync.';
-  }
-
-  protected indexedSummaryTooltip(): string {
-    return 'Scenes currently available in the local library projection.';
-  }
-
-  protected resultsHeading(): string {
-    if (this.loading()) {
-      return 'Loading local library';
-    }
-
-    if (this.error()) {
-      return 'Local library loading failed';
-    }
-
-    if (this.hasItems()) {
-      return 'Local scenes';
-    }
-
-    return this.emptyStateTitle();
-  }
-
-  protected resultsSummary(): string {
-    if (this.loading()) {
-      return 'Fetching scenes from the local library projection and applying the current local-first view.';
-    }
-
-    if (this.error()) {
-      return 'Retry the library feed to restore fast local browsing from the database-backed projection.';
-    }
-
-    if (this.hasItems()) {
-      return `${this.total().toLocaleString()} ${this.hasNarrowingFilters() ? 'matches' : 'scenes'} / ${this.sortSummaryShort()}`;
-    }
-
-    return this.emptyStateMessage();
+  protected libraryControlsNote(): string {
+    return 'Filters apply to indexed local scenes. Favorite overlay toggles use Stash favorites only.';
   }
 
   protected emptyStateTitle(): string {
@@ -482,30 +388,6 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
       : 'This page only shows scenes that already exist in Stash. Import content, wait for indexing to finish, or browse discovery while your local library catches up.';
   }
 
-  protected emptyStateEyebrow(): string {
-    return this.hasNarrowingFilters() ? 'Filtered View' : 'Library Empty';
-  }
-
-  protected sortSummary(): string {
-    switch (this.selectedSort()) {
-      case 'TITLE':
-        return this.selectedDirection() === 'ASC' ? 'title, A to Z' : 'title, Z to A';
-      case 'CREATED_AT':
-        return this.selectedDirection() === 'ASC'
-          ? 'recently added, oldest first'
-          : 'recently added, newest first';
-      case 'UPDATED_AT':
-        return this.selectedDirection() === 'ASC'
-          ? 'recently updated, oldest first'
-          : 'recently updated, newest first';
-      case 'RELEASE_DATE':
-      default:
-        return this.selectedDirection() === 'ASC'
-          ? 'release date, oldest first'
-          : 'release date, newest first';
-    }
-  }
-
   protected sortSummaryShort(): string {
     switch (this.selectedSort()) {
       case 'TITLE':
@@ -518,20 +400,6 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
       default:
         return this.selectedDirection() === 'ASC' ? 'Release oldest' : 'Release newest';
     }
-  }
-
-  protected tagModeTooltip(): string {
-    if (this.selectedTags().length <= 1) {
-      return 'Choose multiple tags to use AND or OR matching.';
-    }
-
-    return this.selectedTagMode() === 'AND'
-      ? 'Scenes must include every selected tag.'
-      : 'Scenes can include any selected tag.';
-  }
-
-  protected favoriteOverlayTooltip(): string {
-    return 'Applies local Stash favorite overlays only.';
   }
 
   protected queryFilterLabel(): string {
