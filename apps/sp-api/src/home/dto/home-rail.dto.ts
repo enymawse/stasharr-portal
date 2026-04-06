@@ -19,7 +19,7 @@ export type HomeRailKey = (typeof HOME_RAIL_KEY_VALUES)[number];
 export const HOME_RAIL_KIND_VALUES = ['BUILTIN', 'CUSTOM'] as const;
 export type HomeRailKind = (typeof HOME_RAIL_KIND_VALUES)[number];
 
-export const HOME_RAIL_SOURCE_VALUES = ['STASHDB', 'STASH', 'HYBRID'] as const;
+export const HOME_RAIL_SOURCE_VALUES = ['STASHDB', 'STASH'] as const;
 export type HomeRailSource = (typeof HOME_RAIL_SOURCE_VALUES)[number];
 
 export const HOME_RAIL_CONTENT_TYPE_VALUES = ['SCENES'] as const;
@@ -44,12 +44,6 @@ export type HomeRailStashSceneSort = (typeof HOME_RAIL_STASH_SCENE_SORT_VALUES)[
 export type HomeRailDirection = SortDirection;
 export type HomeRailFavorites = SceneFavoritesFilter;
 export type HomeRailTagMode = SceneTagMatchMode;
-export const HOME_RAIL_LIBRARY_AVAILABILITY_VALUES = [
-  'IN_LIBRARY',
-  'MISSING_FROM_LIBRARY',
-] as const;
-export type HomeRailLibraryAvailability =
-  (typeof HOME_RAIL_LIBRARY_AVAILABILITY_VALUES)[number];
 
 export class HomeRailStashdbSceneConfigDto {
   sort!: HomeRailStashdbSceneSort;
@@ -78,26 +72,9 @@ export class HomeRailStashSceneConfigDto {
   limit!: number;
 }
 
-export class HomeRailHybridSceneConfigDto {
-  sort!: HomeRailStashdbSceneSort;
-  direction!: HomeRailDirection;
-  stashdbFavorites!: HomeRailFavorites | null;
-  tagIds!: string[];
-  tagNames!: string[];
-  tagMode!: HomeRailTagMode | null;
-  studioIds!: string[];
-  studioNames!: string[];
-  stashFavoritePerformersOnly!: boolean;
-  stashFavoriteStudiosOnly!: boolean;
-  stashFavoriteTagsOnly!: boolean;
-  libraryAvailability!: HomeRailLibraryAvailability;
-  limit!: number;
-}
-
 export type HomeRailSceneConfigDto =
   | HomeRailStashdbSceneConfigDto
-  | HomeRailStashSceneConfigDto
-  | HomeRailHybridSceneConfigDto;
+  | HomeRailStashSceneConfigDto;
 
 export class HomeRailDto {
   id!: string;

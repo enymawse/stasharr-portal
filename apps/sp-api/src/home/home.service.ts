@@ -30,19 +30,17 @@ import {
   HOME_RAIL_CONTENT_TYPE_VALUES,
   HOME_RAIL_DIRECTION_VALUES,
   HOME_RAIL_FAVORITES_VALUES,
-  HOME_RAIL_LIBRARY_AVAILABILITY_VALUES,
   HOME_RAIL_SCENE_LIMIT_DEFAULT,
   HOME_RAIL_SCENE_LIMIT_MAX,
   HOME_RAIL_SCENE_LIMIT_MIN,
   HOME_RAIL_SOURCE_VALUES,
-  type HomeRailLibraryAvailability,
-  type HomeRailHybridSceneConfigDto,
   HOME_RAIL_STASH_SCENE_SORT_VALUES,
   HOME_RAIL_STASHDB_SCENE_SORT_VALUES,
   HOME_RAIL_TAG_MODE_VALUES,
   HomeRailDto,
   type HomeRailKey as HomeRailDtoKey,
   type HomeRailSceneConfigDto,
+  type HomeRailSource as HomeRailDtoSource,
   type HomeRailStashSceneConfigDto,
   type HomeRailStashdbSceneConfigDto,
 } from './dto/home-rail.dto';
@@ -56,6 +54,15 @@ import {
   HomeRailItemDto,
 } from './dto/home-rail-content.dto';
 import { HybridScenesService } from '../hybrid-scenes/hybrid-scenes.service';
+import {
+  LEGACY_HOME_RAIL_LIBRARY_AVAILABILITY_VALUES,
+  type LegacyHomeRailHybridSceneConfig,
+  type LegacyHomeRailLibraryAvailability,
+} from './home-rail-hybrid.internal';
+
+type HomeRailStoredSceneConfig =
+  | HomeRailSceneConfigDto
+  | LegacyHomeRailHybridSceneConfig;
 
 const DEFAULT_HOME_RAILS: Array<{
   key: HomeRailKey;
@@ -146,13 +153,13 @@ export class HomeService {
   ) {}
 
   async getRails(): Promise<HomeRailDto[]> {
-    await this.ensureDefaultRails();
+    await this.ensureUserFacingRailsReady();
     const rails = await this.listRails();
     return rails.map((rail) => this.toDto(rail));
   }
 
   async updateRails(payload: UpdateHomeRailsDto): Promise<HomeRailDto[]> {
-    await this.ensureDefaultRails();
+    await this.ensureUserFacingRailsReady();
     const existingRails = await this.listRails();
     this.validateSubmittedRails(payload, existingRails);
 
@@ -172,7 +179,8 @@ export class HomeService {
   }
 
   async createRail(payload: CreateHomeRailDto): Promise<HomeRailDto> {
-    await this.ensureDefaultRails();
+    await this.ensureUserFacingRailsReady();
+    this.ensureSupportedCustomRailSource(payload.source);
     const lastRail = await this.prisma.homeRail.findFirst({
       orderBy: { sortOrder: 'desc' },
     });
@@ -201,8 +209,14 @@ export class HomeService {
     id: string,
     payload: UpdateHomeRailDto,
   ): Promise<HomeRailDto> {
-    await this.ensureDefaultRails();
+    await this.ensureUserFacingRailsReady();
+    this.ensureSupportedCustomRailSource(payload.source);
     const existingRail = await this.requireCustomRail(id);
+    if (existingRail.source === HomeRailSource.HYBRID) {
+      throw new BadRequestException(
+        'Legacy hybrid Home rails are disabled and cannot be edited.',
+      );
+    }
     if (payload.source !== existingRail.source) {
       throw new BadRequestException(
         'Custom Home rail source cannot be changed after creation.',
@@ -226,14 +240,14 @@ export class HomeService {
   }
 
   async deleteRail(id: string): Promise<void> {
-    await this.ensureDefaultRails();
+    await this.ensureUserFacingRailsReady();
     await this.requireCustomRail(id);
     await this.prisma.homeRail.delete({ where: { id } });
     await this.reindexSortOrders();
   }
 
   async getRailContent(id: string): Promise<HomeRailContentDto> {
-    await this.ensureDefaultRails();
+    await this.ensureUserFacingRailsReady();
     const rail = await this.prisma.homeRail.findUnique({ where: { id } });
     if (!rail) {
       throw new NotFoundException('Home rail not found.');
@@ -286,6 +300,11 @@ export class HomeService {
     }));
   }
 
+  private async ensureUserFacingRailsReady(): Promise<void> {
+    await this.ensureDefaultRails();
+    await this.disableLegacyHybridRails();
+  }
+
   private async ensureDefaultRails(): Promise<void> {
     for (const rail of DEFAULT_HOME_RAILS) {
       await this.prisma.homeRail.upsert({
@@ -313,15 +332,27 @@ export class HomeService {
     }
   }
 
+  private async disableLegacyHybridRails(): Promise<void> {
+    await this.prisma.homeRail.updateMany({
+      where: {
+        source: HomeRailSource.HYBRID,
+        enabled: true,
+      },
+      data: {
+        enabled: false,
+      },
+    });
+  }
+
   private async getStashRailContent(
     rail: HomeRail,
   ): Promise<HomeRailContentDto> {
     const config = this.normalizeSceneRailConfig(
-      rail.source,
+      'STASH',
       rail.config,
       DEFAULT_HOME_RAILS.find((defaultRail) => defaultRail.key === rail.key)
         ?.config ?? null,
-    ) as HomeRailStashSceneConfigDto;
+    );
 
     try {
       const items = await this.libraryService.getScenesPreview(
@@ -379,10 +410,10 @@ export class HomeService {
     }
 
     const config = this.normalizeSceneRailConfig(
-      rail.source,
+      'HYBRID',
       rail.config,
       null,
-    ) as HomeRailHybridSceneConfigDto;
+    );
 
     try {
       const matchedScenes = await this.hybridScenesService.getHybridSceneFeed(
@@ -433,6 +464,11 @@ export class HomeService {
 
   private async listRails(): Promise<HomeRail[]> {
     return this.prisma.homeRail.findMany({
+      where: {
+        source: {
+          not: HomeRailSource.HYBRID,
+        },
+      },
       orderBy: { sortOrder: 'asc' },
     });
   }
@@ -495,12 +531,13 @@ export class HomeService {
     const defaults = rail.key
       ? DEFAULT_HOME_RAILS.find((defaultRail) => defaultRail.key === rail.key)
       : null;
+    const source = this.ensureInSet(rail.source, HOME_RAIL_SOURCE_VALUES);
 
     return {
       id: rail.id,
       key: (rail.key as HomeRailDtoKey | null) ?? null,
       kind: rail.kind,
-      source: this.ensureInSet(rail.source, HOME_RAIL_SOURCE_VALUES),
+      source,
       contentType: this.ensureInSet(
         rail.contentType,
         HOME_RAIL_CONTENT_TYPE_VALUES,
@@ -512,7 +549,7 @@ export class HomeService {
       editable: rail.kind === HomeRailKind.CUSTOM,
       deletable: rail.kind === HomeRailKind.CUSTOM,
       config: this.normalizeSceneRailConfig(
-        rail.source,
+        source,
         rail.config,
         defaults?.config ?? null,
       ),
@@ -543,7 +580,7 @@ export class HomeService {
 
   private toHybridRailItem(
     scene: StashdbScene,
-    libraryAvailability: HomeRailLibraryAvailability,
+    libraryAvailability: LegacyHomeRailLibraryAvailability,
     status: SceneStatusDto,
   ): HomeRailItemDto {
     const effectiveStatus =
@@ -573,10 +610,30 @@ export class HomeService {
   }
 
   private normalizeSceneRailConfig(
+    source: 'STASH',
+    input: unknown,
+    fallback?: Partial<HomeRailStoredSceneConfig> | null,
+  ): HomeRailStashSceneConfigDto;
+  private normalizeSceneRailConfig(
+    source: 'STASHDB',
+    input: unknown,
+    fallback?: Partial<HomeRailStoredSceneConfig> | null,
+  ): HomeRailStashdbSceneConfigDto;
+  private normalizeSceneRailConfig(
+    source: HomeRailDtoSource,
+    input: unknown,
+    fallback?: Partial<HomeRailStoredSceneConfig> | null,
+  ): HomeRailSceneConfigDto;
+  private normalizeSceneRailConfig(
+    source: 'HYBRID',
+    input: unknown,
+    fallback?: Partial<HomeRailStoredSceneConfig> | null,
+  ): LegacyHomeRailHybridSceneConfig;
+  private normalizeSceneRailConfig(
     source: HomeRailSource,
     input: unknown,
-    fallback: Partial<HomeRailSceneConfigDto> | null = null,
-  ): HomeRailSceneConfigDto {
+    fallback: Partial<HomeRailStoredSceneConfig> | null = null,
+  ): HomeRailStoredSceneConfig {
     const record = this.asRecord(input);
     if (source === HomeRailSource.STASH) {
       return this.normalizeStashSceneRailConfig(record, fallback);
@@ -590,7 +647,7 @@ export class HomeService {
 
   private normalizeStashdbSceneRailConfig(
     record: Record<string, unknown>,
-    fallback: Partial<HomeRailSceneConfigDto> | null,
+    fallback: Partial<HomeRailStoredSceneConfig> | null,
   ): HomeRailStashdbSceneConfigDto {
     const fallbackConfig = this.asStashdbSceneConfig(fallback);
     const sort = this.parseInSet(
@@ -643,7 +700,7 @@ export class HomeService {
 
   private normalizeStashSceneRailConfig(
     record: Record<string, unknown>,
-    fallback: Partial<HomeRailSceneConfigDto> | null,
+    fallback: Partial<HomeRailStoredSceneConfig> | null,
   ): HomeRailStashSceneConfigDto {
     this.ensureNullishField(record.favorites, 'favorites', 'STASH');
     this.ensureNullishField(
@@ -740,8 +797,8 @@ export class HomeService {
 
   private normalizeHybridSceneRailConfig(
     record: Record<string, unknown>,
-    fallback: Partial<HomeRailSceneConfigDto> | null,
-  ): HomeRailHybridSceneConfigDto {
+    fallback: Partial<HomeRailStoredSceneConfig> | null,
+  ): LegacyHomeRailHybridSceneConfig {
     this.ensureNullishField(record.favorites, 'favorites', 'HYBRID');
     this.ensureNullishField(record.titleQuery, 'titleQuery', 'HYBRID');
     this.ensureFalseField(
@@ -797,7 +854,7 @@ export class HomeService {
         : null;
     const libraryAvailability = this.parseOptionalStrictInSet(
       record.libraryAvailability,
-      HOME_RAIL_LIBRARY_AVAILABILITY_VALUES,
+      LEGACY_HOME_RAIL_LIBRARY_AVAILABILITY_VALUES,
       fallbackConfig?.libraryAvailability ?? 'MISSING_FROM_LIBRARY',
       'libraryAvailability',
     );
@@ -928,7 +985,7 @@ export class HomeService {
   }
 
   private asStashdbSceneConfig(
-    value: Partial<HomeRailSceneConfigDto> | null,
+    value: Partial<HomeRailStoredSceneConfig> | null,
   ): Partial<HomeRailStashdbSceneConfigDto> | null {
     if (
       !value ||
@@ -943,7 +1000,7 @@ export class HomeService {
   }
 
   private asStashSceneConfig(
-    value: Partial<HomeRailSceneConfigDto> | null,
+    value: Partial<HomeRailStoredSceneConfig> | null,
   ): Partial<HomeRailStashSceneConfigDto> | null {
     if (!value) {
       return null;
@@ -986,14 +1043,14 @@ export class HomeService {
   }
 
   private asHybridSceneConfig(
-    value: Partial<HomeRailSceneConfigDto> | null,
-  ): Partial<HomeRailHybridSceneConfigDto> | null {
+    value: Partial<HomeRailStoredSceneConfig> | null,
+  ): Partial<LegacyHomeRailHybridSceneConfig> | null {
     if (!value) {
       return null;
     }
 
     if ('stashdbFavorites' in value || 'libraryAvailability' in value) {
-      return value as Partial<HomeRailHybridSceneConfigDto>;
+      return value as Partial<LegacyHomeRailHybridSceneConfig>;
     }
 
     return null;
@@ -1068,6 +1125,18 @@ export class HomeService {
     }
 
     return value as T[number];
+  }
+
+  private ensureSupportedCustomRailSource(source: unknown): void {
+    if (source === HomeRailSource.HYBRID) {
+      throw new BadRequestException(
+        'Custom HYBRID Home rails are no longer supported.',
+      );
+    }
+
+    if (source !== HomeRailSource.STASHDB && source !== HomeRailSource.STASH) {
+      throw new BadRequestException('Unsupported Home rail source.');
+    }
   }
 
   private normalizeSubtitle(value: string | null | undefined): string | null {

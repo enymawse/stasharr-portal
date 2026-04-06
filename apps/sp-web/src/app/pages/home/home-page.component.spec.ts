@@ -119,43 +119,11 @@ describe('HomePageComponent', () => {
           limit: 16,
         },
       },
-      {
-        id: 'rail-hybrid',
-        key: null,
-        kind: 'CUSTOM',
-        source: 'HYBRID',
-        contentType: 'SCENES',
-        title: 'Hybrid Rail',
-        subtitle: 'Curated hybrid results',
-        enabled: true,
-        sortOrder: 2,
-        editable: true,
-        deletable: true,
-        config: {
-          sort: 'DATE',
-          direction: 'DESC',
-          stashdbFavorites: null,
-          tagIds: [],
-          tagNames: [],
-          tagMode: null,
-          studioIds: [],
-          studioNames: [],
-          stashFavoritePerformersOnly: false,
-          stashFavoriteStudiosOnly: false,
-          stashFavoriteTagsOnly: false,
-          libraryAvailability: 'MISSING_FROM_LIBRARY',
-          limit: 16,
-        },
-      },
     ];
 
     const homeRailItemsById: Record<string, HomeRailContentResponse> = {
       'rail-stash': {
         items: [buildRailItem()],
-        message: null,
-      },
-      'rail-hybrid': {
-        items: [buildRailItem({ id: 'stashdb-scene-2', source: 'STASHDB', viewUrl: null })],
         message: null,
       },
     };
@@ -225,7 +193,7 @@ describe('HomePageComponent', () => {
     return section as HTMLElement;
   }
 
-  it('routes STASHDB rails to /scenes, STASH rails to /library, and leaves HYBRID rails without see-all links', async () => {
+  it('routes STASHDB rails to /scenes and STASH rails to /library', async () => {
     const { fixture, discoverService } = await renderPage();
 
     expect(discoverService.getScenesFeed).toHaveBeenCalledWith(
@@ -245,9 +213,6 @@ describe('HomePageComponent', () => {
     const libraryLink = railSectionByTitle(fixture, 'Library Rail').querySelector(
       '.see-all-link',
     ) as HTMLAnchorElement | null;
-    const hybridLink = railSectionByTitle(fixture, 'Hybrid Rail').querySelector(
-      '.see-all-link',
-    ) as HTMLAnchorElement | null;
 
     expect(discoveryLink?.getAttribute('href')).toContain('/scenes');
     expect(discoveryLink?.getAttribute('href')).toContain('fav=ALL');
@@ -263,8 +228,6 @@ describe('HomePageComponent', () => {
     expect(libraryLink?.getAttribute('href')).toContain('favoriteTagsOnly=1');
     expect(libraryLink?.getAttribute('href')).toContain('tags=tag-2');
     expect(libraryLink?.getAttribute('href')).toContain('studios=studio-2');
-
-    expect(hybridLink).toBeNull();
   });
 
   it('renders Home rails through the shared scene card and preserves request routing', async () => {
@@ -276,7 +239,7 @@ describe('HomePageComponent', () => {
     const requestButton = discoverySection.querySelector('.request-cta') as HTMLButtonElement | null;
     const libraryLink = librarySection.querySelector('.media-link-stretch') as HTMLAnchorElement | null;
 
-    expect(cards).toHaveLength(3);
+    expect(cards).toHaveLength(2);
     expect(libraryLink?.getAttribute('href')).toBe('http://stash.local/scenes/local-scene-1');
     expect(component.requestModalOpen()).toBe(false);
 
@@ -288,5 +251,30 @@ describe('HomePageComponent', () => {
       title: 'Discovery Scene',
       imageUrl: 'http://cdn.local/discovery.jpg',
     });
+  });
+
+  it('limits custom rail creation to Catalog and Stash and removes hybrid-only controls', async () => {
+    const { fixture } = await renderPage();
+    const component = fixture.componentInstance as any;
+
+    component.openEditor();
+    component.openCreateRailForm();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.sourceOptions.map((option: { value: string }) => option.value)).toEqual([
+      'STASHDB',
+      'STASH',
+    ]);
+    expect(fixture.nativeElement.textContent).not.toContain('Hybrid');
+    expect(fixture.nativeElement.querySelector('#home-rail-hybrid-favorites')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#home-rail-library-availability')).toBeNull();
+
+    component.updateRailSource('STASH');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('#home-rail-hybrid-favorites')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#home-rail-library-availability')).toBeNull();
   });
 });

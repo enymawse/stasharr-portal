@@ -55,7 +55,7 @@
         <div class="editor-head">
           <div>
             <p class="eyebrow">Customize Home</p>
-            <h2>Reorder built-ins and add custom Catalog, Stash, or Hybrid scene rails</h2>
+            <h2>Reorder built-ins and add custom Catalog or Stash scene rails</h2>
           </div>
           <div class="editor-actions">
             <button type="button" class="state-button secondary" (click)="cancelEditor()">
@@ -123,13 +123,6 @@
                   }
                   @if (railLocalFavoritesValue(rail); as localFavorites) {
                     <span>{{ localFavorites }}</span>
-                  }
-                  @if (isHybridRail(rail)) {
-                    <span>{{
-                      rail.config.libraryAvailability === 'IN_LIBRARY'
-                        ? 'Already In Library'
-                        : 'Missing From Library'
-                    }}</span>
                   }
                   @if (railTagCount(rail) > 0) {
                     <span>{{ railTagCount(rail) }} tags</span>
@@ -246,7 +239,7 @@
               @if (editingRailId()) {
                 <p class="editor-note source-note">
                   Source is fixed after creation. Create a new rail if you want to switch between
-                  Catalog, Stash, and Hybrid.
+                  Catalog and Stash.
                 </p>
               }
 
@@ -259,9 +252,7 @@
                   [placeholder]="
                     form.source === 'STASH'
                       ? 'Newest Library Scenes, Recently Updated Library...'
-                      : form.source === 'HYBRID'
-                        ? 'Missing from library, In-library favorites...'
-                        : 'Weekend queue, New tags, Favorite studios...'
+                      : 'Weekend queue, New tags, Favorite studios...'
                   "
                 />
               </label>
@@ -356,48 +347,6 @@
                     panelStyleClass="home-rail-select-panel"
                   />
                 </label>
-              } @else if (form.source === 'HYBRID') {
-                <label class="control-field">
-                  <span>Catalog Favorites</span>
-                  <p-select
-                    inputId="home-rail-hybrid-favorites"
-                    [ngModel]="form.stashdbFavorites"
-                    (ngModelChange)="updateRailForm('stashdbFavorites', $event)"
-                    [options]="favoritesOptions"
-                    optionLabel="label"
-                    optionValue="value"
-                    [appendTo]="'body'"
-                    panelStyleClass="home-rail-select-panel"
-                  />
-                </label>
-
-                <label class="control-field">
-                  <span>Library Availability</span>
-                  <p-select
-                    inputId="home-rail-library-availability"
-                    [ngModel]="form.libraryAvailability"
-                    (ngModelChange)="updateRailForm('libraryAvailability', $event)"
-                    [options]="hybridLibraryAvailabilityOptions"
-                    optionLabel="label"
-                    optionValue="value"
-                    [appendTo]="'body'"
-                    panelStyleClass="home-rail-select-panel"
-                  />
-                </label>
-
-                <label class="control-field">
-                  <span>Tag Mode</span>
-                  <p-select
-                    inputId="home-rail-hybrid-tag-mode"
-                    [ngModel]="form.tagMode"
-                    (ngModelChange)="updateRailForm('tagMode', $event)"
-                    [options]="tagMatchOptions"
-                    optionLabel="label"
-                    optionValue="value"
-                    [appendTo]="'body'"
-                    panelStyleClass="home-rail-select-panel"
-                  />
-                </label>
               } @else {
                 <label class="control-field">
                   <span>Title Contains</span>
@@ -425,7 +374,7 @@
               }
             </div>
 
-            @if (form.source === 'STASHDB' || form.source === 'STASH' || form.source === 'HYBRID') {
+            @if (form.source === 'STASHDB' || form.source === 'STASH') {
               <div class="rail-form-pickers">
                 <label class="control-field">
                   <span>Tags</span>
@@ -535,54 +484,8 @@
                 </div>
 
                 <p class="editor-note source-note">
-                  Stash rails use your local library filters only. This slice supports title search,
-                  local tags, local studios, and favorite performer, studio, or tag toggles.
-                </p>
-              } @else if (form.source === 'HYBRID') {
-                <p class="editor-note source-note source-subsection">Stash Local Favorites</p>
-                <div class="rail-form-grid stash-toggle-grid">
-                  <label class="control-field checkbox-field compact-toggle">
-                    <span>Only Favorite Performers</span>
-                    <label class="toggle-inline">
-                      <input
-                        type="checkbox"
-                        [ngModel]="form.stashFavoritePerformersOnly"
-                        (ngModelChange)="updateRailForm('stashFavoritePerformersOnly', $event)"
-                      />
-                      <span>{{ form.stashFavoritePerformersOnly ? 'Enabled' : 'Disabled' }}</span>
-                    </label>
-                  </label>
-
-                  <label class="control-field checkbox-field compact-toggle">
-                    <span>Only Favorite Studios</span>
-                    <label class="toggle-inline">
-                      <input
-                        type="checkbox"
-                        [ngModel]="form.stashFavoriteStudiosOnly"
-                        (ngModelChange)="updateRailForm('stashFavoriteStudiosOnly', $event)"
-                      />
-                      <span>{{ form.stashFavoriteStudiosOnly ? 'Enabled' : 'Disabled' }}</span>
-                    </label>
-                  </label>
-
-                  <label class="control-field checkbox-field compact-toggle">
-                    <span>Only Favorite Tags</span>
-                    <label class="toggle-inline">
-                      <input
-                        type="checkbox"
-                        [ngModel]="form.stashFavoriteTagsOnly"
-                        (ngModelChange)="updateRailForm('stashFavoriteTagsOnly', $event)"
-                      />
-                      <span>{{ form.stashFavoriteTagsOnly ? 'Enabled' : 'Disabled' }}</span>
-                    </label>
-                  </label>
-                </div>
-
-                <p class="editor-note source-note">
-                  Hybrid rails discover scenes from the catalog provider configured for this
-                  instance, then filter them by whether they exist in your local Stash library.
-                  Catalog favorites drive discovery; Stash local favorites are applied as a
-                  separate overlay after library matching.
+                  Stash rails use your local library filters only, including title search, local
+                  tags, local studios, and favorite performer, studio, or tag toggles.
                 </p>
               }
             }
@@ -635,9 +538,6 @@
                     }
                     @if (rail.summary.titleQueryLabel) {
                       <span>{{ rail.summary.titleQueryLabel }}</span>
-                    }
-                    @if (rail.summary.libraryAvailabilityLabel) {
-                      <span>{{ rail.summary.libraryAvailabilityLabel }}</span>
                     }
                     <span>{{ rail.summary.limit }} items</span>
                     @if (rail.summary.tagCount > 0) {

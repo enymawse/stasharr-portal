@@ -14,7 +14,6 @@ import {
 import {
   HOME_RAIL_DIRECTION_VALUES,
   HOME_RAIL_FAVORITES_VALUES,
-  HOME_RAIL_LIBRARY_AVAILABILITY_VALUES,
   HOME_RAIL_SCENE_LIMIT_DEFAULT,
   HOME_RAIL_SCENE_LIMIT_MAX,
   HOME_RAIL_SCENE_LIMIT_MIN,
@@ -23,7 +22,6 @@ import {
   type HomeRailDirection,
   type HomeRailFavorites,
   type HomeRailSource,
-  type HomeRailLibraryAvailability,
   type HomeRailStashSceneSort,
   type HomeRailStashdbSceneSort,
   type HomeRailTagMode,
@@ -44,10 +42,6 @@ class HomeRailSceneConfigInputDto {
   @IsOptional()
   @IsIn(HOME_RAIL_FAVORITES_VALUES)
   favorites?: HomeRailFavorites | null;
-
-  @IsOptional()
-  @IsIn(HOME_RAIL_FAVORITES_VALUES)
-  stashdbFavorites?: HomeRailFavorites | null;
 
   @IsOptional()
   @IsArray()
@@ -87,25 +81,6 @@ class HomeRailSceneConfigInputDto {
   @Type(() => Boolean)
   @IsBoolean()
   favoriteTagsOnly?: boolean;
-
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
-  stashFavoritePerformersOnly?: boolean;
-
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
-  stashFavoriteStudiosOnly?: boolean;
-
-  @IsOptional()
-  @Type(() => Boolean)
-  @IsBoolean()
-  stashFavoriteTagsOnly?: boolean;
-
-  @IsOptional()
-  @IsIn(HOME_RAIL_LIBRARY_AVAILABILITY_VALUES)
-  libraryAvailability?: HomeRailLibraryAvailability;
 
   @Type(() => Number)
   @IsInt()
