@@ -1,6 +1,26 @@
-# Stasharr-Portal
+# Stasharr
 
-Stasharr-Portal (SP) is a single-user orchestration console for managing Whisparr acquisitions enriched by StashDB metadata and validated against local Stash availability.
+Stasharr is a self-hosted console that discovers scenes from a supported catalog provider, sends acquisitions to Whisparr, and validates availability against your local Stash library.
+
+[![Latest release](https://img.shields.io/github/v/release/enymawse/stasharr-portal?display_name=tag&sort=semver&style=for-the-badge)](https://github.com/enymawse/stasharr-portal/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/enymawse/stasharr-portal/ci.yml?branch=main&label=CI&style=for-the-badge)](https://github.com/enymawse/stasharr-portal/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/enymawse/stasharr-portal?&style=for-the-badge)](LICENSE)
+[![Self-hosted](https://img.shields.io/badge/self--hosted-yes-0f766e?&style=for-the-badge)](#self-hosted-quick-start)
+[![Deploy: Docker Compose](https://img.shields.io/badge/deploy-Docker%20Compose-2496ED?logo=docker&logoColor=white&style=for-the-badge)](#self-hosted-quick-start)
+[![Auth: local admin](https://img.shields.io/badge/auth-local%20admin-475569?&style=for-the-badge)](#self-hosted-quick-start)
+
+## What Stasharr Does
+
+- Discover scenes through a configured catalog provider during first-run setup.
+- Submit and track acquisition requests through Whisparr.
+- Check local Stash availability so you can see what is already in your library.
+
+## What You Need
+
+- Docker and Docker Compose on the machine that will run Stasharr
+- An existing Stash instance that Stasharr can reach
+- An existing Whisparr instance that Stasharr can reach
+- A supported catalog provider to configure during setup: StashDB or FansDB
 
 ## Self-Hosted Quick Start
 
@@ -71,7 +91,7 @@ docker compose up -d
 
 Open `http://localhost:3000`.
 
-On the first visit, Stasharr now opens a first-run bootstrap screen instead of the normal app until you create the single local admin account. After that, unauthenticated visits land on the login screen and normal app/API usage requires that session.
+On the first visit, Stasharr opens a bootstrap screen until you create the single local admin account. After that, unauthenticated visits land on the login screen and normal app and API usage require that session.
 
 Tag guidance:
 
@@ -99,8 +119,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Rolling back the app image does not automatically roll back database schema changes. Take a database backup before upgrades, and be cautious about rolling back across releases that may have already applied newer migrations.
-If an older image cannot start cleanly against the migrated schema, restore the pre-upgrade database backup before retrying the rollback.
+Rolling back the app image does not automatically roll back database schema changes. Take a database backup before upgrades, and be cautious about rolling back across releases that may have already applied newer migrations. If an older image cannot start cleanly against the migrated schema, restore the pre-upgrade database backup before retrying the rollback.
 
 ## Backups
 
@@ -116,66 +135,18 @@ One practical logical backup command is:
 docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > stasharr-backup.sql
 ```
 
-The production stack has exactly two services:
-- `postgres`
-- `app`
-
-The published `ghcr.io/enymawse/stasharr-portal:<tag>` image is built from the repo-root `Dockerfile`. It installs the workspace, generates the Prisma client, builds the Nest API and Angular frontend, then copies the built runtime artifacts and required workspace `node_modules` into a separate runtime stage that serves both `/api/...` routes and the built SPA.
-
-On container startup, `infrastructure/docker/start-app.sh` derives the container `DATABASE_URL` from the shared root `POSTGRES_*` values plus `DATABASE_HOST=postgres`, loads or generates a per-install session secret under `/var/lib/stasharr`, retries `prisma migrate deploy` until Postgres is reachable, then launches the Nest production server. The frontend is served from the same container in production; local development still runs the backend and Angular dev server separately.
-
 ## Local Development
 
-- Copy `.env.example` to `.env` for local credentials and the local `DATABASE_URL`.
-- Set `SESSION_SECRET` in root `.env` before running the backend locally.
-- Start Postgres only with `docker compose -f infrastructure/compose/docker-compose.yml up -d postgres`.
-- Use the existing local app workflow with `pnpm run backend` and `pnpm run web`.
-- If an older local database says migration `20260402142846` was modified after it was applied, run `pnpm run db:repair-runtime-health-migration` once, then rerun `pnpm prisma migrate dev`.
-- The root `.env` is now the single source of truth for `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`.
-- The local `DATABASE_URL` in root `.env` points at `localhost:5432`.
+If you want to run the repo locally instead of the published image:
 
-## Deployment Notes
+- install dependencies with `pnpm install`
+- copy `.env.example` to `.env` and set `SESSION_SECRET`
+- start Postgres with `pnpm run dev:db`
+- run the backend with `pnpm run backend`
+- run the frontend with `pnpm run web`
 
-- The primary self-hosted install path is the standalone `compose.yaml` shown above or [`infrastructure/compose/compose.example.yaml`](infrastructure/compose/compose.example.yaml), which runs directly from published images and does not require a repo checkout.
-- The deployment compose file uses named volumes, `sp_postgres_data` and `sp_app_data`, so Postgres data and the generated session secret survive container recreation.
-- The deployment compose file now consumes the published GHCR image `ghcr.io/enymawse/stasharr-portal:${STASHARR_IMAGE_TAG:-latest}` instead of building locally.
-- Root `.env` owns the shared database identity: `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD`.
-- Root `.env` still owns `SESSION_SECRET` for local development, where the backend runs directly instead of through the container startup script.
-- Root `.env` also owns the local-development `DATABASE_URL`, which points at `localhost`.
-- `infrastructure/compose/docker-compose.yml` plus [`infrastructure/compose/.env.example`](infrastructure/compose/.env.example) remain available as a secondary repo-checkout deployment path for contributors or operators who want checked-in compose assets.
-- `infrastructure/compose/.env` owns deployment-specific app settings such as `STASHARR_IMAGE_TAG`, `DATABASE_HOST=postgres`, `HOST`, `PORT`, and migration retry values. `SESSION_SECRET` remains available there as an advanced override, but the default compose path no longer requires it.
-- The compose app container intentionally starts with an empty `DATABASE_URL`; the startup script rebuilds it with host `postgres`, which keeps the DB identity centralized while still allowing a context-specific hostname.
-- The shipped compose stack exposes the app on host port `${PORT}` and passes `HOST` and `PORT` directly into the app container.
-- The published app image now carries its own Docker `HEALTHCHECK` against `GET /api/v1/status`, which verifies both the API process and database connectivity without repeating inline healthcheck logic in compose files.
-- `GET /api/v1/status` remains public for Docker and external health probes. Normal app pages, integration APIs, indexing APIs, and other product routes require the signed admin session once bootstrap is complete.
+If an older local database says migration `20260402142846` was modified after it was applied, run `pnpm run db:repair-runtime-health-migration` once, then rerun `pnpm prisma migrate dev`.
 
-## Stack
+## Contributing
 
-- Frontend: Angular
-- Backend: NestJS
-- Database: PostgreSQL
-- ORM: Prisma
-- Packaging: Docker
-
-## Repository Structure
-
-- `apps/sp-api` — NestJS backend
-- `apps/sp-web` — Angular frontend
-- `packages/shared-types` — shared DTOs and enums
-- `packages/core-domain` — shared domain rules and logic
-- `prisma` — Prisma schema and migrations
-- `infrastructure` — Docker and deployment assets
-
-## Container Images
-
-Stasharr publishes one production app image to GHCR at `ghcr.io/enymawse/stasharr-portal`. Pushes to `main` publish development tags `edge` and `sha-<shortsha>`. Pushes of release tags matching `vX.Y.Z` publish release tags `vX.Y.Z`, `vX.Y`, `vX`, and `latest`. `latest` tracks the newest stable tagged release, not the tip of `main`.
-
-The GHCR publish workflow must already be merged to `main` before merging the current `release-please` PR for `v0.1.0`. `release-please` creates the Git tag, and that tag push is what triggers the release image publish automatically. The workflow uses metadata-action to keep the GHCR image name normalized and to attach OCI labels for source, revision, and version metadata.
-
-## Release Management
-
-Stasharr uses one repo-level product version for the whole repository. The canonical version source is the root `version.txt`, release tags use `vX.Y.Z`, GitHub Releases are created from those tags, and `release-please` maintains the root `CHANGELOG.md`.
-
-The release workflow runs on pushes to `main` and expects a dedicated `RELEASE_PLEASE_TOKEN` repository secret. Commits land on `main`, `release-please` opens or updates a Release PR, and merging that Release PR updates `version.txt` and `CHANGELOG.md`, creates the `vX.Y.Z` tag, and publishes the GitHub Release.
-
-Bootstrap the first official release as `v0.1.0` by merging the PR that introduces this setup with `Release-As: 0.1.0` in the final commit body. The repo starts at `0.0.0` in `version.txt` to represent "no official release yet"; the initial Release PR is what moves the product to `0.1.0`. After that first release, keep feature work flowing through PRs into `main` and prefer squash merges with Conventional Commit messages so version bumps stay predictable: `feat:` bumps minor, `fix:` bumps patch, and `!` marks a major release. Development builds from `main` stay separate from official SemVer releases, which come from release tags.
+For repo structure, release automation, CI expectations, PR conventions, and contributor deployment notes, see [CONTRIBUTING.md](CONTRIBUTING.md).
