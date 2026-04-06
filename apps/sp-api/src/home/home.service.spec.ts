@@ -91,6 +91,7 @@ describe('HomeService', () => {
   const upsertMock = jest.fn();
   const findManyMock = jest.fn();
   const updateMock = jest.fn();
+  const updateManyMock = jest.fn();
   const transactionMock = jest.fn();
   const findFirstMock = jest.fn();
   const createMock = jest.fn();
@@ -113,6 +114,7 @@ describe('HomeService', () => {
       upsert: upsertMock,
       findMany: findManyMock,
       update: updateMock,
+      updateMany: updateManyMock,
       findFirst: findFirstMock,
       create: createMock,
       findUnique: findUniqueMock,
@@ -157,6 +159,7 @@ describe('HomeService', () => {
     transactionMock.mockImplementation((operations: Array<Promise<unknown>>) =>
       Promise.all(operations),
     );
+    updateManyMock.mockResolvedValue({ count: 0 });
     libraryGetScenesPreviewMock.mockResolvedValue([]);
     libraryGetScenesFeedMock.mockResolvedValue({
       total: 0,
@@ -187,7 +190,7 @@ describe('HomeService', () => {
     );
   });
 
-  it('bootstraps built-in rails and returns them in sort order', async () => {
+  it('bootstraps built-in rails, disables legacy hybrid rails, and returns supported rails in sort order', async () => {
     upsertMock.mockResolvedValue({});
     findManyMock.mockResolvedValue([
       buildRail({
@@ -220,7 +223,21 @@ describe('HomeService', () => {
     const result = await service.getRails();
 
     expect(upsertMock).toHaveBeenCalledTimes(3);
+    expect(updateManyMock).toHaveBeenCalledWith({
+      where: {
+        source: 'HYBRID',
+        enabled: true,
+      },
+      data: {
+        enabled: false,
+      },
+    });
     expect(findManyMock).toHaveBeenCalledWith({
+      where: {
+        source: {
+          not: 'HYBRID',
+        },
+      },
       orderBy: { sortOrder: 'asc' },
     });
     expect(result.map((rail) => rail.key)).toEqual([
@@ -387,85 +404,23 @@ describe('HomeService', () => {
     });
   });
 
-  it('creates a custom hybrid rail with explicit StashDB favorites and availability mode', async () => {
+  it('rejects creation of custom hybrid rails', async () => {
     upsertMock.mockResolvedValue({});
-    findFirstMock.mockResolvedValue(
-      buildStashRail({ id: 'built-in-3', sortOrder: 2 }),
-    );
-    createMock.mockResolvedValue(
-      buildHybridRail({
-        id: 'custom-hybrid-1',
-        title: 'Missing Favorite Studios',
-        subtitle: null,
-        sortOrder: 3,
+
+    await expect(
+      service.createRail({
+        source: 'HYBRID' as never,
+        title: ' Missing Favorite Studios ',
+        subtitle: '',
+        enabled: true,
         config: {
           sort: 'DATE',
           direction: 'DESC',
-          stashdbFavorites: 'STUDIO',
-          tagIds: ['tag-1'],
-          tagNames: ['Feature'],
-          tagMode: 'AND',
-          studioIds: ['studio-9'],
-          studioNames: ['Pulse'],
-          stashFavoritePerformersOnly: false,
-          stashFavoriteStudiosOnly: false,
-          stashFavoriteTagsOnly: false,
-          libraryAvailability: 'MISSING_FROM_LIBRARY',
           limit: 18,
         },
       }),
-    );
-
-    const result = await service.createRail({
-      source: 'HYBRID',
-      title: ' Missing Favorite Studios ',
-      subtitle: '',
-      enabled: true,
-      config: {
-        sort: 'DATE',
-        direction: 'DESC',
-        stashdbFavorites: 'STUDIO',
-        tagIds: ['tag-1'],
-        tagNames: ['Feature'],
-        tagMode: 'AND',
-        studioIds: ['studio-9'],
-        studioNames: ['Pulse'],
-        stashFavoritePerformersOnly: false,
-        stashFavoriteStudiosOnly: false,
-        stashFavoriteTagsOnly: false,
-        libraryAvailability: 'MISSING_FROM_LIBRARY',
-        limit: 18,
-      },
-    });
-
-    expect(createMock).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        source: 'HYBRID',
-        title: 'Missing Favorite Studios',
-        config: {
-          sort: 'DATE',
-          direction: 'DESC',
-          stashdbFavorites: 'STUDIO',
-          tagIds: ['tag-1'],
-          tagNames: ['Feature'],
-          tagMode: 'AND',
-          studioIds: ['studio-9'],
-          studioNames: ['Pulse'],
-          stashFavoritePerformersOnly: false,
-          stashFavoriteStudiosOnly: false,
-          stashFavoriteTagsOnly: false,
-          libraryAvailability: 'MISSING_FROM_LIBRARY',
-          limit: 18,
-        },
-      }),
-    });
-    expect(result).toMatchObject({
-      source: 'HYBRID',
-      config: {
-        stashdbFavorites: 'STUDIO',
-        libraryAvailability: 'MISSING_FROM_LIBRARY',
-      },
-    });
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(createMock).not.toHaveBeenCalled();
   });
 
   it('updates a custom rail config and metadata', async () => {
@@ -624,107 +579,31 @@ describe('HomeService', () => {
     });
   });
 
-  it('updates a custom hybrid rail with provider-scoped favorites and availability mode', async () => {
+  it('rejects editing legacy hybrid rails', async () => {
     upsertMock.mockResolvedValue({});
     findUniqueMock.mockResolvedValue(
       buildHybridRail({
         id: 'custom-hybrid-1',
-        config: {
-          sort: 'DATE',
-          direction: 'DESC',
-          stashdbFavorites: null,
-          tagIds: [],
-          tagNames: [],
-          tagMode: null,
-          studioIds: [],
-          studioNames: [],
-          stashFavoritePerformersOnly: false,
-          stashFavoriteStudiosOnly: false,
-          stashFavoriteTagsOnly: false,
-          libraryAvailability: 'MISSING_FROM_LIBRARY',
-          limit: 16,
-        },
       }),
     );
-    updateMock.mockResolvedValue(
-      buildHybridRail({
-        id: 'custom-hybrid-1',
+
+    await expect(
+      service.updateRail('custom-hybrid-1', {
+        source: 'STASHDB',
         title: 'Already in Library Favorites',
         subtitle: 'Updated subtitle',
         enabled: false,
         config: {
           sort: 'TITLE',
           direction: 'ASC',
-          stashdbFavorites: 'PERFORMER',
-          tagIds: ['tag-4'],
-          tagNames: ['Archive'],
-          tagMode: 'OR',
-          studioIds: ['studio-8'],
-          studioNames: ['North'],
-          stashFavoritePerformersOnly: true,
-          stashFavoriteStudiosOnly: false,
-          stashFavoriteTagsOnly: true,
-          libraryAvailability: 'IN_LIBRARY',
           limit: 12,
         },
       }),
-    );
-
-    const result = await service.updateRail('custom-hybrid-1', {
-      source: 'HYBRID',
-      title: 'Already in Library Favorites',
-      subtitle: 'Updated subtitle',
-      enabled: false,
-      config: {
-        sort: 'TITLE',
-        direction: 'ASC',
-        stashdbFavorites: 'PERFORMER',
-        tagIds: ['tag-4'],
-        tagNames: ['Archive'],
-        tagMode: 'OR',
-        studioIds: ['studio-8'],
-        studioNames: ['North'],
-        stashFavoritePerformersOnly: true,
-        stashFavoriteStudiosOnly: false,
-        stashFavoriteTagsOnly: true,
-        libraryAvailability: 'IN_LIBRARY',
-        limit: 12,
-      },
-    });
-
-    expect(updateMock).toHaveBeenCalledWith({
-      where: { id: 'custom-hybrid-1' },
-      data: expect.objectContaining({
-        title: 'Already in Library Favorites',
-        subtitle: 'Updated subtitle',
-        enabled: false,
-        config: {
-          sort: 'TITLE',
-          direction: 'ASC',
-          stashdbFavorites: 'PERFORMER',
-          tagIds: ['tag-4'],
-          tagNames: ['Archive'],
-          tagMode: 'OR',
-          studioIds: ['studio-8'],
-          studioNames: ['North'],
-          stashFavoritePerformersOnly: true,
-          stashFavoriteStudiosOnly: false,
-          stashFavoriteTagsOnly: true,
-          libraryAvailability: 'IN_LIBRARY',
-          limit: 12,
-        },
-      }),
-    });
-    expect(result).toMatchObject({
-      source: 'HYBRID',
-      config: {
-        stashdbFavorites: 'PERFORMER',
-        libraryAvailability: 'IN_LIBRARY',
-      },
-    });
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(updateMock).not.toHaveBeenCalled();
   });
 
-  it('rejects unsupported source-specific config pollution and source switching', async () => {
+  it('rejects unsupported source-specific config pollution, hybrid source attempts, and source switching', async () => {
     upsertMock.mockResolvedValue({});
 
     await expect(
@@ -742,23 +621,21 @@ describe('HomeService', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
+    findUniqueMock.mockResolvedValue(buildRail({ id: 'custom-1' }));
+
     await expect(
-      service.createRail({
-        source: 'HYBRID',
+      service.updateRail('custom-1', {
+        source: 'HYBRID' as never,
         title: 'Bad Hybrid Rail',
         subtitle: null,
         enabled: true,
         config: {
           sort: 'DATE',
           direction: 'DESC',
-          favorites: 'ALL',
-          libraryAvailability: 'IN_LIBRARY',
           limit: 16,
         },
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
-
-    findUniqueMock.mockResolvedValue(buildRail({ id: 'custom-1' }));
 
     await expect(
       service.updateRail('custom-1', {
@@ -1136,6 +1013,23 @@ describe('HomeService', () => {
     expect(libraryGetScenesFeedMock).not.toHaveBeenCalled();
     expect(integrationFindUniqueMock).not.toHaveBeenCalled();
     expect(stashGetLocalSceneFeedMock).not.toHaveBeenCalled();
+  });
+
+  it('does not serve disabled legacy hybrid rails by id', async () => {
+    upsertMock.mockResolvedValue({});
+    findUniqueMock.mockResolvedValue(
+      buildHybridRail({
+        id: 'custom-hybrid-disabled',
+        enabled: false,
+      }),
+    );
+
+    await expect(
+      service.getRailContent('custom-hybrid-disabled'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(stashdbGetScenesBySortMock).not.toHaveBeenCalled();
+    expect(stashFindScenesByStashIdMock).not.toHaveBeenCalled();
+    expect(sceneStatusResolveForScenesMock).not.toHaveBeenCalled();
   });
 
   it('loads hybrid content by discovering on StashDB and matching in-library scenes in Stash', async () => {
