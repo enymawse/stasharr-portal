@@ -1015,6 +1015,23 @@ describe('HomeService', () => {
     expect(stashGetLocalSceneFeedMock).not.toHaveBeenCalled();
   });
 
+  it('does not serve disabled legacy hybrid rails by id', async () => {
+    upsertMock.mockResolvedValue({});
+    findUniqueMock.mockResolvedValue(
+      buildHybridRail({
+        id: 'custom-hybrid-disabled',
+        enabled: false,
+      }),
+    );
+
+    await expect(
+      service.getRailContent('custom-hybrid-disabled'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(stashdbGetScenesBySortMock).not.toHaveBeenCalled();
+    expect(stashFindScenesByStashIdMock).not.toHaveBeenCalled();
+    expect(sceneStatusResolveForScenesMock).not.toHaveBeenCalled();
+  });
+
   it('loads hybrid content by discovering on StashDB and matching in-library scenes in Stash', async () => {
     upsertMock.mockResolvedValue({});
     findUniqueMock.mockResolvedValue(

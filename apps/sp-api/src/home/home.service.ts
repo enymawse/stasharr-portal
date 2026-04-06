@@ -253,6 +253,10 @@ export class HomeService {
       throw new NotFoundException('Home rail not found.');
     }
 
+    if (rail.source === HomeRailSource.HYBRID && !rail.enabled) {
+      throw new NotFoundException('Home rail not found.');
+    }
+
     if (rail.contentType !== HomeRailContentType.SCENES) {
       throw new BadRequestException('Unsupported Home rail content type.');
     }
