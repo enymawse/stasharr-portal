@@ -11,6 +11,58 @@ import { SetupStatusResponse } from '../../core/api/setup.types';
 import { AppShellLayoutComponent } from './app-shell-layout.component';
 
 describe('AppShellLayoutComponent', () => {
+  function installMatchMedia(isPhone = false) {
+    const listeners = new Set<(event: MediaQueryListEvent) => void>();
+    const media = '(max-width: 720px)';
+    const mediaQueryList = {
+      matches: isPhone,
+      media,
+      onchange: null,
+      addEventListener: vi.fn(
+        (eventName: string, listener: (event: MediaQueryListEvent) => void) => {
+          if (eventName === 'change') {
+            listeners.add(listener);
+          }
+        },
+      ),
+      removeEventListener: vi.fn(
+        (eventName: string, listener: (event: MediaQueryListEvent) => void) => {
+          if (eventName === 'change') {
+            listeners.delete(listener);
+          }
+        },
+      ),
+      dispatchEvent: vi.fn(),
+    } as unknown as MediaQueryList;
+
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockImplementation((query: string) => {
+        if (query === media) {
+          return mediaQueryList;
+        }
+
+        return {
+          ...mediaQueryList,
+          matches: false,
+          media: query,
+        };
+      }),
+    );
+
+    return {
+      setMatches(next: boolean) {
+        (mediaQueryList as { matches: boolean }).matches = next;
+        listeners.forEach((listener) =>
+          listener({
+            matches: next,
+            media,
+          } as MediaQueryListEvent),
+        );
+      },
+    };
+  }
+
   function buildSetupStatus(overrides: Partial<SetupStatusResponse> = {}): SetupStatusResponse {
     const required = {
       stash: true,
@@ -69,9 +121,17 @@ describe('AppShellLayoutComponent', () => {
   }
 
   async function renderComponent(
-    setupStatus = buildSetupStatus(),
-    runtimeHealth = buildRuntimeHealth(),
+    {
+      setupStatus = buildSetupStatus(),
+      runtimeHealth = buildRuntimeHealth(),
+      isPhone = false,
+    }: {
+      setupStatus?: SetupStatusResponse;
+      runtimeHealth?: RuntimeHealthResponse;
+      isPhone?: boolean;
+    } = {},
   ) {
+    const viewport = installMatchMedia(isPhone);
     const runtimeHealthState = signal(runtimeHealth);
     const authStatus = signal({
       bootstrapRequired: false,
@@ -137,15 +197,18 @@ describe('AppShellLayoutComponent', () => {
       notifications,
       router,
       runtimeHealthService,
+      viewport,
       setRuntimeHealth: (next: RuntimeHealthResponse) => runtimeHealthState.set(next),
     };
   }
 
   afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     TestBed.resetTestingModule();
   });
 
-  it('renders the consolidated primary navigation labels without a degraded warning when all required services are ready', async () => {
+  it('renders the desktop sidebar navigation without a degraded warning when all required services are ready', async () => {
     const { fixture, runtimeHealthService } = await renderComponent();
     const navLinks = Array.from(
       fixture.nativeElement.querySelectorAll('a.nav-item') as NodeListOf<HTMLAnchorElement>,
@@ -155,6 +218,8 @@ describe('AppShellLayoutComponent', () => {
       .filter((label): label is string => Boolean(label));
 
     expect(runtimeHealthService.ensureStarted).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.querySelector('[data-testid="desktop-sidebar"]')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('[data-testid="mobile-bottom-nav"]')).toBeNull();
     expect(navLabels).toEqual([
       'Home',
       'Scenes',
@@ -173,23 +238,47 @@ describe('AppShellLayoutComponent', () => {
     ).toBeNull();
   });
 
-  it('logs out from the shell and returns the admin to /login', async () => {
-    const { fixture, authService, notifications, router } = await renderComponent();
-    const navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+  it('renders a bottom navigation on phones and exposes secondary destinations from More', async () => {
+    const { fixture } = await renderComponent({
+      isPhone: true,
+    });
 
-    const logoutButton = fixture.nativeElement.querySelector('.logout-btn') as HTMLButtonElement;
-    logoutButton.click();
+    const desktopSidebar = fixture.nativeElement.querySelector('[data-testid="desktop-sidebar"]');
+    const bottomNav = fixture.nativeElement.querySelector(
+      '[data-testid="mobile-bottom-nav"]',
+    ) as HTMLElement | null;
+    const bottomNavItems = Array.from(
+      fixture.nativeElement.querySelectorAll('.mobile-nav-item') as NodeListOf<HTMLElement>,
+    ).map((item) => item.textContent?.replace(/\s+/g, ' ').trim());
+    const moreTrigger = fixture.nativeElement.querySelector(
+      '[data-testid="mobile-more-trigger"]',
+    ) as HTMLButtonElement | null;
+
+    expect(desktopSidebar).toBeNull();
+    expect(bottomNav).toBeTruthy();
+    expect(bottomNavItems).toEqual(['Home', 'Scenes', 'Acquisition', 'Library', 'More']);
+
+    moreTrigger?.click();
+    fixture.detectChanges();
     await fixture.whenStable();
+    fixture.detectChanges();
 
-    expect(authService.logout).toHaveBeenCalledTimes(1);
-    expect(notifications.info).toHaveBeenCalledWith('Signed out');
-    expect(navigateSpy).toHaveBeenCalledWith('/login');
+    const moreSheet = fixture.nativeElement.querySelector(
+      '[data-testid="mobile-more-sheet"]',
+    ) as HTMLElement | null;
+
+    expect(moreSheet).toBeTruthy();
+    expect(moreSheet?.textContent).toContain('Performers');
+    expect(moreSheet?.textContent).toContain('Studios');
+    expect(moreSheet?.textContent).toContain('Settings');
+    expect(moreSheet?.textContent).toContain('Log out');
   });
 
-  it('renders a runtime Whisparr outage warning with a Settings repair action', async () => {
-    const { fixture } = await renderComponent(
-      buildSetupStatus(),
-      buildRuntimeHealth({
+  it('keeps repair visibility available from the phone shell', async () => {
+    const { fixture } = await renderComponent({
+      isPhone: true,
+      setupStatus: buildSetupStatus(),
+      runtimeHealth: buildRuntimeHealth({
         degraded: true,
         services: {
           ...buildRuntimeHealth().services,
@@ -205,7 +294,75 @@ describe('AppShellLayoutComponent', () => {
           },
         },
       }),
-    );
+    });
+
+    const moreIndicator = fixture.nativeElement.querySelector(
+      '[data-testid="mobile-more-indicator"]',
+    ) as HTMLElement | null;
+    const moreTrigger = fixture.nativeElement.querySelector(
+      '[data-testid="mobile-more-trigger"]',
+    ) as HTMLButtonElement | null;
+
+    expect(moreIndicator).toBeTruthy();
+
+    moreTrigger?.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const settingsIndicator = fixture.nativeElement.querySelector(
+      '[data-testid="mobile-settings-nav-indicator"]',
+    ) as HTMLElement | null;
+
+    expect(settingsIndicator?.textContent).toContain('Repair');
+    expect(fixture.nativeElement.querySelector('[data-testid="degraded-banner"]')).toBeTruthy();
+  });
+
+  it('keeps logout accessible from the phone shell and returns the admin to /login', async () => {
+    const { fixture, authService, notifications, router } = await renderComponent({
+      isPhone: true,
+    });
+    const navigateSpy = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+
+    const moreTrigger = fixture.nativeElement.querySelector(
+      '[data-testid="mobile-more-trigger"]',
+    ) as HTMLButtonElement;
+    moreTrigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const logoutButton = fixture.nativeElement.querySelector(
+      '.mobile-logout-btn',
+    ) as HTMLButtonElement;
+    logoutButton.click();
+    await fixture.whenStable();
+
+    expect(authService.logout).toHaveBeenCalledTimes(1);
+    expect(notifications.info).toHaveBeenCalledWith('Signed out');
+    expect(navigateSpy).toHaveBeenCalledWith('/login');
+  });
+
+  it('renders a runtime Whisparr outage warning with a Settings repair action', async () => {
+    const { fixture } = await renderComponent({
+      setupStatus: buildSetupStatus(),
+      runtimeHealth: buildRuntimeHealth({
+        degraded: true,
+        services: {
+          ...buildRuntimeHealth().services,
+          whisparr: {
+            service: 'WHISPARR',
+            status: 'DEGRADED',
+            degraded: true,
+            consecutiveFailures: 2,
+            lastHealthyAt: '2026-04-02T00:00:00.000Z',
+            lastFailureAt: '2026-04-02T00:01:00.000Z',
+            lastErrorMessage: 'Failed to reach Whisparr provider endpoint.',
+            degradedAt: '2026-04-02T00:01:00.000Z',
+          },
+        },
+      }),
+    });
 
     const banner = fixture.nativeElement.querySelector(
       '[data-testid="degraded-banner"]',
@@ -226,9 +383,9 @@ describe('AppShellLayoutComponent', () => {
   });
 
   it('renders a runtime Stash outage warning', async () => {
-    const { fixture } = await renderComponent(
-      buildSetupStatus(),
-      buildRuntimeHealth({
+    const { fixture } = await renderComponent({
+      setupStatus: buildSetupStatus(),
+      runtimeHealth: buildRuntimeHealth({
         degraded: true,
         services: {
           ...buildRuntimeHealth().services,
@@ -244,7 +401,7 @@ describe('AppShellLayoutComponent', () => {
           },
         },
       }),
-    );
+    });
 
     const banner = fixture.nativeElement.querySelector(
       '[data-testid="degraded-banner"]',
@@ -256,9 +413,9 @@ describe('AppShellLayoutComponent', () => {
   });
 
   it('clears a runtime outage warning when shared runtime health recovers', async () => {
-    const { fixture, setRuntimeHealth } = await renderComponent(
-      buildSetupStatus(),
-      buildRuntimeHealth({
+    const { fixture, setRuntimeHealth } = await renderComponent({
+      setupStatus: buildSetupStatus(),
+      runtimeHealth: buildRuntimeHealth({
         degraded: true,
         services: {
           ...buildRuntimeHealth().services,
@@ -274,7 +431,7 @@ describe('AppShellLayoutComponent', () => {
           },
         },
       }),
-    );
+    });
 
     expect(fixture.nativeElement.querySelector('[data-testid="degraded-banner"]')).toBeTruthy();
 
@@ -290,8 +447,8 @@ describe('AppShellLayoutComponent', () => {
   });
 
   it('keeps setup degradation messaging ahead of runtime outage messaging', async () => {
-    const { fixture } = await renderComponent(
-      buildSetupStatus({
+    const { fixture } = await renderComponent({
+      setupStatus: buildSetupStatus({
         setupComplete: false,
         required: {
           stash: true,
@@ -299,7 +456,7 @@ describe('AppShellLayoutComponent', () => {
           whisparr: false,
         },
       }),
-      buildRuntimeHealth({
+      runtimeHealth: buildRuntimeHealth({
         degraded: true,
         services: {
           ...buildRuntimeHealth().services,
@@ -315,7 +472,7 @@ describe('AppShellLayoutComponent', () => {
           },
         },
       }),
-    );
+    });
 
     const banner = fixture.nativeElement.querySelector(
       '[data-testid="degraded-banner"]',
