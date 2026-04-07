@@ -48,17 +48,29 @@ export class SettingsOverviewPageComponent implements OnInit {
     return catalogProvider ? integrationLabel(catalogProvider) : 'Not chosen';
   });
 
+  protected readonly statusTone = computed<'good' | 'warn'>(() => {
+    if (this.loadError() || !this.setupStatus()) {
+      return 'warn';
+    }
+
+    return this.degradedState() ? 'warn' : 'good';
+  });
+
   protected readonly statusLabel = computed(() =>
-    this.degradedState() ? 'Needs attention' : 'Healthy',
+    this.loadError() || !this.setupStatus()
+      ? 'Unavailable'
+      : this.degradedState()
+        ? 'Needs attention'
+        : 'Healthy',
   );
 
   protected readonly statusLead = computed(() => {
-    if (this.degradedState()) {
-      return this.degradedState()!.message;
+    if (this.loadError() || !this.setupStatus()) {
+      return 'Required service readiness could not be loaded right now.';
     }
 
-    if (!this.setupStatus()) {
-      return 'Use the tabs above to inspect the latest state.';
+    if (this.degradedState()) {
+      return this.degradedState()!.message;
     }
 
     return 'Every required integration is ready and the app is ready for normal use.';

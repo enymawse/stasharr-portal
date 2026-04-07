@@ -11,8 +11,8 @@
   } @else {
     <section
       class="hero-card"
-      [class.tone-good]="!degradedState()"
-      [class.tone-warn]="!!degradedState()"
+      [class.tone-good]="statusTone() === 'good'"
+      [class.tone-warn]="statusTone() === 'warn'"
     >
       <div class="hero-head">
         <div class="hero-copy">
@@ -21,7 +21,11 @@
           <p class="hero-lead">{{ statusLead() }}</p>
         </div>
 
-        <span class="status-pill" [class.tone-warn]="!!degradedState()">
+        <span
+          class="status-pill"
+          [class.tone-good]="statusTone() === 'good'"
+          [class.tone-warn]="statusTone() === 'warn'"
+        >
           {{ statusLabel() }}
         </span>
       </div>
