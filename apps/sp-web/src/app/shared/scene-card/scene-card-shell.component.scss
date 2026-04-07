@@ -23,16 +23,20 @@
   --scene-card-placeholder-background:
     linear-gradient(
       130deg,
-      color-mix(in srgb, var(--surface-2) 88%, #fff),
-      color-mix(in srgb, var(--surface-2) 78%, #9fb3c8)
+      color-mix(in srgb, var(--surface-2) 88%, var(--surface-1)),
+      color-mix(in srgb, var(--surface-2) 78%, var(--surface-raised))
     ),
-    radial-gradient(circle at 18% 25%, rgb(255 255 255 / 45%), transparent 55%);
+    radial-gradient(
+      circle at 18% 25%,
+      color-mix(in srgb, var(--surface-1) 45%, transparent),
+      transparent 55%
+    );
 }
 
 :host(.scene-card-shell-variant-rail) {
   --scene-card-card-radius: 12px;
   --scene-card-media-radius: 12px;
-  --scene-card-media-shadow: 0 12px 28px rgb(5 10 17 / 28%);
+  --scene-card-media-shadow: var(--shadow-md);
   --scene-card-top-padding: 0.6rem;
   --scene-card-text-badge-max-width: min(5.8rem, 40%);
 }
@@ -100,10 +104,10 @@
 }
 
 .studio-badge {
-  border: 1px solid color-mix(in srgb, var(--border-strong) 65%, transparent);
+  border: 1px solid var(--scene-card-glass-border, var(--media-surface-glass-border));
   box-shadow:
-    0 4px 12px rgb(12 22 33 / 26%),
-    inset 0 1px 0 rgb(255 255 255 / 25%);
+    var(--scene-card-glass-shadow, var(--media-surface-glass-shadow)),
+    inset 0 1px 0 color-mix(in srgb, var(--surface-1) 25%, transparent);
   backdrop-filter: blur(7px);
 }
 
@@ -127,10 +131,14 @@
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--surface-elevated) 92%, #fff),
+      color-mix(in srgb, var(--surface-elevated) 92%, var(--surface-1)),
       color-mix(in srgb, var(--surface-2) 88%, transparent)
     ),
-    rgb(21 34 48 / 24%);
+    color-mix(
+      in srgb,
+      var(--scene-card-glass-background, var(--media-surface-glass-background)) 34%,
+      transparent
+    );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -154,10 +162,14 @@
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--surface-elevated) 92%, #fff),
+      color-mix(in srgb, var(--surface-elevated) 92%, var(--surface-1)),
       color-mix(in srgb, var(--surface-2) 85%, transparent)
     ),
-    rgb(17 27 38 / 52%);
+    color-mix(
+      in srgb,
+      var(--scene-card-glass-background, var(--media-surface-glass-background)) 58%,
+      transparent
+    );
   color: var(--text-primary);
   font-size: var(--scene-card-text-badge-font-size);
   font-weight: var(--scene-card-text-badge-font-weight);
@@ -167,7 +179,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: 0.01em;
-  text-shadow: 0 1px 0 rgb(255 255 255 / 35%);
+  text-shadow: 0 1px 0 color-mix(in srgb, var(--surface-1) 35%, transparent);
 }
 
 .media-bottom {

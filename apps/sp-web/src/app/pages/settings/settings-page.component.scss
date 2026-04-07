@@ -22,10 +22,8 @@ p {
   gap: 0.35rem;
   padding: 1.15rem 1.2rem;
   border-radius: 22px;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 72%, transparent);
-  background:
-    radial-gradient(circle at top right, rgba(38, 132, 255, 0.15), transparent 34%),
-    linear-gradient(145deg, var(--surface-1), color-mix(in srgb, var(--surface-2) 88%, #0a2743 12%));
+  border: 1px solid var(--surface-panel-hero-border);
+  background: var(--surface-panel-hero-background);
 }
 
 .shell-copy {
@@ -76,8 +74,9 @@ p {
 }
 
 .settings-nav-link.active {
-  border-color: color-mix(in srgb, #2684ff 48%, var(--border-strong));
-  background: color-mix(in srgb, #2684ff 12%, var(--surface-elevated));
+  border-color: var(--tone-info-border);
+  background: var(--tone-info-background);
+  color: var(--tone-info-text);
 }
 
 @media (max-width: 640px) {

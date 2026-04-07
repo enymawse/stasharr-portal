@@ -5,25 +5,11 @@
   font-family: var(--app-font-family);
 }
 
-main {
-  max-width: min(1540px, 96vw);
-  margin: 0 auto;
-  padding: 1.2rem 1rem 1.5rem;
-}
-
 h1,
 h2,
 p,
 ul {
   margin: 0;
-}
-
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  margin-bottom: 0.75rem;
-  color: var(--text-muted);
-  text-decoration: none;
 }
 
 .hero-shell {
@@ -223,20 +209,15 @@ ul {
 
 .content-shell {
   margin-top: 0.95rem;
-  display: grid;
-  gap: 0.9rem;
 }
 
 .section {
-  border-radius: 10px;
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-1);
-  padding: 0.8rem;
+  --app-section-radius: 10px;
+  --app-section-padding: 0.8rem;
 }
 
 .section h2 {
   font-size: 1rem;
-  margin-bottom: 0.6rem;
 }
 
 .hierarchy-card {
@@ -363,7 +344,7 @@ ul {
 }
 
 .controls-shell {
-  --studio-filter-control-height: 2.46rem;
+  --app-control-height: 2.46rem;
   margin-top: 0.95rem;
 }
 
@@ -372,43 +353,6 @@ ul {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 0.6rem;
   align-items: start;
-}
-
-.control-field {
-  display: grid;
-  gap: 0.3rem;
-}
-
-.control-field > span {
-  font-size: 0.74rem;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  font-weight: 700;
-}
-
-.sort-with-direction {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.35rem;
-}
-
-.sort-direction-toggle {
-  width: var(--studio-filter-control-height);
-  min-width: var(--studio-filter-control-height);
-  height: var(--studio-filter-control-height);
-  border-radius: 7px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-
-.sort-direction-toggle:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
 }
 
 .filter-grid {
@@ -421,48 +365,8 @@ ul {
   gap: 0.35rem;
 }
 
-:host ::ng-deep .controls-shell .p-select,
-:host ::ng-deep .controls-shell .p-multiselect {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  border-radius: 7px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  min-height: var(--studio-filter-control-height);
-  font-size: 0.84rem;
-}
-
-:host ::ng-deep .controls-shell .p-select-label {
-  display: flex;
-  align-items: center;
-  min-height: calc(var(--studio-filter-control-height) - 2px);
-  padding: 0 0.55rem;
-}
-
-:host ::ng-deep .controls-shell .p-multiselect-label {
-  min-height: calc(var(--studio-filter-control-height) - 2px);
-  padding: 0.45rem 0.55rem;
-  display: flex;
-  gap: 0.25rem;
-  align-items: center;
-}
-
-:host ::ng-deep .controls-shell .p-multiselect .p-chip,
-:host ::ng-deep .controls-shell .p-multiselect-token {
-  font-size: 0.72rem;
-}
-
-:host ::ng-deep .controls-shell .tag-mode-select.p-select {
-  width: auto;
+.tag-mode-select {
   min-width: 7.5rem;
-}
-
-:host ::ng-deep .controls-shell .p-select.p-focus,
-:host ::ng-deep .controls-shell .p-multiselect.p-focus {
-  border-color: var(--focus-ring);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus-ring) 44%, transparent);
 }
 
 .grid {

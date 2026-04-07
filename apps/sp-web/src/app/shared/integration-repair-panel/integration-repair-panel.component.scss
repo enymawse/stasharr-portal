@@ -3,11 +3,11 @@
 }
 
 .repair-card {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--surface-panel-border);
   border-radius: 16px;
   padding: 1rem;
-  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
-  box-shadow: 0 18px 38px rgba(10, 17, 29, 0.12);
+  background: var(--surface-panel-background);
+  box-shadow: var(--surface-panel-shadow);
   display: grid;
   gap: 0.8rem;
 }
@@ -71,18 +71,21 @@ form {
 }
 
 .is-ready {
-  border-color: color-mix(in srgb, var(--success-color, #2f855a) 48%, var(--border-strong));
-  background: color-mix(in srgb, var(--success-color, #2f855a) 14%, var(--surface-elevated));
+  border-color: var(--tone-success-border);
+  background: var(--tone-success-background);
+  color: var(--tone-success-text);
 }
 
 .is-saved {
-  border-color: color-mix(in srgb, var(--warning-color, #b7791f) 48%, var(--border-strong));
-  background: color-mix(in srgb, var(--warning-color, #b7791f) 12%, var(--surface-elevated));
+  border-color: var(--tone-warning-border);
+  background: var(--tone-warning-background);
+  color: var(--tone-warning-text);
 }
 
 .is-error {
-  border-color: color-mix(in srgb, var(--error-color, #c53030) 52%, var(--border-strong));
-  background: color-mix(in srgb, var(--error-color, #c53030) 12%, var(--surface-elevated));
+  border-color: var(--tone-danger-border);
+  background: var(--tone-danger-background);
+  color: var(--tone-danger-text);
 }
 
 .is-pending {

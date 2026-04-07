@@ -1,5 +1,9 @@
-<main>
-  <a class="back-link" [routerLink]="backLinkPath()" [queryParams]="backLinkQueryParams()">
+<main class="app-page-shell">
+  <a
+    class="back-link app-back-link app-back-link--media"
+    [routerLink]="backLinkPath()"
+    [queryParams]="backLinkQueryParams()"
+  >
     {{ backLinkLabel() }}
   </a>
 
@@ -109,7 +113,7 @@
           }
 
           @if (hasStashCopy(scene) || hasWhisparrLink(scene) || canRequestScene(scene)) {
-            <div class="hero-actions">
+            <div class="hero-actions app-action-row">
               @if (hasStashCopy(scene)) {
                 @if (hasMultipleStashCopies(scene)) {
                   <label class="stash-copy-selector">
@@ -122,7 +126,7 @@
                       optionLabel="label"
                       optionValue="viewUrl"
                       [appendTo]="'body'"
-                      panelStyleClass="scene-action-select-panel"
+                      panelStyleClass="app-overlay-panel"
                     />
                   </label>
 
@@ -198,8 +202,8 @@
       </div>
     </section>
 
-    <div class="content-shell">
-      <section class="section lifecycle-section">
+    <div class="content-shell app-section-stack">
+      <section class="section lifecycle-section app-section-panel">
         <h2>Lifecycle</h2>
         <p class="overview-text">{{ lifecycleSummary(scene) }}</p>
 
@@ -219,7 +223,7 @@
       </section>
 
       @if (displayedDescription(scene.description); as description) {
-        <section class="section overview-section">
+        <section class="section overview-section app-section-panel">
           <h2>Overview</h2>
           <p class="overview-text">{{ description }}</p>
 
@@ -232,7 +236,7 @@
       }
 
       @if (scene.performers.length > 0) {
-        <section class="section">
+        <section class="section app-section-panel">
           <h2>Performers</h2>
           <div class="performer-grid">
             @for (performer of scene.performers; track performer.id) {
@@ -285,12 +289,12 @@
       }
 
       @if (scene.tags.length > 0) {
-        <section class="section">
+        <section class="section app-section-panel">
           <h2>Tags</h2>
-          <div class="chips">
+          <div class="chips app-chip-list">
             @for (tag of scene.tags; track tag.id) {
               <a
-                class="chip tag-link"
+                class="chip app-chip tag-link"
                 [routerLink]="['/scenes']"
                 [queryParams]="{ tags: tag.id, tagNames: tag.name }"
                 [attr.aria-label]="'Open scenes tagged ' + tag.name"

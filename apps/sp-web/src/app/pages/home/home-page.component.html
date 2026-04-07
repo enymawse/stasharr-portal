@@ -1,4 +1,4 @@
-<main>
+<main class="app-page-shell app-page-shell--xl">
   <section class="hero-shell">
     <div class="hero-grid">
       <div class="hero-copy">
@@ -8,7 +8,7 @@
           Keep the built-in favorites rails, mix in your local library, add custom catalog scene
           rails, and shape Home into a personal browsing screen instead of a fixed landing page.
         </p>
-        <div class="hero-actions">
+        <div class="hero-actions app-action-row">
           <button type="button" class="hero-link secondary" (click)="openEditor()">
             Customize Home
           </button>
@@ -35,7 +35,7 @@
   </section>
 
   @if (loading()) {
-    <div class="home-state loading" role="status" aria-live="polite">
+    <div class="home-state loading app-state-block" role="status" aria-live="polite">
       <p-progressspinner
         styleClass="app-blocking-spinner"
         strokeWidth="4"
@@ -44,20 +44,20 @@
       <p>Loading your Home rails...</p>
     </div>
   } @else if (configError()) {
-    <section class="home-state error-state">
+    <section class="home-state error-state app-state-block">
       <h2>Home could not be loaded</h2>
       <p>{{ configError() }}</p>
       <button type="button" class="state-button" (click)="loadHome()">Retry</button>
     </section>
   } @else {
     @if (editorOpen()) {
-      <section class="editor-shell" aria-label="Customize Home rails">
-        <div class="editor-head">
+      <section class="editor-shell app-section-panel" aria-label="Customize Home rails">
+        <div class="editor-head app-section-head">
           <div>
             <p class="eyebrow">Customize Home</p>
             <h2>Reorder built-ins and add custom Catalog or Stash scene rails</h2>
           </div>
-          <div class="editor-actions">
+          <div class="editor-actions app-action-row">
             <button type="button" class="state-button secondary" (click)="cancelEditor()">
               Close
             </button>
@@ -85,7 +85,7 @@
           <p class="editor-error">{{ deleteError }}</p>
         }
 
-        <div class="editor-toolbar">
+        <div class="editor-toolbar app-action-row">
           <button
             type="button"
             class="state-button"
@@ -133,8 +133,8 @@
                 </div>
               </div>
 
-              <div class="editor-item-controls">
-                <label class="rail-toggle">
+              <div class="editor-item-controls app-action-row">
+                <label class="rail-toggle app-action-row">
                   <input
                     type="checkbox"
                     [checked]="rail.enabled"
@@ -143,7 +143,7 @@
                   <span>{{ rail.enabled ? 'Enabled' : 'Disabled' }}</span>
                 </label>
 
-                <div class="move-controls">
+                <div class="move-controls app-action-row">
                   <button
                     type="button"
                     class="mini-button"
@@ -187,8 +187,8 @@
         </div>
 
         @if (railFormOpen() && railForm(); as form) {
-          <section class="rail-form-shell">
-            <div class="rail-form-head">
+          <section class="rail-form-shell app-section-panel app-control-shell">
+            <div class="rail-form-head app-section-head">
               <div>
                 <p class="eyebrow">{{ editingRailId() ? 'Edit Rail' : 'Add Rail' }}</p>
                 <h3>
@@ -199,7 +199,7 @@
                   }}
                 </h3>
               </div>
-              <div class="editor-actions">
+              <div class="editor-actions app-action-row">
                 <button type="button" class="state-button secondary" (click)="closeRailForm()">
                   Cancel
                 </button>
@@ -221,8 +221,8 @@
             }
 
             <div class="rail-form-grid">
-              <label class="control-field">
-                <span>Source</span>
+              <label class="control-field app-control-field">
+                <span class="app-control-label">Source</span>
                 <p-select
                   inputId="home-rail-source"
                   [ngModel]="form.source"
@@ -231,7 +231,7 @@
                   optionLabel="label"
                   optionValue="value"
                   [appendTo]="'body'"
-                  panelStyleClass="home-rail-select-panel"
+                  panelStyleClass="app-overlay-panel"
                   [disabled]="!!editingRailId()"
                 />
               </label>
@@ -243,9 +243,10 @@
                 </p>
               }
 
-              <label class="control-field">
-                <span>Title</span>
+              <label class="control-field app-control-field">
+                <span class="app-control-label">Title</span>
                 <input
+                  class="app-control-input"
                   type="text"
                   [ngModel]="form.title"
                   (ngModelChange)="updateRailForm('title', $event)"
@@ -257,9 +258,10 @@
                 />
               </label>
 
-              <label class="control-field">
-                <span>Subtitle</span>
+              <label class="control-field app-control-field">
+                <span class="app-control-label">Subtitle</span>
                 <input
+                  class="app-control-input"
                   type="text"
                   [ngModel]="form.subtitle"
                   (ngModelChange)="updateRailForm('subtitle', $event)"
@@ -267,8 +269,8 @@
                 />
               </label>
 
-              <label class="control-field checkbox-field compact-toggle">
-                <span>Enabled</span>
+              <label class="control-field checkbox-field compact-toggle app-control-field">
+                <span class="app-control-label">Enabled</span>
                 <label class="toggle-inline">
                   <input
                     type="checkbox"
@@ -279,9 +281,10 @@
                 </label>
               </label>
 
-              <label class="control-field">
-                <span>Item Limit</span>
+              <label class="control-field app-control-field">
+                <span class="app-control-label">Item Limit</span>
                 <input
+                  class="app-control-input"
                   type="number"
                   min="6"
                   max="30"
@@ -291,8 +294,8 @@
                 />
               </label>
 
-              <label class="control-field">
-                <span>Sort</span>
+              <label class="control-field app-control-field">
+                <span class="app-control-label">Sort</span>
                 <p-select
                   inputId="home-rail-sort"
                   [ngModel]="form.sort"
@@ -301,12 +304,12 @@
                   optionLabel="label"
                   optionValue="value"
                   [appendTo]="'body'"
-                  panelStyleClass="home-rail-select-panel"
+                  panelStyleClass="app-overlay-panel"
                 />
               </label>
 
-              <label class="control-field">
-                <span>Direction</span>
+              <label class="control-field app-control-field">
+                <span class="app-control-label">Direction</span>
                 <p-select
                   inputId="home-rail-direction"
                   [ngModel]="form.direction"
@@ -315,13 +318,13 @@
                   optionLabel="label"
                   optionValue="value"
                   [appendTo]="'body'"
-                  panelStyleClass="home-rail-select-panel"
+                  panelStyleClass="app-overlay-panel"
                 />
               </label>
 
               @if (form.source === 'STASHDB') {
-                <label class="control-field">
-                  <span>Favorites</span>
+                <label class="control-field app-control-field">
+                  <span class="app-control-label">Favorites</span>
                   <p-select
                     inputId="home-rail-favorites"
                     [ngModel]="form.favorites"
@@ -330,12 +333,12 @@
                     optionLabel="label"
                     optionValue="value"
                     [appendTo]="'body'"
-                    panelStyleClass="home-rail-select-panel"
+                    panelStyleClass="app-overlay-panel"
                   />
                 </label>
 
-                <label class="control-field">
-                  <span>Tag Mode</span>
+                <label class="control-field app-control-field">
+                  <span class="app-control-label">Tag Mode</span>
                   <p-select
                     inputId="home-rail-tag-mode"
                     [ngModel]="form.tagMode"
@@ -344,13 +347,14 @@
                     optionLabel="label"
                     optionValue="value"
                     [appendTo]="'body'"
-                    panelStyleClass="home-rail-select-panel"
+                    panelStyleClass="app-overlay-panel"
                   />
                 </label>
               } @else {
-                <label class="control-field">
-                  <span>Title Contains</span>
+                <label class="control-field app-control-field">
+                  <span class="app-control-label">Title Contains</span>
                   <input
+                    class="app-control-input"
                     type="text"
                     [ngModel]="form.titleQuery"
                     (ngModelChange)="updateRailForm('titleQuery', $event)"
@@ -358,8 +362,8 @@
                   />
                 </label>
 
-                <label class="control-field">
-                  <span>Tag Mode</span>
+                <label class="control-field app-control-field">
+                  <span class="app-control-label">Tag Mode</span>
                   <p-select
                     inputId="home-rail-stash-tag-mode"
                     [ngModel]="form.tagMode"
@@ -368,7 +372,7 @@
                     optionLabel="label"
                     optionValue="value"
                     [appendTo]="'body'"
-                    panelStyleClass="home-rail-select-panel"
+                    panelStyleClass="app-overlay-panel"
                   />
                 </label>
               }
@@ -376,8 +380,8 @@
 
             @if (form.source === 'STASHDB' || form.source === 'STASH') {
               <div class="rail-form-pickers">
-                <label class="control-field">
-                  <span>Tags</span>
+                <label class="control-field app-control-field">
+                  <span class="app-control-label">Tags</span>
                   <p-multiselect
                     inputId="home-rail-tags"
                     [ngModel]="formTagSelectedIdsModel()"
@@ -399,7 +403,7 @@
                     [emptyFilterMessage]="tagSelectEmptyMessage()"
                     [resetFilterOnHide]="true"
                     [appendTo]="'body'"
-                    panelStyleClass="home-rail-tag-panel"
+                    panelStyleClass="app-overlay-panel"
                     [placeholder]="
                       form.source === 'STASH' ? 'Select local-library tags' : 'Select matching tags'
                     "
@@ -407,8 +411,8 @@
                   />
                 </label>
 
-                <label class="control-field">
-                  <span>Studios</span>
+                <label class="control-field app-control-field">
+                  <span class="app-control-label">Studios</span>
                   <p-multiselect
                     inputId="home-rail-studios"
                     [ngModel]="formStudioSelectedIdsModel()"
@@ -433,7 +437,7 @@
                     [emptyFilterMessage]="studioSelectEmptyMessage()"
                     [resetFilterOnHide]="true"
                     [appendTo]="'body'"
-                    panelStyleClass="home-rail-studio-panel"
+                    panelStyleClass="app-overlay-panel"
                     [placeholder]="
                       form.source === 'STASH'
                         ? 'Choose local studios'
@@ -446,8 +450,8 @@
 
               @if (form.source === 'STASH') {
                 <div class="rail-form-grid stash-toggle-grid">
-                  <label class="control-field checkbox-field compact-toggle">
-                    <span>Only Favorite Performers</span>
+                  <label class="control-field checkbox-field compact-toggle app-control-field">
+                    <span class="app-control-label">Only Favorite Performers</span>
                     <label class="toggle-inline">
                       <input
                         type="checkbox"
@@ -458,8 +462,8 @@
                     </label>
                   </label>
 
-                  <label class="control-field checkbox-field compact-toggle">
-                    <span>Only Favorite Studios</span>
+                  <label class="control-field checkbox-field compact-toggle app-control-field">
+                    <span class="app-control-label">Only Favorite Studios</span>
                     <label class="toggle-inline">
                       <input
                         type="checkbox"
@@ -470,8 +474,8 @@
                     </label>
                   </label>
 
-                  <label class="control-field checkbox-field compact-toggle">
-                    <span>Only Favorite Tags</span>
+                  <label class="control-field checkbox-field compact-toggle app-control-field">
+                    <span class="app-control-label">Only Favorite Tags</span>
                     <label class="toggle-inline">
                       <input
                         type="checkbox"
@@ -495,24 +499,24 @@
     }
 
     @if (isNoRailsEnabledState()) {
-      <section class="home-state empty-state">
+      <section class="home-state empty-state app-state-block">
         <h2>No Home rails are enabled</h2>
         <p>
           Turn at least one rail back on or create a custom rail to restore your personalized
           landing page.
         </p>
-        <div class="empty-links">
+        <div class="empty-links app-action-row">
           <button type="button" class="hero-link" (click)="openEditor()">Edit Rails</button>
         </div>
       </section>
     } @else if (isPageEmptyState()) {
-      <section class="home-state empty-state">
+      <section class="home-state empty-state app-state-block">
         <h2>No enabled rails are matching scenes yet</h2>
         <p>
           Try favoriting more performers or studios, or add a custom rail with broader tags,
           studios, or favorites filters.
         </p>
-        <div class="empty-links">
+        <div class="empty-links app-action-row">
           <button type="button" class="hero-link" (click)="openEditor()">Customize Home</button>
           <a class="hero-link secondary" [routerLink]="['/scenes']">Browse Scenes</a>
           <a class="hero-link secondary" [routerLink]="['/library']">Browse Library</a>
@@ -549,7 +553,7 @@
                   </div>
                 </div>
 
-                <div class="rail-actions">
+                <div class="rail-actions app-action-row">
                   @if (rail.items.length > 0) {
                     @if (rail.seeAllLink; as seeAllLink) {
                       <a

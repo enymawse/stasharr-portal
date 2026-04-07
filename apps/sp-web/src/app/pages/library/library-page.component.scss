@@ -9,12 +9,6 @@
   --library-accent-text: color-mix(in srgb, var(--focus-ring) 82%, var(--text-primary));
 }
 
-main {
-  max-width: min(1540px, 96vw);
-  margin: 0 auto;
-  padding: 1.2rem 1rem 1.5rem;
-}
-
 h1,
 h2,
 p {
@@ -25,11 +19,6 @@ a {
   color: inherit;
 }
 
-header p {
-  margin-top: 0.5rem;
-  max-width: 66ch;
-}
-
 .state {
   margin-top: 1rem;
   color: var(--text-muted);
@@ -37,24 +26,8 @@ header p {
 
 .page-alert {
   margin-top: 0.9rem;
-  padding: 0.75rem 0.85rem;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--warning-border) 82%, var(--border-strong));
-  background: color-mix(in srgb, var(--warning-bg) 42%, var(--surface-1));
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.page-alert-copy {
-  display: grid;
-  gap: 0.32rem;
-}
-
-.page-alert-title {
-  font-size: 0.96rem;
-  font-weight: 700;
+  --app-alert-padding: 0.75rem 0.85rem;
+  --app-alert-radius: 10px;
 }
 
 .page-alert-copy p:last-child {
@@ -65,39 +38,8 @@ header p {
 
 .controls-shell {
   margin-top: 0.9rem;
-  padding: 0.75rem;
-  border-radius: 10px;
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-1);
-  display: grid;
-  gap: 0.65rem;
-}
-
-.controls-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-.page-alert-actions,
-.controls-actions,
-.state-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-.controls-title {
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-primary);
+  --app-section-padding: 0.75rem;
+  --app-section-radius: 10px;
 }
 
 .controls-row {
@@ -105,20 +47,6 @@ header p {
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 0.6rem;
   align-items: start;
-}
-
-.control-field {
-  display: grid;
-  gap: 0.26rem;
-  min-width: 0;
-}
-
-.control-field > span {
-  font-size: 0.74rem;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  font-weight: 700;
 }
 
 .control-field--query {
@@ -138,41 +66,14 @@ header p {
   grid-column: 1 / -1;
 }
 
-.control-field input {
-  width: 100%;
-  min-height: 2.5rem;
-  box-sizing: border-box;
-  border-radius: 7px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  padding: 0.38rem 0.44rem;
-}
-
-.control-field input:focus {
-  outline: none;
-  border-color: var(--focus-ring);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus-ring) 44%, transparent);
-}
-
 .tag-input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 8.5rem);
   gap: 0.35rem;
-  align-items: center;
   min-width: 0;
 }
 
 .tag-input-row > * {
-  min-width: 0;
-}
-
-.sort-with-direction {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.35rem;
-  align-items: center;
   min-width: 0;
 }
 
@@ -182,23 +83,6 @@ header p {
 .filter-chip,
 .retry-button {
   font: inherit;
-}
-
-.sort-direction-toggle {
-  width: 2.5rem;
-  min-width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 7px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-
-.sort-direction-toggle i {
-  font-size: 1rem;
 }
 
 .local-favorites-toggles {
@@ -286,54 +170,11 @@ header p {
   font-size: 0.72rem;
 }
 
-:host ::ng-deep .controls-shell .p-select,
-:host ::ng-deep .controls-shell .p-inputtext,
-:host ::ng-deep .controls-shell .p-multiselect {
-  width: 100%;
-}
-
-:host ::ng-deep .controls-shell .p-select,
-:host ::ng-deep .controls-shell .p-inputtext,
-:host ::ng-deep .controls-shell .p-multiselect {
-  min-height: 2.5rem;
-  border-radius: 7px;
-  border-color: var(--border-strong);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-}
-
-:host ::ng-deep .controls-shell .p-select.p-focus,
-:host ::ng-deep .controls-shell .p-inputtext:focus,
-:host ::ng-deep .controls-shell .p-multiselect.p-focus {
-  border-color: var(--focus-ring);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus-ring) 44%, transparent);
-}
-
-:host ::ng-deep .controls-shell .p-multiselect-label-container {
-  min-width: 0;
-}
-
-:host ::ng-deep .controls-shell .p-multiselect-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .state-shell {
   margin-top: 0.9rem;
-  padding: 1rem;
-  border-radius: 10px;
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-1);
-  display: grid;
-  gap: 0.65rem;
-  justify-items: start;
-}
-
-.state-copy {
-  max-width: 64ch;
-  line-height: 1.58;
-  color: var(--text-muted);
+  --app-state-padding: 1rem;
+  --app-state-radius: 10px;
+  --app-state-gap: 0.65rem;
 }
 
 .primary-link,
@@ -391,7 +232,6 @@ header p {
   margin-top: 0.5rem;
 }
 
-.sort-direction-toggle:focus-visible,
 .reset-filters-button:focus-visible,
 .filter-toggle:focus-visible,
 .filter-chip:focus-visible,
@@ -431,10 +271,6 @@ header p {
 }
 
 @media (max-width: 560px) {
-  main {
-    padding-inline: 0.85rem;
-  }
-
   .grid {
     grid-template-columns: 1fr;
     gap: 0.65rem;
