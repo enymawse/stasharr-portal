@@ -1,126 +1,62 @@
-<div class="layout" [class.collapsed]="collapsed()">
-  <aside class="sidebar">
-    <div class="sidebar-head">
-      @if (!collapsed()) {
-        <p class="brand">Stasharr</p>
-      } @else {
-        <p class="brand compact">S</p>
-      }
-
-      <button
-        type="button"
-        class="collapse-btn"
-        (click)="toggleCollapsed()"
-        [attr.aria-label]="collapsed() ? 'Expand navigation' : 'Collapse navigation'"
-        [attr.aria-expanded]="!collapsed()"
-      >
-        <i
-          [class]="collapsed() ? 'pi pi-angle-double-right' : 'pi pi-angle-double-left'"
-          aria-hidden="true"
-        ></i>
-      </button>
-    </div>
-
-    <nav class="nav" aria-label="Primary navigation">
-      <a
-        routerLink="/home"
-        routerLinkActive="active"
-        [routerLinkActiveOptions]="{ exact: true }"
-        class="nav-item"
-      >
-        <span class="icon" aria-hidden="true"><i class="pi pi-home"></i></span>
+<div
+  class="layout"
+  [class.collapsed]="!mobileShell() && collapsed()"
+  [class.mobile-shell]="mobileShell()"
+>
+  @if (!mobileShell()) {
+    <aside class="sidebar" data-testid="desktop-sidebar">
+      <div class="sidebar-head">
         @if (!collapsed()) {
-          <span>Home</span>
+          <p class="brand">Stasharr</p>
+        } @else {
+          <p class="brand compact">S</p>
         }
-      </a>
 
-      <a
-        routerLink="/scenes"
-        routerLinkActive="active"
-        [routerLinkActiveOptions]="{ exact: true }"
-        class="nav-item"
-      >
-        <span class="icon" aria-hidden="true"><i class="pi pi-video"></i></span>
-        @if (!collapsed()) {
-          <span>Scenes</span>
+        <button
+          type="button"
+          class="collapse-btn"
+          (click)="toggleCollapsed()"
+          [attr.aria-label]="collapsed() ? 'Expand navigation' : 'Collapse navigation'"
+          [attr.aria-expanded]="!collapsed()"
+        >
+          <i
+            [class]="collapsed() ? 'pi pi-angle-double-right' : 'pi pi-angle-double-left'"
+            aria-hidden="true"
+          ></i>
+        </button>
+      </div>
+
+      <nav class="nav" aria-label="Primary navigation">
+        @for (item of desktopNavItems; track item.route) {
+          <a
+            [routerLink]="item.route"
+            class="nav-item"
+            [class.active]="isNavItemActive(item)"
+            [class.settings-nav-item]="item.route === '/settings'"
+            [class.has-alert]="item.route === '/settings' && !!degradedState()"
+            [attr.data-testid]="item.route === '/settings' ? 'settings-nav-link' : null"
+          >
+            <span class="icon" aria-hidden="true"><i [class]="item.icon"></i></span>
+            @if (!collapsed()) {
+              <span>{{ item.label }}</span>
+              @if (item.route === '/settings' && degradedState()) {
+                <span class="nav-badge" data-testid="settings-nav-indicator">Repair</span>
+              }
+            }
+          </a>
         }
-      </a>
+      </nav>
 
-      <a
-        routerLink="/acquisition"
-        routerLinkActive="active"
-        [routerLinkActiveOptions]="{ exact: true }"
-        class="nav-item"
-      >
-        <span class="icon" aria-hidden="true"><i class="pi pi-inbox"></i></span>
-        @if (!collapsed()) {
-          <span>Acquisition</span>
+      <section class="sidebar-footer">
+        @if (authStatus()?.username; as username) {
+          <p class="session-user">{{ username }}</p>
         }
-      </a>
-
-      <a
-        routerLink="/library"
-        routerLinkActive="active"
-        [routerLinkActiveOptions]="{ exact: true }"
-        class="nav-item"
-      >
-        <span class="icon" aria-hidden="true"><i class="pi pi-folder-open"></i></span>
-        @if (!collapsed()) {
-          <span>Library</span>
-        }
-      </a>
-
-      <a
-        routerLink="/performers"
-        routerLinkActive="active"
-        [routerLinkActiveOptions]="{ exact: true }"
-        class="nav-item"
-      >
-        <span class="icon" aria-hidden="true"><i class="pi pi-users"></i></span>
-        @if (!collapsed()) {
-          <span>Performers</span>
-        }
-      </a>
-
-      <a
-        routerLink="/studios"
-        routerLinkActive="active"
-        [routerLinkActiveOptions]="{ exact: true }"
-        class="nav-item"
-      >
-        <span class="icon" aria-hidden="true"><i class="pi pi-building"></i></span>
-        @if (!collapsed()) {
-          <span>Studios</span>
-        }
-      </a>
-
-      <a
-        routerLink="/settings"
-        routerLinkActive="active"
-        [routerLinkActiveOptions]="{ exact: false }"
-        class="nav-item settings-nav-item"
-        data-testid="settings-nav-link"
-        [class.has-alert]="!!degradedState()"
-      >
-        <span class="icon" aria-hidden="true"><i class="pi pi-cog"></i></span>
-        @if (!collapsed()) {
-          <span>Settings</span>
-          @if (degradedState()) {
-            <span class="nav-badge" data-testid="settings-nav-indicator">Repair</span>
-          }
-        }
-      </a>
-    </nav>
-
-    <section class="sidebar-footer">
-      @if (authStatus()?.username; as username) {
-        <p class="session-user">{{ username }}</p>
-      }
-      <button type="button" class="logout-btn" (click)="logout()">
-        {{ loggingOut() ? 'Signing out...' : 'Log out' }}
-      </button>
-    </section>
-  </aside>
+        <button type="button" class="logout-btn" (click)="logout()">
+          {{ loggingOut() ? 'Signing out...' : 'Log out' }}
+        </button>
+      </section>
+    </aside>
+  }
 
   <main class="content">
     @if (degradedState(); as degradedState) {
@@ -149,3 +85,94 @@
     <router-outlet />
   </main>
 </div>
+
+@if (mobileShell()) {
+  @if (moreMenuOpen()) {
+    <button
+      type="button"
+      class="mobile-more-backdrop"
+      aria-label="Close more navigation"
+      (click)="closeMoreMenu()"
+    ></button>
+    <section
+      id="mobile-more-sheet"
+      class="mobile-more-sheet"
+      aria-label="More navigation"
+      data-testid="mobile-more-sheet"
+    >
+      <div class="mobile-more-head">
+        <p class="mobile-more-eyebrow">More</p>
+        @if (authStatus()?.username; as username) {
+          <p class="mobile-more-session">{{ username }}</p>
+        } @else {
+          <p class="mobile-more-session">Secondary destinations and account actions</p>
+        }
+      </div>
+
+      <nav class="mobile-more-nav" aria-label="Secondary navigation">
+        @for (item of mobileSecondaryNavItems; track item.route) {
+          <a
+            [routerLink]="item.route"
+            class="mobile-more-item"
+            [class.active]="isNavItemActive(item)"
+            [class.has-alert]="item.route === '/settings' && !!degradedState()"
+            [attr.data-testid]="item.route === '/settings' ? 'mobile-settings-link' : null"
+            (click)="closeMoreMenu()"
+          >
+            <span class="icon" aria-hidden="true"><i [class]="item.icon"></i></span>
+            <span class="mobile-more-label">{{ item.label }}</span>
+            @if (item.route === '/settings' && degradedState()) {
+              <span class="nav-badge" data-testid="mobile-settings-nav-indicator">Repair</span>
+            }
+          </a>
+        }
+      </nav>
+
+      <div class="mobile-more-footer">
+        <button
+          type="button"
+          class="mobile-logout-btn"
+          [disabled]="loggingOut()"
+          (click)="logout(); closeMoreMenu()"
+        >
+          {{ loggingOut() ? 'Signing out...' : 'Log out' }}
+        </button>
+      </div>
+    </section>
+  }
+
+  <nav
+    class="mobile-bottom-nav"
+    aria-label="Bottom navigation"
+    data-testid="mobile-bottom-nav"
+  >
+    @for (item of mobilePrimaryNavItems; track item.route) {
+      <a
+        [routerLink]="item.route"
+        class="mobile-nav-item"
+        [class.active]="isNavItemActive(item)"
+        (click)="closeMoreMenu()"
+      >
+        <span class="icon" aria-hidden="true"><i [class]="item.icon"></i></span>
+        <span class="mobile-nav-label">{{ item.label }}</span>
+      </a>
+    }
+
+    <button
+      type="button"
+      class="mobile-nav-item mobile-nav-item--more"
+      [class.active]="moreMenuOpen() || moreNavActive()"
+      [class.has-alert]="!!degradedState()"
+      [attr.aria-controls]="moreMenuOpen() ? 'mobile-more-sheet' : null"
+      [attr.aria-expanded]="moreMenuOpen()"
+      data-testid="mobile-more-trigger"
+      (click)="toggleMoreMenu()"
+    >
+      <span class="icon" aria-hidden="true"><i class="pi pi-ellipsis-h"></i></span>
+      <span class="mobile-nav-label">More</span>
+      @if (degradedState()) {
+        <span class="mobile-nav-indicator" data-testid="mobile-more-indicator"></span>
+      }
+    </button>
+  </nav>
+}
