@@ -13,12 +13,6 @@
     );
 }
 
-main {
-  max-width: min(1680px, 98vw);
-  margin: 0 auto;
-  padding: 1.2rem 1rem 1.8rem;
-}
-
 h1,
 h2,
 h3,
@@ -90,10 +84,7 @@ p {
 .hero-actions,
 .empty-links,
 .rail-actions {
-  display: flex;
-  flex-wrap: wrap;
   gap: 0.55rem;
-  align-items: center;
 }
 
 .hero-link,
@@ -148,12 +139,8 @@ p {
 
 .home-state {
   margin-top: 1rem;
-  border-radius: 18px;
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-1);
-  padding: 1rem;
-  display: grid;
-  gap: 0.7rem;
+  --app-state-radius: 18px;
+  --app-state-padding: 1rem;
 }
 
 .home-state.loading {
@@ -162,29 +149,10 @@ p {
 
 .editor-shell {
   margin-top: 1rem;
-  border-radius: 18px;
-  border: 1px solid var(--border-subtle);
-  background: color-mix(in srgb, var(--surface-1) 88%, #122130);
-  padding: 1rem;
-  display: grid;
-  gap: 0.85rem;
-}
-
-.editor-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 0.75rem;
-}
-
-.editor-actions,
-.editor-item-controls,
-.move-controls,
-.rail-toggle {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
+  --app-section-radius: 18px;
+  --app-section-padding: 1rem;
+  --app-section-gap: 0.85rem;
+  --app-section-bg: color-mix(in srgb, var(--surface-1) 88%, #122130);
 }
 
 .editor-error {
@@ -197,9 +165,6 @@ p {
 }
 
 .editor-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
   gap: 0.65rem;
 }
 
@@ -277,22 +242,18 @@ p {
 }
 
 .rail-form-shell {
-  display: grid;
-  gap: 0.9rem;
   margin-top: 0.35rem;
-  padding: 1rem;
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 76%, transparent);
-  background:
+  --app-section-gap: 0.9rem;
+  --app-section-padding: 1rem;
+  --app-section-radius: 16px;
+  --app-section-border: 1px solid color-mix(in srgb, var(--border-strong) 76%, transparent);
+  --app-section-bg:
     linear-gradient(135deg, rgb(9 17 27 / 82%), rgb(11 22 34 / 62%)),
     radial-gradient(circle at top right, rgb(77 160 223 / 18%), transparent 38%);
-}
-
-.rail-form-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 0.8rem;
+  --app-control-height: 3rem;
+  --app-control-radius: 12px;
+  --app-control-border: color-mix(in srgb, var(--border-strong) 76%, transparent);
+  --app-control-bg: color-mix(in srgb, var(--surface-elevated) 88%, #0f1c2a);
 }
 
 .rail-form-grid {
@@ -307,13 +268,11 @@ p {
   gap: 0.8rem;
 }
 
-.control-field {
-  display: grid;
+.rail-form-shell .app-control-field {
   gap: 0.45rem;
-  min-width: 0;
 }
 
-.control-field > span {
+.rail-form-shell .app-control-label {
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -321,18 +280,8 @@ p {
   color: #9bc5e7;
 }
 
-.control-field input {
-  width: 100%;
-  min-width: 0;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 76%, transparent);
-  background: color-mix(in srgb, var(--surface-elevated) 88%, #0f1c2a);
-  color: var(--text-primary);
+.rail-form-shell .app-control-input {
   padding: 0.72rem 0.8rem;
-}
-
-.control-field :is(p-select, p-multiselect) {
-  width: 100%;
 }
 
 .checkbox-field {

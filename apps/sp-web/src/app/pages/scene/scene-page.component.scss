@@ -12,9 +12,8 @@
 }
 
 main {
-  max-width: min(1220px, 96vw);
-  margin: 0 auto;
-  padding: 1.2rem 1rem 2.2rem;
+  --app-page-max-width: min(1220px, 96vw);
+  --app-page-padding-end: 2.2rem;
 }
 
 h1,
@@ -24,15 +23,12 @@ p {
   margin: 0;
 }
 
-.back-link {
-  display: inline-block;
-  margin-bottom: 0.95rem;
-  color: color-mix(in srgb, var(--text-primary) 75%, #9bc0e2);
-  text-decoration: none;
-}
-
 .error {
   color: var(--danger);
+}
+
+.back-link {
+  margin-bottom: 0.95rem;
 }
 
 .hero-shell {
@@ -244,10 +240,7 @@ a.studio-logo-overlay:focus-visible {
 }
 
 .hero-actions {
-  display: flex;
-  flex-wrap: wrap;
   gap: 0.48rem;
-  align-items: center;
 }
 
 .hero-action-button {
@@ -351,8 +344,6 @@ button {
 
 .content-shell {
   margin-top: 0.9rem;
-  display: grid;
-  gap: 0.9rem;
 }
 
 .lifecycle-grid {
@@ -366,16 +357,6 @@ button {
   padding: 0.8rem;
   border: 1px solid var(--border-subtle);
   background: var(--surface-2);
-}
-
-.section {
-  display: grid;
-  gap: 0.75rem;
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  padding: 0.95rem;
-  color: var(--text-primary);
 }
 
 .overview-text {
@@ -474,21 +455,6 @@ button {
 .performer-gender {
   font-size: 0.82rem;
   color: var(--text-muted);
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.46rem;
-}
-
-.chip {
-  border: 1px solid var(--chip-border);
-  background: var(--chip-bg);
-  border-radius: 999px;
-  padding: 0.18rem 0.56rem;
-  font-size: 0.88rem;
-  color: var(--chip-text);
 }
 
 @media (max-width: 880px) {

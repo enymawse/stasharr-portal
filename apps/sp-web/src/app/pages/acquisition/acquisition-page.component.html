@@ -1,20 +1,20 @@
-<main>
-  <header class="page-head">
-    <div class="page-copy">
+<main class="app-page-shell">
+  <header class="page-head app-page-header">
+    <div class="page-copy app-page-header__copy">
       <h1>Acquisition</h1>
-      <p>Track requested scenes through Whisparr and into your Stash library.</p>
+      <p class="app-page-lede">Track requested scenes through Whisparr and into your Stash library.</p>
     </div>
   </header>
 
   @if (pageAlert(); as alert) {
-    <section class="page-alert" data-testid="acquisition-degraded-state" role="status">
-      <div class="page-alert-copy">
-        <p class="eyebrow">{{ alert.eyebrow }}</p>
+    <section class="page-alert app-page-alert" data-testid="acquisition-degraded-state" role="status">
+      <div class="page-alert-copy app-page-alert__copy">
+        <p class="eyebrow app-page-eyebrow">{{ alert.eyebrow }}</p>
         <h2>{{ alert.title }}</h2>
         <p>{{ alert.message }}</p>
       </div>
 
-      <div class="page-alert-actions">
+      <div class="page-alert-actions app-action-row">
         <a class="primary-link small" [routerLink]="['/settings']">Open Settings</a>
         <a class="secondary-link small" [routerLink]="['/scenes']">Open Scenes</a>
       </div>
@@ -31,7 +31,7 @@
       <p>Loading acquisition feed...</p>
     </div>
   } @else if (error()) {
-    <section class="state-shell">
+    <section class="state-shell app-state-block">
       <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
       <button type="button" class="secondary-action" (click)="retryInitialLoad()">Retry</button>
     </section>
@@ -54,12 +54,12 @@
     </section>
 
     @if (!hasItems()) {
-      <section class="state-shell empty-shell" data-testid="acquisition-empty-state">
-        <p class="eyebrow">Pipeline Quiet</p>
+      <section class="state-shell empty-shell app-state-block" data-testid="acquisition-empty-state">
+        <p class="eyebrow app-page-eyebrow">Pipeline Quiet</p>
         <h2>{{ emptyStateTitle() }}</h2>
-        <p class="state-copy">{{ emptyStateMessage() }}</p>
+        <p class="state-copy app-state-copy">{{ emptyStateMessage() }}</p>
 
-        <div class="state-actions">
+        <div class="state-actions app-action-row">
           @if (selectedLifecycle() !== 'ANY') {
             <button type="button" class="secondary-action" (click)="selectLifecycle('ANY')">
               Show all tracked
@@ -70,13 +70,15 @@
         </div>
       </section>
     } @else {
-      <section class="section-shell">
-        <div class="section-shell-head">
-          <div>
-            <p class="eyebrow">Operational View</p>
+      <section class="section-shell app-section-panel">
+        <div class="section-shell-head app-section-head">
+          <div class="app-section-head__copy">
+            <p class="eyebrow app-page-eyebrow">Operational View</p>
             <h2>{{ sectionIntroTitle() }}</h2>
-            <p class="section-shell-copy">{{ pageSummaryText() }}</p>
-            <p class="section-shell-copy secondary">{{ sectionIntroCopy() }}</p>
+            <p class="section-shell-copy app-section-copy">{{ pageSummaryText() }}</p>
+            <p class="section-shell-copy secondary app-section-copy app-section-copy--muted">
+              {{ sectionIntroCopy() }}
+            </p>
           </div>
 
           @if (selectedLifecycle() !== 'ANY') {
@@ -88,12 +90,12 @@
 
         @for (section of visibleSections(); track section.lifecycle) {
           <section
-            class="lifecycle-section"
+            class="lifecycle-section app-section-panel"
             [attr.data-tone]="section.tone"
             [attr.data-testid]="'lifecycle-section-' + section.lifecycle"
           >
-            <div class="lifecycle-section-head">
-              <div>
+            <div class="lifecycle-section-head app-section-head">
+              <div class="app-section-head__copy">
                 <div class="section-title-row">
                   <h3>{{ section.label }}</h3>
                   <span class="section-count">{{ sectionVisibleCountLabel(section) }}</span>
@@ -172,7 +174,7 @@
                       }
                     </div>
 
-                    <div class="card-actions">
+                    <div class="card-actions app-action-row">
                       <a
                         class="primary-link small"
                         [routerLink]="['/scene', item.id]"

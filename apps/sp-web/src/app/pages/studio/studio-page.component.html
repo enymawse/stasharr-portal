@@ -1,6 +1,6 @@
-<main>
+<main class="app-page-shell app-page-shell--wide">
   <a
-    class="back-link"
+    class="back-link app-back-link"
     [routerLink]="backLinkPath()"
     [queryParams]="backLinkQueryParams()"
   >
@@ -107,9 +107,9 @@
       </div>
     </section>
 
-    <div class="content-shell">
+    <div class="content-shell app-section-stack">
       @if (studio.parentStudio; as parentStudio) {
-        <section class="section">
+        <section class="section app-section-panel">
           <h2>Parent Studio</h2>
           <article class="hierarchy-card">
             <a
@@ -127,7 +127,7 @@
       }
 
       @if (studio.childStudios.length > 0) {
-        <section class="section">
+        <section class="section app-section-panel">
           <h2>Child Studios</h2>
           <div class="child-grid">
             @for (child of studio.childStudios; track child.id) {
@@ -161,7 +161,7 @@
       }
 
       @if (studio.urls.length > 0) {
-        <section class="section">
+        <section class="section app-section-panel">
           <h2>Source Links</h2>
           <ul class="source-list">
             @for (entry of studio.urls; track entry.url) {
@@ -194,12 +194,12 @@
       }
     </div>
 
-    <section class="section controls-shell" aria-label="Studio scene filters">
+    <section class="section controls-shell app-section-panel app-control-shell" aria-label="Studio scene filters">
       <h2>Scenes</h2>
-      <div class="controls-row">
-        <div class="control-field">
-          <span>Sort</span>
-          <div class="sort-with-direction">
+      <div class="controls-row app-control-grid">
+        <div class="control-field app-control-field">
+          <span class="app-control-label">Sort</span>
+          <div class="sort-with-direction app-control-inline">
             <p-select
               inputId="studio-scenes-sort"
               [ngModel]="sceneSort()"
@@ -208,11 +208,11 @@
               optionLabel="label"
               optionValue="value"
               [appendTo]="'body'"
-              panelStyleClass="performer-filter-select-panel"
+              panelStyleClass="app-overlay-panel"
             />
             <button
               type="button"
-              class="sort-direction-toggle"
+              class="sort-direction-toggle app-sort-direction-toggle"
               [attr.aria-label]="sceneSortDirectionToggleLabel()"
               [attr.title]="sceneSortDirectionToggleLabel()"
               (click)="toggleSceneSortDirection()"
@@ -222,8 +222,8 @@
           </div>
         </div>
 
-        <label class="control-field">
-          <span>Favorites</span>
+        <label class="control-field app-control-field">
+          <span class="app-control-label">Favorites</span>
           <p-select
             inputId="studio-scenes-favorites"
             [ngModel]="selectedFavorites()"
@@ -232,16 +232,16 @@
             optionLabel="label"
             optionValue="value"
             [appendTo]="'body'"
-            panelStyleClass="performer-filter-select-panel"
+            panelStyleClass="app-overlay-panel"
           />
         </label>
       </div>
 
       <div class="filter-grid">
         <div class="filter-panel">
-          <label class="control-field">
-            <span>Tags</span>
-            <div class="tag-input-row">
+          <label class="control-field app-control-field">
+            <span class="app-control-label">Tags</span>
+            <div class="tag-input-row app-control-inline">
               <p-multiselect
                 inputId="studio-scenes-tags"
                 [ngModel]="tagSelectedIdsModel()"
@@ -261,7 +261,7 @@
                 [emptyFilterMessage]="tagSelectEmptyMessage()"
                 [resetFilterOnHide]="true"
                 [appendTo]="'body'"
-                panelStyleClass="performer-filter-tag-panel"
+                panelStyleClass="app-overlay-panel"
                 placeholder="Select tags"
                 scrollHeight="16rem"
               />
@@ -274,7 +274,7 @@
                 optionLabel="label"
                 optionValue="value"
                 [appendTo]="'body'"
-                panelStyleClass="performer-filter-select-panel"
+                panelStyleClass="app-overlay-panel"
               />
             </div>
           </label>

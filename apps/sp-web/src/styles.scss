@@ -164,67 +164,350 @@ body {
   scrollbar-color: var(--border-strong) transparent;
 }
 
-.request-select-panel,
-.request-multiselect-panel {
-  border-color: color-mix(in srgb, var(--border-strong) 70%, transparent);
-  background: color-mix(in srgb, var(--surface-1) 90%, #0e1a28);
+.app-page-shell {
+  --app-page-max-width: min(1240px, 96vw);
+  --app-page-padding-start: 1.2rem;
+  --app-page-padding-end: 1.8rem;
+  max-width: var(--app-page-max-width);
+  margin: 0 auto;
+  padding: var(--app-page-padding-start) 1rem var(--app-page-padding-end);
 }
 
-.request-select-panel .p-select-option,
-.request-multiselect-panel .p-multiselect-option,
-.request-select-panel .p-select-empty-message,
-.request-multiselect-panel .p-multiselect-empty-message {
+.app-page-shell--wide {
+  --app-page-max-width: min(1540px, 96vw);
+  --app-page-padding-end: 1.5rem;
+}
+
+.app-page-shell--xl {
+  --app-page-max-width: min(1680px, 98vw);
+}
+
+.app-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.app-back-link--media {
+  color: color-mix(in srgb, var(--text-primary) 75%, #9bc0e2);
+}
+
+.app-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+}
+
+.app-page-header__copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.app-page-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--focus-ring) 68%, var(--text-primary));
+}
+
+.app-page-lede {
+  max-width: 66ch;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.app-page-meta {
+  color: var(--text-muted);
+}
+
+.app-page-alert {
+  border: var(
+    --app-alert-border,
+    1px solid color-mix(in srgb, var(--warning-border) 82%, var(--border-strong))
+  );
+  border-radius: var(--app-alert-radius, 14px);
+  padding: var(--app-alert-padding, 0.9rem 1rem);
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+  background: var(
+    --app-alert-bg,
+    color-mix(in srgb, var(--warning-bg) 42%, var(--surface-1))
+  );
+}
+
+.app-page-alert__copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.app-page-alert__title {
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.app-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.app-state-block {
+  border: var(--app-state-border, 1px solid var(--border-subtle));
+  border-radius: var(--app-state-radius, 12px);
+  padding: var(--app-state-padding, 1rem);
+  background: var(--app-state-bg, var(--surface-1));
+  display: grid;
+  gap: var(--app-state-gap, 0.7rem);
+  justify-items: start;
+}
+
+.app-state-copy {
+  max-width: 64ch;
+  line-height: 1.58;
+  color: var(--text-muted);
+}
+
+.app-section-stack {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.app-section-panel {
+  border: var(--app-section-border, 1px solid var(--border-subtle));
+  border-radius: var(--app-section-radius, 12px);
+  padding: var(--app-section-padding, 0.95rem);
+  background: var(--app-section-bg, var(--surface-1));
+  color: var(--text-primary);
+  display: grid;
+  gap: var(--app-section-gap, 0.75rem);
+}
+
+.app-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+}
+
+.app-section-head__copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.app-section-copy {
+  max-width: 68ch;
+  line-height: 1.5;
+}
+
+.app-section-copy--muted {
+  color: var(--text-muted);
+}
+
+.app-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.46rem;
+}
+
+.app-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--app-chip-border, var(--chip-border));
+  background: var(--app-chip-bg, var(--chip-bg));
+  border-radius: 999px;
+  padding: 0.18rem 0.56rem;
+  font-size: 0.88rem;
+  color: var(--app-chip-text, var(--chip-text));
+}
+
+.app-control-shell {
+  --app-control-height: 2.5rem;
+  --app-control-radius: 7px;
+  --app-control-border: var(--border-strong);
+  --app-control-bg: var(--surface-elevated);
+  --app-control-text: var(--text-primary);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.app-control-shell__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.app-control-grid {
+  display: grid;
+  gap: 0.6rem;
+  align-items: start;
+}
+
+.app-control-field {
+  display: grid;
+  gap: 0.26rem;
+  min-width: 0;
+}
+
+.app-control-label {
+  font-size: 0.74rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.app-control-note {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.app-control-inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.35rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.app-control-input,
+.app-control-shell .p-select,
+.app-control-shell .p-inputtext,
+.app-control-shell .p-multiselect {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: var(--app-control-height);
+  border-radius: var(--app-control-radius);
+  border: 1px solid var(--app-control-border);
+  background: var(--app-control-bg);
+  color: var(--app-control-text);
   font-size: 0.84rem;
 }
 
-.performer-filter-select-panel,
-.performer-filter-studio-panel,
-.performer-filter-tag-panel {
-  border-color: color-mix(in srgb, var(--border-strong) 70%, transparent);
+.app-control-input {
+  padding: 0.38rem 0.44rem;
+}
+
+.app-control-input:focus {
+  outline: none;
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus-ring) 44%, transparent);
+}
+
+.app-control-shell .p-select-label {
+  display: flex;
+  align-items: center;
+  min-height: calc(var(--app-control-height) - 2px);
+  padding: 0 0.55rem;
+}
+
+.app-control-shell .p-select-dropdown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+}
+
+.app-control-shell .p-multiselect-label-container {
+  min-width: 0;
+}
+
+.app-control-shell .p-multiselect-label {
+  min-height: calc(var(--app-control-height) - 2px);
+  padding: 0.45rem 0.55rem;
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.app-control-shell .p-multiselect .p-chip,
+.app-control-shell .p-multiselect-token {
+  font-size: 0.72rem;
+}
+
+.app-control-shell :is(.p-select.p-focus, .p-inputtext:focus, .p-multiselect.p-focus) {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus-ring) 44%, transparent);
+}
+
+.app-control-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.app-sort-direction-toggle {
+  width: var(--app-control-height);
+  min-width: var(--app-control-height);
+  height: var(--app-control-height);
+  border-radius: var(--app-control-radius);
+  border: 1px solid var(--app-control-border);
+  background: var(--app-control-bg);
+  color: var(--app-control-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.app-sort-direction-toggle i {
+  font-size: 1rem;
+}
+
+.app-sort-direction-toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.app-overlay-panel {
+  --app-overlay-option-size: 0.82rem;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
   background: color-mix(in srgb, var(--surface-1) 90%, #0e1a28);
+  box-shadow: var(--shadow-sm);
 }
 
-.performer-filter-select-panel .p-select-option,
-.performer-filter-select-panel .p-select-empty-message,
-.performer-filter-studio-panel .p-multiselect-option-group,
-.performer-filter-studio-panel .p-multiselect-option,
-.performer-filter-studio-panel .p-multiselect-empty-message,
-.performer-filter-tag-panel .p-multiselect-option,
-.performer-filter-tag-panel .p-multiselect-empty-message {
-  font-size: 0.82rem;
+.app-overlay-panel--comfortable {
+  --app-overlay-option-size: 0.84rem;
 }
 
-.scenes-filter-select-panel,
-.scenes-filter-tag-panel {
-  border-color: color-mix(in srgb, var(--border-strong) 70%, transparent);
-  background: color-mix(in srgb, var(--surface-1) 90%, #0e1a28);
+.app-overlay-panel :is(
+    .p-select-option,
+    .p-select-empty-message,
+    .p-multiselect-option-group,
+    .p-multiselect-option,
+    .p-multiselect-empty-message
+  ) {
+  font-size: var(--app-overlay-option-size);
 }
 
-.scenes-filter-select-panel .p-select-option,
-.scenes-filter-select-panel .p-select-empty-message,
-.scenes-filter-tag-panel .p-multiselect-option,
-.scenes-filter-tag-panel .p-multiselect-empty-message {
-  font-size: 0.82rem;
-}
+@media (max-width: 640px) {
+  .app-page-shell {
+    padding-inline: 0.85rem;
+  }
 
-.scene-action-select-panel {
-  border-color: color-mix(in srgb, var(--border-strong) 70%, transparent);
-  background: color-mix(in srgb, var(--surface-1) 90%, #0e1a28);
-}
-
-.scene-action-select-panel .p-select-option,
-.scene-action-select-panel .p-select-empty-message {
-  font-size: 0.82rem;
-}
-
-.studios-filter-select-panel {
-  border-color: color-mix(in srgb, var(--border-strong) 70%, transparent);
-  background: color-mix(in srgb, var(--surface-1) 90%, #0e1a28);
-}
-
-.studios-filter-select-panel .p-select-option,
-.studios-filter-select-panel .p-select-empty-message {
-  font-size: 0.82rem;
+  .app-page-alert,
+  .app-section-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .app-toast .p-toast-message {

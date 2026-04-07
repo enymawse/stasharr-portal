@@ -5,12 +5,6 @@
   font-family: var(--app-font-family);
 }
 
-main {
-  max-width: min(1240px, 96vw);
-  margin: 0 auto;
-  padding: 1.25rem 1rem 1.8rem;
-}
-
 h1,
 h2,
 h3,
@@ -23,27 +17,6 @@ a {
   color: inherit;
 }
 
-.page-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  gap: 1rem;
-}
-
-.page-copy p {
-  margin-top: 0.45rem;
-  max-width: 62ch;
-  color: var(--text-muted);
-}
-
-.eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: color-mix(in srgb, var(--focus-ring) 68%, var(--text-primary));
-}
-
 .page-alert,
 .state-shell,
 .section-shell {
@@ -51,32 +24,15 @@ a {
 }
 
 .page-alert {
-  border: 1px solid var(--acquisition-alert-border);
-  border-radius: 18px;
-  padding: 1rem 1.1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 1rem;
-  background: var(--acquisition-alert-bg);
-}
-
-.page-alert-copy {
-  display: grid;
-  gap: 0.38rem;
+  --app-alert-border: 1px solid var(--acquisition-alert-border);
+  --app-alert-radius: 18px;
+  --app-alert-padding: 1rem 1.1rem;
+  --app-alert-bg: var(--acquisition-alert-bg);
 }
 
 .page-alert-copy p:last-child {
   color: var(--text-muted);
   max-width: 66ch;
-}
-
-.page-alert-actions,
-.state-actions,
-.card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
 }
 
 .summary-shell {
@@ -142,59 +98,30 @@ a {
 }
 
 .state-shell {
-  border: 1px dashed color-mix(in srgb, var(--border-strong) 60%, transparent);
-  border-radius: 18px;
-  padding: 1.2rem;
-  background: color-mix(in srgb, var(--surface-elevated) 94%, var(--surface-1));
-  display: grid;
-  gap: 0.8rem;
-  justify-items: start;
+  --app-state-border: 1px dashed color-mix(in srgb, var(--border-strong) 60%, transparent);
+  --app-state-radius: 18px;
+  --app-state-padding: 1.2rem;
+  --app-state-gap: 0.8rem;
+  --app-state-bg: color-mix(in srgb, var(--surface-elevated) 94%, var(--surface-1));
 }
 
 .empty-shell {
   padding: 1.35rem 1.2rem;
 }
 
-.state-copy {
-  max-width: 64ch;
-  line-height: 1.55;
-  color: var(--text-muted);
-}
-
 .section-shell {
-  border: 1px solid color-mix(in srgb, var(--border-strong) 55%, transparent);
-  border-radius: 22px;
-  padding: 1rem;
-  background: color-mix(in srgb, var(--surface-elevated) 94%, var(--surface-1));
-}
-
-.section-shell-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 1rem;
-}
-
-.section-shell-head > div:first-child {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.section-shell-copy {
-  max-width: 68ch;
-  line-height: 1.5;
-}
-
-.section-shell-copy.secondary {
-  color: var(--text-muted);
+  --app-section-border: 1px solid color-mix(in srgb, var(--border-strong) 55%, transparent);
+  --app-section-radius: 22px;
+  --app-section-padding: 1rem;
+  --app-section-bg: color-mix(in srgb, var(--surface-elevated) 94%, var(--surface-1));
 }
 
 .lifecycle-section {
   margin-top: 1rem;
-  border-radius: 18px;
-  padding: 0.95rem;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 52%, transparent);
-  background: color-mix(in srgb, var(--surface-elevated) 92%, var(--surface-1));
+  --app-section-radius: 18px;
+  --app-section-padding: 0.95rem;
+  --app-section-border: 1px solid color-mix(in srgb, var(--border-strong) 52%, transparent);
+  --app-section-bg: color-mix(in srgb, var(--surface-elevated) 92%, var(--surface-1));
 }
 
 .summary-card[data-tone='attention'],
@@ -219,18 +146,6 @@ a {
 .lifecycle-section[data-tone='passive'] {
   background: var(--acquisition-passive-bg);
   border-color: var(--acquisition-passive-border);
-}
-
-.lifecycle-section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 1rem;
-}
-
-.lifecycle-section-head > div:first-child {
-  display: grid;
-  gap: 0.34rem;
 }
 
 .lifecycle-section-head p {

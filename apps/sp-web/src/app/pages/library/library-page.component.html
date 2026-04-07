@@ -1,30 +1,30 @@
-<main>
-  <header>
+<main class="app-page-shell app-page-shell--wide">
+  <header class="app-page-header__copy">
     <h1>Library</h1>
-    <p>Browse scenes already indexed from your local Stash library.</p>
+    <p class="app-page-lede">Browse scenes already indexed from your local Stash library.</p>
     @if (!loading() && !error()) {
-      <p class="state">{{ libraryStateLabel() }}</p>
+      <p class="state app-page-meta">{{ libraryStateLabel() }}</p>
     }
   </header>
 
   @if (pageAlert(); as alert) {
-    <section class="page-alert" data-testid="library-degraded-state" role="status">
-      <div class="page-alert-copy">
-        <p class="page-alert-title">{{ alert.title }}</p>
+    <section class="page-alert app-page-alert" data-testid="library-degraded-state" role="status">
+      <div class="page-alert-copy app-page-alert__copy">
+        <p class="page-alert-title app-page-alert__title">{{ alert.title }}</p>
         <p>{{ alert.message }}</p>
       </div>
 
-      <div class="page-alert-actions">
+      <div class="page-alert-actions app-action-row">
         <a class="secondary-link small" [routerLink]="['/settings']">Open Settings</a>
         <a class="secondary-link small" [routerLink]="['/acquisition']">Track Imports</a>
       </div>
     </section>
   }
 
-  <section class="controls-shell" aria-label="Library controls">
-    <div class="controls-header">
-      <span class="controls-title">Local Library</span>
-      <div class="controls-actions">
+  <section class="controls-shell app-section-panel app-control-shell" aria-label="Library controls">
+    <div class="controls-header app-control-shell__header">
+      <span class="controls-title app-control-title">Local Library</span>
+      <div class="controls-actions app-action-row">
         <button
           type="button"
           class="reset-filters-button"
@@ -37,10 +37,11 @@
       </div>
     </div>
 
-    <div class="controls-row">
-      <label class="control-field control-field--query">
-        <span>Text Query</span>
+    <div class="controls-row app-control-grid">
+      <label class="control-field control-field--query app-control-field">
+        <span class="app-control-label">Text Query</span>
         <input
+          class="app-control-input"
           type="search"
           inputmode="search"
           [ngModel]="queryTerm()"
@@ -49,8 +50,8 @@
         />
       </label>
 
-      <label class="control-field control-field--studio">
-        <span>Studio Filter</span>
+      <label class="control-field control-field--studio app-control-field">
+        <span class="app-control-label">Studio Filter</span>
         <p-multiselect
           inputId="library-studios"
           [ngModel]="studioSelectedIdsModel()"
@@ -70,15 +71,15 @@
           [emptyFilterMessage]="studioSelectEmptyMessage()"
           [resetFilterOnHide]="true"
           [appendTo]="'body'"
-          panelStyleClass="library-filter-panel"
+          panelStyleClass="app-overlay-panel"
           placeholder="Choose local studios"
           scrollHeight="16rem"
         />
       </label>
 
-      <label class="control-field control-field--tag">
-        <span>Tag Filter</span>
-        <div class="tag-input-row">
+      <label class="control-field control-field--tag app-control-field">
+        <span class="app-control-label">Tag Filter</span>
+        <div class="tag-input-row app-control-inline">
           <p-multiselect
             inputId="library-tags"
             [ngModel]="selectedTagIdsModel()"
@@ -98,7 +99,7 @@
             [emptyFilterMessage]="tagSelectEmptyMessage()"
             [resetFilterOnHide]="true"
             [appendTo]="'body'"
-            panelStyleClass="library-filter-panel"
+            panelStyleClass="app-overlay-panel"
             placeholder="Select matching tags"
             scrollHeight="16rem"
           />
@@ -111,14 +112,14 @@
             optionLabel="label"
             optionValue="value"
             [appendTo]="'body'"
-            panelStyleClass="library-filter-select-panel"
+            panelStyleClass="app-overlay-panel"
           />
         </div>
       </label>
 
-      <div class="control-field control-field--sort">
-        <span>Sort By</span>
-        <div class="sort-with-direction">
+      <div class="control-field control-field--sort app-control-field">
+        <span class="app-control-label">Sort By</span>
+        <div class="sort-with-direction app-control-inline">
           <p-select
             inputId="library-sort"
             [ngModel]="selectedSort()"
@@ -127,11 +128,11 @@
             optionLabel="label"
             optionValue="value"
             [appendTo]="'body'"
-            panelStyleClass="library-filter-select-panel"
+            panelStyleClass="app-overlay-panel"
           />
           <button
             type="button"
-            class="sort-direction-toggle"
+            class="sort-direction-toggle app-sort-direction-toggle"
             [attr.aria-label]="sortDirectionToggleLabel()"
             [attr.title]="sortDirectionToggleLabel()"
             (click)="toggleSortDirection()"
@@ -141,8 +142,8 @@
         </div>
       </div>
 
-      <div class="control-field control-field--favorites">
-        <span>Local Favorite Overlays</span>
+      <div class="control-field control-field--favorites app-control-field">
+        <span class="app-control-label">Local Favorite Overlays</span>
         <div class="local-favorites-toggles">
           <button
             type="button"
@@ -175,7 +176,7 @@
       </div>
     </div>
 
-    <p class="controls-note">{{ libraryControlsNote() }}</p>
+    <p class="controls-note app-control-note">{{ libraryControlsNote() }}</p>
 
     @if (hasNarrowingFilters()) {
       <div class="active-filters" data-testid="library-active-filters">
@@ -240,11 +241,11 @@
     <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
     <button type="button" class="retry-button" (click)="retryInitialLoad()">Retry</button>
   } @else if (!hasItems()) {
-    <section class="state-shell empty-shell" data-testid="library-empty-state">
+    <section class="state-shell empty-shell app-state-block" data-testid="library-empty-state">
       <h2>{{ emptyStateTitle() }}</h2>
-      <p class="state-copy">{{ emptyStateMessage() }}</p>
+      <p class="state-copy app-state-copy">{{ emptyStateMessage() }}</p>
 
-      <div class="state-actions">
+      <div class="state-actions app-action-row">
         @if (hasNarrowingFilters()) {
           <button type="button" class="secondary-link" (click)="resetFilters()">
             Clear filters
