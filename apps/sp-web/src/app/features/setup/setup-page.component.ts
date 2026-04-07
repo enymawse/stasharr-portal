@@ -1,7 +1,5 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Observable, finalize, forkJoin, map, switchMap } from 'rxjs';
 import { ButtonDirective } from 'primeng/button';
 import { Message } from 'primeng/message';
@@ -11,10 +9,8 @@ import {
   IntegrationResponse,
   IntegrationType,
   ReadinessState,
-  UpdateIntegrationPayload,
   hasSavedIntegrationConfig,
   integrationLabel,
-  integrationReadinessLabel,
   integrationReadinessState,
   isIntegrationReady,
   isCatalogProviderType,
@@ -23,16 +19,31 @@ import { IntegrationsService } from '../../core/api/integrations.service';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import { SetupService } from '../../core/api/setup.service';
 import { SetupStatusResponse } from '../../core/api/setup.types';
-import { IntegrationFormFieldsComponent } from '../../shared/integration-form-fields/integration-form-fields.component';
+import {
+  IntegrationRepairPanelComponent,
+  IntegrationRepairPanelMessage,
+} from '../../shared/integration-repair-panel/integration-repair-panel.component';
+import {
+  IntegrationActionState,
+  IntegrationForm,
+  buildIntegrationPayload,
+  createActionStateRecord,
+  createEmptyIntegrationsRecord,
+  createIntegrationForm,
+  defaultEnabledValue,
+  describeMutationError,
+  formatOptionalDateTime,
+  mapIntegrationsByType,
+  patchActionState,
+} from '../../shared/integration-repair/integration-repair.utils';
 
 @Component({
   selector: 'app-setup-page',
   imports: [
-    ReactiveFormsModule,
     Message,
     ProgressSpinner,
     ButtonDirective,
-    IntegrationFormFieldsComponent,
+    IntegrationRepairPanelComponent,
   ],
   templateUrl: './setup-page.component.html',
   styleUrl: './setup-page.component.scss',
@@ -63,39 +74,27 @@ export class SetupPageComponent implements OnInit {
   });
 
   protected readonly forms: Record<IntegrationType, IntegrationForm> = {
-    STASH: this.createIntegrationForm(),
-    WHISPARR: this.createIntegrationForm(),
-    STASHDB: this.createIntegrationForm(),
-    FANSDB: this.createIntegrationForm(),
+    STASH: createIntegrationForm(),
+    WHISPARR: createIntegrationForm(),
+    STASHDB: createIntegrationForm(),
+    FANSDB: createIntegrationForm(),
   };
 
-  protected readonly integrations = signal<Record<IntegrationType, IntegrationResponse | null>>({
-    STASH: null,
-    WHISPARR: null,
-    STASHDB: null,
-    FANSDB: null,
-  });
+  protected readonly integrations = signal<Record<IntegrationType, IntegrationResponse | null>>(
+    createEmptyIntegrationsRecord(),
+  );
 
-  protected readonly saveState = signal<Record<IntegrationType, ActionState>>({
-    STASH: this.defaultActionState(),
-    WHISPARR: this.defaultActionState(),
-    STASHDB: this.defaultActionState(),
-    FANSDB: this.defaultActionState(),
-  });
+  protected readonly saveState = signal<Record<IntegrationType, IntegrationActionState>>(
+    createActionStateRecord(),
+  );
 
-  protected readonly testState = signal<Record<IntegrationType, ActionState>>({
-    STASH: this.defaultActionState(),
-    WHISPARR: this.defaultActionState(),
-    STASHDB: this.defaultActionState(),
-    FANSDB: this.defaultActionState(),
-  });
+  protected readonly testState = signal<Record<IntegrationType, IntegrationActionState>>(
+    createActionStateRecord(),
+  );
 
-  protected readonly saveAndTestState = signal<Record<IntegrationType, ActionState>>({
-    STASH: this.defaultActionState(),
-    WHISPARR: this.defaultActionState(),
-    STASHDB: this.defaultActionState(),
-    FANSDB: this.defaultActionState(),
-  });
+  protected readonly saveAndTestState = signal<Record<IntegrationType, IntegrationActionState>>(
+    createActionStateRecord(),
+  );
 
   protected readonly isSetupComplete = computed(() => this.status()?.setupComplete ?? false);
   protected readonly checklistItems = computed<SetupChecklistItem[]>(() => [
@@ -191,10 +190,6 @@ export class SetupPageComponent implements OnInit {
     return 'Required service';
   }
 
-  protected readinessLabel(type: IntegrationType): string {
-    return integrationReadinessLabel(this.readinessState(type));
-  }
-
   protected readinessSummary(type: IntegrationType): string {
     const integration = this.integrations()[type];
     const label = this.labelFor(type);
@@ -243,13 +238,11 @@ export class SetupPageComponent implements OnInit {
   }
 
   protected lastHealthyAt(type: IntegrationType): string | null {
-    const value = this.integrations()[type]?.lastHealthyAt;
-    return value ? this.formatDateTime(value) : null;
+    return formatOptionalDateTime(this.integrations()[type]?.lastHealthyAt ?? null);
   }
 
   protected lastErrorAt(type: IntegrationType): string | null {
-    const value = this.integrations()[type]?.lastErrorAt;
-    return value ? this.formatDateTime(value) : null;
+    return formatOptionalDateTime(this.integrations()[type]?.lastErrorAt ?? null);
   }
 
   protected hasStoredApiKey(type: IntegrationType): boolean {
@@ -272,14 +265,42 @@ export class SetupPageComponent implements OnInit {
     return this.isSaving(type) || this.isTesting(type) || this.isSaveAndTesting(type);
   }
 
+  protected messagesFor(type: IntegrationType): IntegrationRepairPanelMessage[] {
+    const messages: IntegrationRepairPanelMessage[] = [];
+    const saveAndTestState = this.saveAndTestState()[type];
+    const saveState = this.saveState()[type];
+    const testState = this.testState()[type];
+
+    if (saveAndTestState.success) {
+      messages.push({ severity: 'success', text: saveAndTestState.success });
+    }
+    if (saveAndTestState.error) {
+      messages.push({ severity: 'error', text: saveAndTestState.error });
+    }
+    if (saveState.success) {
+      messages.push({ severity: 'success', text: saveState.success });
+    }
+    if (saveState.error) {
+      messages.push({ severity: 'error', text: saveState.error });
+    }
+    if (testState.success) {
+      messages.push({ severity: 'success', text: testState.success });
+    }
+    if (testState.error) {
+      messages.push({ severity: 'error', text: testState.error });
+    }
+
+    return messages;
+  }
+
   protected saveIntegration(type: IntegrationType): void {
-    const payload = this.payloadFromForm(type);
-    this.patchActionState(this.saveState, type, {
+    const payload = buildIntegrationPayload(type, this.forms[type]);
+    patchActionState(this.saveState, type, {
       running: true,
       success: null,
       error: null,
     });
-    this.patchActionState(this.testState, type, { success: null, error: null });
+    patchActionState(this.testState, type, { success: null, error: null });
 
     this.integrationsService
       .updateIntegration(type, payload)
@@ -288,7 +309,7 @@ export class SetupPageComponent implements OnInit {
           this.refreshSetupState().pipe(map((snapshot) => ({ integration, ...snapshot }))),
         ),
         finalize(() => {
-          this.patchActionState(this.saveState, type, { running: false });
+          patchActionState(this.saveState, type, { running: false });
         }),
       )
       .subscribe({
@@ -296,7 +317,7 @@ export class SetupPageComponent implements OnInit {
           this.syncSetupState(status, integrations);
           const message = this.describeSaveSuccess(type, integration);
           this.notifications.success(message);
-          this.patchActionState(this.saveState, type, {
+          patchActionState(this.saveState, type, {
             success: message,
             error: null,
           });
@@ -306,12 +327,9 @@ export class SetupPageComponent implements OnInit {
           }
         },
         error: (error: unknown) => {
-          const message = this.describeMutationError(
-            error,
-            `Failed to save ${this.labelFor(type)}.`,
-          );
+          const message = describeMutationError(error, `Failed to save ${this.labelFor(type)}.`);
           this.notifications.error(message);
-          this.patchActionState(this.saveState, type, {
+          patchActionState(this.saveState, type, {
             success: null,
             error: message,
           });
@@ -320,14 +338,14 @@ export class SetupPageComponent implements OnInit {
   }
 
   protected saveAndTestIntegration(type: IntegrationType): void {
-    const payload = this.payloadFromForm(type);
-    this.patchActionState(this.saveAndTestState, type, {
+    const payload = buildIntegrationPayload(type, this.forms[type]);
+    patchActionState(this.saveAndTestState, type, {
       running: true,
       success: null,
       error: null,
     });
-    this.patchActionState(this.saveState, type, { success: null, error: null });
-    this.patchActionState(this.testState, type, { success: null, error: null });
+    patchActionState(this.saveState, type, { success: null, error: null });
+    patchActionState(this.testState, type, { success: null, error: null });
 
     this.integrationsService
       .updateIntegration(type, payload)
@@ -337,7 +355,7 @@ export class SetupPageComponent implements OnInit {
           this.refreshSetupState().pipe(map((snapshot) => ({ integration, ...snapshot }))),
         ),
         finalize(() => {
-          this.patchActionState(this.saveAndTestState, type, { running: false });
+          patchActionState(this.saveAndTestState, type, { running: false });
         }),
       )
       .subscribe({
@@ -347,7 +365,7 @@ export class SetupPageComponent implements OnInit {
           if (integration.status === 'CONFIGURED') {
             const message = `${this.labelFor(type)} is ready.`;
             this.notifications.success(message);
-            this.patchActionState(this.saveAndTestState, type, {
+            patchActionState(this.saveAndTestState, type, {
               success: message,
               error: null,
             });
@@ -360,18 +378,18 @@ export class SetupPageComponent implements OnInit {
 
           const message = `${this.labelFor(type)} settings were saved, but the test failed.`;
           this.notifications.error(message);
-          this.patchActionState(this.saveAndTestState, type, {
+          patchActionState(this.saveAndTestState, type, {
             success: null,
             error: message,
           });
         },
         error: (error: unknown) => {
-          const message = this.describeMutationError(
+          const message = describeMutationError(
             error,
             `Failed to save and test ${this.labelFor(type)}.`,
           );
           this.notifications.error(message);
-          this.patchActionState(this.saveAndTestState, type, {
+          patchActionState(this.saveAndTestState, type, {
             success: null,
             error: message,
           });
@@ -380,8 +398,8 @@ export class SetupPageComponent implements OnInit {
   }
 
   protected testIntegration(type: IntegrationType): void {
-    const payload = this.payloadFromForm(type);
-    this.patchActionState(this.testState, type, {
+    const payload = buildIntegrationPayload(type, this.forms[type]);
+    patchActionState(this.testState, type, {
       running: true,
       success: null,
       error: null,
@@ -394,7 +412,7 @@ export class SetupPageComponent implements OnInit {
           this.refreshSetupState().pipe(map((snapshot) => ({ integration, ...snapshot }))),
         ),
         finalize(() => {
-          this.patchActionState(this.testState, type, { running: false });
+          patchActionState(this.testState, type, { running: false });
         }),
       )
       .subscribe({
@@ -404,7 +422,7 @@ export class SetupPageComponent implements OnInit {
           if (integration.status === 'CONFIGURED') {
             const message = `${this.labelFor(type)} test passed.`;
             this.notifications.success(message);
-            this.patchActionState(this.testState, type, {
+            patchActionState(this.testState, type, {
               success: message,
               error: null,
             });
@@ -418,18 +436,15 @@ export class SetupPageComponent implements OnInit {
           const message =
             integration.lastErrorMessage?.trim() || `${this.labelFor(type)} test failed.`;
           this.notifications.error(message);
-          this.patchActionState(this.testState, type, {
+          patchActionState(this.testState, type, {
             success: null,
             error: message,
           });
         },
         error: (error: unknown) => {
-          const message = this.describeMutationError(
-            error,
-            `${this.labelFor(type)} test failed.`,
-          );
+          const message = describeMutationError(error, `${this.labelFor(type)} test failed.`);
           this.notifications.error(message);
-          this.patchActionState(this.testState, type, {
+          patchActionState(this.testState, type, {
             success: null,
             error: message,
           });
@@ -459,7 +474,7 @@ export class SetupPageComponent implements OnInit {
         },
         error: (error: unknown) => {
           this.notifications.error(
-            this.describeMutationError(error, 'Failed to reset catalog setup.'),
+            describeMutationError(error, 'Failed to reset catalog setup.'),
           );
         },
       });
@@ -493,17 +508,7 @@ export class SetupPageComponent implements OnInit {
   }
 
   private applyIntegrations(integrations: IntegrationResponse[]): void {
-    const byType: Record<IntegrationType, IntegrationResponse | null> = {
-      STASH: null,
-      WHISPARR: null,
-      STASHDB: null,
-      FANSDB: null,
-    };
-
-    for (const integration of integrations) {
-      byType[integration.type] = integration;
-    }
-
+    const byType = mapIntegrationsByType(integrations);
     this.integrations.set(byType);
 
     for (const type of this.allIntegrationTypes) {
@@ -512,50 +517,9 @@ export class SetupPageComponent implements OnInit {
         name: integration?.name ?? '',
         baseUrl: integration?.baseUrl ?? '',
         apiKey: '',
-        enabled: this.defaultEnabledValue(type, integration),
+        enabled: defaultEnabledValue(type, integration),
       });
     }
-  }
-
-  private payloadFromForm(type: IntegrationType): UpdateIntegrationPayload {
-    const formValue = this.forms[type].getRawValue();
-    const payload: UpdateIntegrationPayload = {
-      enabled: this.isCatalogProvider(type) ? true : formValue.enabled,
-      name: this.normalizeInput(formValue.name),
-      baseUrl: this.normalizeInput(formValue.baseUrl),
-    };
-
-    const apiKey = this.normalizeInput(formValue.apiKey);
-    if (apiKey) {
-      payload.apiKey = apiKey;
-    }
-
-    return payload;
-  }
-
-  private createIntegrationForm(): IntegrationForm {
-    return new FormGroup({
-      name: new FormControl('', { nonNullable: true }),
-      baseUrl: new FormControl('', { nonNullable: true }),
-      apiKey: new FormControl('', { nonNullable: true }),
-      enabled: new FormControl(true, { nonNullable: true }),
-    });
-  }
-
-  private defaultEnabledValue(
-    type: IntegrationType,
-    integration: IntegrationResponse | null,
-  ): boolean {
-    if (integration) {
-      return integration.enabled;
-    }
-
-    return this.isCatalogProvider(type) ? false : true;
-  }
-
-  private normalizeInput(value: string): string | undefined {
-    const trimmed = value.trim();
-    return trimmed === '' ? undefined : trimmed;
   }
 
   protected readinessState(type: IntegrationType): ReadinessState {
@@ -686,58 +650,6 @@ export class SetupPageComponent implements OnInit {
     return this.integrations()[catalogProvider]?.status === 'ERROR';
   }
 
-  private describeMutationError(error: unknown, fallback: string): string {
-    if (error instanceof HttpErrorResponse) {
-      const message = error.error?.message;
-      if (typeof message === 'string' && message.trim().length > 0) {
-        return message;
-      }
-
-      if (Array.isArray(message) && message.length > 0) {
-        return message.join(' ');
-      }
-    }
-
-    return fallback;
-  }
-
-  private formatDateTime(value: string): string {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return value;
-    }
-
-    return date.toLocaleString();
-  }
-
-  private defaultActionState(): ActionState {
-    return {
-      running: false,
-      success: null,
-      error: null,
-    };
-  }
-
-  private patchActionState(
-    store: {
-      update: (
-        updater: (
-          state: Record<IntegrationType, ActionState>,
-        ) => Record<IntegrationType, ActionState>,
-      ) => void;
-    },
-    type: IntegrationType,
-    patch: Partial<ActionState>,
-  ): void {
-    store.update((current) => ({
-      ...current,
-      [type]: {
-        ...current[type],
-        ...patch,
-      },
-    }));
-  }
-
   private describeSaveSuccess(
     type: IntegrationType,
     integration: IntegrationResponse,
@@ -758,12 +670,6 @@ export class SetupPageComponent implements OnInit {
   }
 }
 
-interface ActionState {
-  running: boolean;
-  success: string | null;
-  error: string | null;
-}
-
 interface SetupChecklistItem {
   key: 'CATALOG' | 'STASH' | 'WHISPARR';
   title: string;
@@ -771,10 +677,3 @@ interface SetupChecklistItem {
   ready: boolean;
   summary: string;
 }
-
-type IntegrationForm = FormGroup<{
-  name: FormControl<string>;
-  baseUrl: FormControl<string>;
-  apiKey: FormControl<string>;
-  enabled: FormControl<boolean>;
-}>;

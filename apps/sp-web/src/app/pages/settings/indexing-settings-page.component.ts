@@ -1,5 +1,4 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { ButtonDirective } from 'primeng/button';
 import { Message } from 'primeng/message';
@@ -80,7 +79,7 @@ const INDEXING_JOB_DEFINITIONS: Record<string, JobDefinition> = {
 
 @Component({
   selector: 'app-indexing-settings-page',
-  imports: [RouterLink, ButtonDirective, Message, ProgressSpinner],
+  imports: [ButtonDirective, Message, ProgressSpinner],
   templateUrl: './indexing-settings-page.component.html',
   styleUrl: './indexing-settings-page.component.scss',
 })

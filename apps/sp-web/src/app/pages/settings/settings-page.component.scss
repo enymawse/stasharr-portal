@@ -4,310 +4,84 @@
   color: var(--text-primary);
 }
 
-main {
-  max-width: min(1160px, 96vw);
+.settings-shell {
+  max-width: min(1220px, 96vw);
   margin: 0 auto;
-  padding: 1.2rem 1rem 1.6rem;
+  padding: 1.2rem 1rem 1.8rem;
   display: grid;
-  gap: 0.9rem;
+  gap: 1rem;
 }
 
 h1,
-h2,
-h3,
 p {
   margin: 0;
 }
 
-.page-head p {
-  margin-top: 0.35rem;
-  color: var(--text-muted);
-}
-
-.indexing-link-card {
-  border: 1px solid var(--border-subtle);
-  background:
-    radial-gradient(circle at top right, rgba(38, 132, 255, 0.12), transparent 36%),
-    linear-gradient(145deg, var(--surface-1), var(--surface-2));
-  border-radius: 14px;
-  padding: 0.9rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.9rem;
-}
-
-.indexing-link-card p {
-  margin-top: 0.25rem;
-  color: var(--text-muted);
-}
-
-.page-link {
-  color: var(--focus-ring);
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.settings-overview {
-  border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  padding: 1rem;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 88%, transparent), var(--surface-1));
+.shell-head {
   display: grid;
-  gap: 0.9rem;
+  gap: 0.35rem;
+  padding: 1.15rem 1.2rem;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 72%, transparent);
+  background:
+    radial-gradient(circle at top right, rgba(38, 132, 255, 0.15), transparent 34%),
+    linear-gradient(145deg, var(--surface-1), color-mix(in srgb, var(--surface-2) 88%, #0a2743 12%));
 }
 
-.overview-head,
-.card-head,
-.checklist-item-head,
-.panel-head {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: space-between;
-  align-items: flex-start;
+.shell-copy {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 58rem;
 }
 
 .eyebrow {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.72rem;
   color: var(--text-muted);
 }
 
-.overview-lead {
-  margin-top: 0.45rem;
-  font-size: 1.02rem;
-}
-
-.progress-pill {
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  padding: 0.45rem 0.75rem;
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  font-size: 0.92rem;
-  white-space: nowrap;
-}
-
-.progress-pill.is-complete {
-  border-color: color-mix(in srgb, var(--success-color, #2f855a) 48%, var(--border-strong));
-}
-
-.overview-meta {
-  display: grid;
-  gap: 0.35rem;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+.shell-copy p:last-child {
   color: var(--text-muted);
-  font-size: 0.94rem;
 }
 
-.overview-summary {
-  color: var(--text-secondary, var(--text-muted));
-}
-
-.checklist-grid {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.checklist-item {
-  border-radius: 12px;
-  border: 1px solid var(--border-subtle);
-  padding: 0.85rem;
-  background: var(--surface-elevated);
-}
-
-.tabs-shell {
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-1);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.check {
-  color: #1f8c48;
-  display: inline-flex;
-  align-items: center;
-  margin-left: 0.25rem;
-}
-
-.check i {
-  font-size: 0.9rem;
-}
-
-:host ::ng-deep .settings-tabs .p-tablist {
-  padding: 0.6rem;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-:host ::ng-deep .settings-tabs .p-tab {
-  border-radius: 999px;
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  font-weight: 600;
-  margin-right: 0.4rem;
-}
-
-:host ::ng-deep .settings-tabs .p-tab-active {
-  background: var(--surface-raised);
-  border-color: var(--border-strong);
-}
-
-:host ::ng-deep .settings-tabs .p-tabpanels {
-  padding: 0.85rem;
-}
-
-.service-panel,
-.about-panel {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.card-summary {
-  font-size: 0.98rem;
-}
-
-.meta {
-  color: var(--text-muted);
-  font-size: 0.95rem;
-}
-
-.health-meta {
-  display: grid;
-  gap: 0.32rem;
-  color: var(--text-muted);
-  font-size: 0.92rem;
-}
-
-form {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.actions {
+.settings-nav {
   display: flex;
-  gap: 0.55rem;
   flex-wrap: wrap;
+  gap: 0.6rem;
 }
 
-.action-hint {
-  color: var(--text-muted);
-  font-size: 0.92rem;
-}
-
-.state-badge {
+.settings-nav-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.65rem 1rem;
   border-radius: 999px;
-  padding: 0.3rem 0.65rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.is-ready {
-  border-color: color-mix(in srgb, var(--success-color, #2f855a) 48%, var(--border-strong));
-  background: color-mix(in srgb, var(--success-color, #2f855a) 14%, var(--surface-elevated));
-}
-
-.is-saved {
-  border-color: color-mix(in srgb, var(--warning-color, #b7791f) 48%, var(--border-strong));
-  background: color-mix(in srgb, var(--warning-color, #b7791f) 12%, var(--surface-elevated));
-}
-
-.is-error {
-  border-color: color-mix(in srgb, var(--error-color, #c53030) 52%, var(--border-strong));
-  background: color-mix(in srgb, var(--error-color, #c53030) 12%, var(--surface-elevated));
-}
-
-.is-pending {
-  border-color: var(--border-strong);
-}
-
-.health-card,
-.danger-card,
-.release-stub,
-.global-health,
-.global-danger {
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  padding: 0.75rem;
-  background: var(--surface-2);
-  display: grid;
-  gap: 0.45rem;
-}
-
-.about-list {
-  display: grid;
-  gap: 0.4rem;
-}
-
-.about-list a {
-  color: var(--focus-ring);
+  background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
+  color: var(--text-primary);
   text-decoration: none;
+  font-weight: 700;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    transform 140ms ease;
 }
 
-.health-grid {
-  display: grid;
-  gap: 0.36rem;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+.settings-nav-link:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
 }
 
-.error {
-  color: var(--error-color, #c53030);
+.settings-nav-link.active {
+  border-color: color-mix(in srgb, #2684ff 48%, var(--border-strong));
+  background: color-mix(in srgb, #2684ff 12%, var(--surface-elevated));
 }
 
-:host ::ng-deep .p-button {
-  padding: 0.42rem 0.72rem;
-  border-radius: 7px;
-  border: 1px solid var(--button-border);
-  background: var(--button-bg);
-  color: var(--button-text);
-  cursor: pointer;
-}
-
-:host ::ng-deep .p-button:disabled {
-  opacity: 0.72;
-  cursor: default;
-}
-
-:host ::ng-deep .p-button.danger {
-  border-color: color-mix(in srgb, var(--danger) 70%, var(--border-strong));
-  color: var(--danger);
-  background: color-mix(in srgb, var(--surface-1) 88%, #ffecec);
-}
-
-:host ::ng-deep .inline-message,
-:host ::ng-deep .state-message {
-  margin: 0;
-  font-size: 0.9rem;
-}
-
-:host ::ng-deep .inline-message .p-message-content,
-:host ::ng-deep .state-message .p-message-content {
-  gap: 0.45rem;
-}
-
-@media (max-width: 720px) {
-  .indexing-link-card,
-  .overview-head,
-  .card-head,
-  .checklist-item-head,
-  .panel-head {
-    flex-direction: column;
-    align-items: start;
-  }
-
-  .progress-pill,
-  .state-badge {
-    align-self: flex-start;
+@media (max-width: 640px) {
+  .settings-shell {
+    padding-inline: 0.85rem;
   }
 }

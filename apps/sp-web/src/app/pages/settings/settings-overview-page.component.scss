@@ -1,0 +1,96 @@
+:host {
+  display: block;
+}
+
+.overview-page {
+  display: grid;
+  gap: 1rem;
+}
+
+h2,
+p {
+  margin: 0;
+}
+
+.hero-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
+  box-shadow: 0 18px 38px rgba(10, 17, 29, 0.12);
+  padding: 1.1rem;
+  display: grid;
+  gap: 0.95rem;
+}
+
+.hero-card.tone-good {
+  border-color: color-mix(in srgb, #2f9e57 42%, var(--border-subtle));
+}
+
+.hero-card.tone-warn {
+  border-color: color-mix(in srgb, #d97706 46%, var(--border-subtle));
+}
+
+.hero-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.hero-copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.eyebrow {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.hero-lead {
+  color: var(--text-muted);
+  max-width: 56rem;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #2f9e57 14%, var(--surface-elevated));
+  color: #2f9e57;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-pill.tone-warn {
+  background: color-mix(in srgb, #d97706 14%, var(--surface-elevated));
+  color: #d97706;
+}
+
+.hero-meta {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.meta-item {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.meta-item span {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .hero-head {
+    flex-direction: column;
+  }
+}

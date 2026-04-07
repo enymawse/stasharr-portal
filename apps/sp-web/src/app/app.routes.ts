@@ -17,6 +17,10 @@ import { LibraryPageComponent } from './pages/library/library-page.component';
 import { ScenesPageComponent } from './pages/scenes/scenes-page.component';
 import { ScenePageComponent } from './pages/scene/scene-page.component';
 import { IndexingSettingsPageComponent } from './pages/settings/indexing-settings-page.component';
+import { SettingsAboutPageComponent } from './pages/settings/settings-about-page.component';
+import { SettingsAccountPageComponent } from './pages/settings/settings-account-page.component';
+import { SettingsIntegrationsPageComponent } from './pages/settings/settings-integrations-page.component';
+import { SettingsOverviewPageComponent } from './pages/settings/settings-overview-page.component';
 import { SettingsPageComponent } from './pages/settings/settings-page.component';
 import { PerformersPageComponent } from './pages/performers/performers-page.component';
 import { PerformerPageComponent } from './pages/performer/performer-page.component';
@@ -82,12 +86,30 @@ export const routes: Routes = [
         component: StudioPageComponent,
       },
       {
-        path: 'settings/indexing',
-        component: IndexingSettingsPageComponent,
-      },
-      {
         path: 'settings',
         component: SettingsPageComponent,
+        children: [
+          {
+            path: '',
+            component: SettingsOverviewPageComponent,
+          },
+          {
+            path: 'integrations',
+            component: SettingsIntegrationsPageComponent,
+          },
+          {
+            path: 'indexing',
+            component: IndexingSettingsPageComponent,
+          },
+          {
+            path: 'account',
+            component: SettingsAccountPageComponent,
+          },
+          {
+            path: 'about',
+            component: SettingsAboutPageComponent,
+          },
+        ],
       },
       {
         path: '',

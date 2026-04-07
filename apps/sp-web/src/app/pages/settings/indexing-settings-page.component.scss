@@ -1,18 +1,13 @@
 :host {
   display: block;
-  min-height: 100dvh;
   color: var(--text-primary);
 }
 
-main {
-  max-width: min(1220px, 96vw);
-  margin: 0 auto;
-  padding: 1.2rem 1rem 1.8rem;
+.indexing-page {
   display: grid;
   gap: 1rem;
 }
 
-h1,
 h2,
 h3,
 h4,
@@ -21,10 +16,8 @@ p {
 }
 
 .page-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
+  display: grid;
+  gap: 0.35rem;
   padding: 1.1rem 1.15rem;
   border-radius: 20px;
   border: 1px solid color-mix(in srgb, var(--border-strong) 72%, transparent);
@@ -53,13 +46,6 @@ p {
 
 .lede.secondary {
   color: var(--text-muted);
-}
-
-.back-link {
-  color: var(--focus-ring);
-  text-decoration: none;
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 .state-shell {

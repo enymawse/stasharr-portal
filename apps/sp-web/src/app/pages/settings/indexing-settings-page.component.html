@@ -1,15 +1,13 @@
-<main>
+<section class="indexing-page">
   <header class="page-head">
     <div class="page-copy">
-      <p class="eyebrow">Settings</p>
-      <h1>Indexing & Sync</h1>
+      <p class="eyebrow">Indexing</p>
+      <h2>Indexing & Sync</h2>
       <p class="lede">Indexing keeps Acquisition, Library, and status overlays fresh.</p>
       <p class="lede secondary">
         Use manual sync when you want to refresh data immediately after external changes.
       </p>
     </div>
-
-    <a class="back-link" [routerLink]="['/settings']">Back to Settings</a>
   </header>
 
   @if (loading()) {
@@ -236,4 +234,4 @@
       </div>
     </section>
   }
-</main>
+</section>
