@@ -1,35 +1,58 @@
 :host {
   display: block;
+  --scene-card-glass-border: var(--media-surface-glass-border);
+  --scene-card-glass-background: var(--media-surface-glass-background);
+  --scene-card-glass-shadow: var(--media-surface-glass-shadow);
   --scene-card-footer-padding: 0.7rem;
   --scene-card-footer-gap: 0.32rem;
-  --scene-card-footer-gradient:
-    linear-gradient(
-      to top,
-      rgb(9 14 20 / 90%) 0%,
-      rgb(9 14 20 / 68%) 45%,
-      rgb(9 14 20 / 20%) 100%
-    );
+  --scene-card-footer-gradient: var(--media-footer-gradient);
+  --scene-card-footer-text: var(--media-surface-text);
   --scene-card-title-size: 1rem;
   --scene-card-title-line-height: 1.2;
   --scene-card-title-shadow: 0 2px 5px rgb(0 0 0 / 45%);
   --scene-card-date-size: 0.73rem;
+  --scene-card-date-text: var(--media-surface-muted-text);
   --scene-card-meta-min-height: 1.8rem;
+  --scene-card-action-border: var(--media-action-border);
+  --scene-card-action-background: var(--media-action-background);
+  --scene-card-action-text: var(--media-action-text);
+  --scene-card-subtle-action-border: var(--media-subtle-action-border);
+  --scene-card-subtle-action-background: var(--media-subtle-action-background);
+  --scene-card-subtle-surface-border: var(--media-subtle-surface-border);
+  --scene-card-subtle-surface-background: var(--media-subtle-surface-background);
 }
 
 :host(.scene-card-variant-rail) {
   --scene-card-footer-padding: 0.8rem 0.75rem 0.7rem;
   --scene-card-footer-gap: 0.36rem;
-  --scene-card-footer-gradient:
-    linear-gradient(
-      to top,
-      rgb(9 14 20 / 90%) 0%,
-      rgb(9 14 20 / 66%) 48%,
-      rgb(9 14 20 / 18%) 100%
-    );
+  --scene-card-footer-gradient: var(--media-footer-gradient-rail);
   --scene-card-title-size: 1.02rem;
   --scene-card-title-line-height: 1.16;
   --scene-card-date-size: 0.72rem;
   --scene-card-meta-min-height: 1.85rem;
+}
+
+:host(.scene-card-tone-surface) {
+  --scene-card-glass-border: color-mix(in srgb, var(--border-strong) 44%, transparent);
+  --scene-card-glass-background: color-mix(in srgb, var(--surface-1) 88%, var(--surface-elevated));
+  --scene-card-glass-shadow: 0 8px 18px rgb(10 17 29 / 10%);
+  --scene-card-footer-gradient:
+    linear-gradient(
+      to top,
+      color-mix(in srgb, var(--surface-1) 98%, transparent) 0%,
+      color-mix(in srgb, var(--surface-elevated) 94%, transparent) 44%,
+      color-mix(in srgb, var(--surface-elevated) 16%, transparent) 100%
+    );
+  --scene-card-footer-text: var(--text-primary);
+  --scene-card-title-shadow: 0 1px 0 color-mix(in srgb, var(--surface-1) 44%, transparent);
+  --scene-card-date-text: var(--text-muted);
+  --scene-card-action-border: color-mix(in srgb, var(--border-strong) 50%, transparent);
+  --scene-card-action-background: color-mix(in srgb, var(--surface-1) 90%, var(--surface-elevated));
+  --scene-card-action-text: var(--text-primary);
+  --scene-card-subtle-action-border: color-mix(in srgb, var(--border-strong) 44%, transparent);
+  --scene-card-subtle-action-background: color-mix(in srgb, var(--surface-1) 84%, var(--surface-elevated));
+  --scene-card-subtle-surface-border: color-mix(in srgb, var(--border-strong) 40%, transparent);
+  --scene-card-subtle-surface-background: color-mix(in srgb, var(--surface-1) 80%, var(--surface-2));
 }
 
 h2,
@@ -47,19 +70,19 @@ p {
   align-items: center;
   padding: 0.18rem 0.48rem;
   border-radius: 999px;
-  border: 1px solid rgb(207 226 243 / 26%);
-  background: rgb(11 21 31 / 70%);
-  color: #f5fbff;
+  border: 1px solid var(--scene-card-glass-border);
+  background: var(--scene-card-glass-background);
+  color: var(--scene-card-footer-text);
   font-size: 0.63rem;
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  box-shadow: 0 4px 12px rgb(8 14 21 / 24%);
+  box-shadow: var(--scene-card-glass-shadow);
 }
 
 .media-footer {
   padding: var(--scene-card-footer-padding);
-  color: #fff;
+  color: var(--scene-card-footer-text);
   background: var(--scene-card-footer-gradient);
   display: grid;
   gap: var(--scene-card-footer-gap);
@@ -82,7 +105,7 @@ p {
 .media-date {
   min-width: 0;
   font-size: var(--scene-card-date-size);
-  color: rgb(225 237 249 / 92%);
+  color: var(--scene-card-date-text);
   text-shadow: 0 1px 4px rgb(0 0 0 / 40%);
   white-space: nowrap;
   overflow: hidden;
@@ -114,9 +137,9 @@ p {
   margin: 0;
   padding: 0.24rem 0.54rem;
   border-radius: 7px;
-  border: 1px solid rgb(180 209 234 / 52%);
-  background: rgb(15 34 52 / 76%);
-  color: #ecf6ff;
+  border: 1px solid var(--scene-card-action-border);
+  background: var(--scene-card-action-background);
+  color: var(--scene-card-action-text);
   font-size: 0.73rem;
   font-weight: 700;
   width: fit-content;
@@ -129,9 +152,9 @@ p {
   margin: 0;
   padding: 0.24rem 0.54rem;
   border-radius: 7px;
-  border: 1px solid rgb(180 209 234 / 44%);
-  background: rgb(11 26 40 / 72%);
-  color: #ecf6ff;
+  border: 1px solid var(--scene-card-subtle-action-border);
+  background: var(--scene-card-subtle-action-background);
+  color: var(--scene-card-action-text);
   font-size: 0.72rem;
   font-weight: 700;
   line-height: 1.2;
@@ -146,6 +169,6 @@ p {
 }
 
 .footer-pill {
-  border-color: rgb(207 226 243 / 28%);
-  background: rgb(9 18 27 / 66%);
+  border-color: var(--scene-card-subtle-surface-border);
+  background: var(--scene-card-subtle-surface-background);
 }

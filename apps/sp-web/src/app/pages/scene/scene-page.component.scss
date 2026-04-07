@@ -4,8 +4,8 @@
   color: var(--text-primary);
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--app-bg) 35%, #0c141f) 0%,
-    color-mix(in srgb, var(--app-bg) 25%, #101a27) 22%,
+    color-mix(in srgb, var(--app-bg) 84%, var(--surface-raised)) 0%,
+    color-mix(in srgb, var(--app-bg) 92%, var(--surface-2)) 22%,
     var(--app-bg) 55%
   );
   font-family: var(--app-font-family);
@@ -36,9 +36,9 @@ p {
   border-radius: 16px;
   overflow: hidden;
   min-height: 500px;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
-  box-shadow: 0 18px 38px rgb(5 9 14 / 38%);
-  background: #152331;
+  border: 1px solid var(--media-detail-hero-border);
+  box-shadow: var(--media-detail-hero-shadow);
+  background: var(--media-detail-hero-background);
 }
 
 .hero-backdrop {
@@ -53,14 +53,7 @@ p {
 .hero-shade {
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(110deg, rgb(7 13 20 / 86%) 0%, rgb(7 13 20 / 58%) 42%, rgb(7 13 20 / 84%) 100%),
-    linear-gradient(
-      to bottom,
-      rgb(8 14 23 / 10%) 0%,
-      rgb(8 14 23 / 52%) 66%,
-      rgb(18 28 39 / 92%) 100%
-    );
+  background: var(--media-detail-hero-shade);
 }
 
 .studio-affordance-cluster {
@@ -77,17 +70,11 @@ p {
   height: 2.2rem;
   border-radius: 0.72rem;
   padding: 0.22rem 0.5rem;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 66%, transparent);
+  border: 1px solid var(--media-detail-glass-border);
   box-shadow:
-    0 6px 16px rgb(7 12 19 / 34%),
+    var(--media-detail-glass-shadow),
     inset 0 1px 0 rgb(255 255 255 / 24%);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface-elevated) 90%, #fff),
-      color-mix(in srgb, var(--surface-2) 84%, transparent)
-    ),
-    rgb(19 30 44 / 30%);
+  background: var(--media-detail-glass-background);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -108,33 +95,38 @@ a.studio-logo-overlay:focus-visible {
   filter: drop-shadow(0 1px 1px rgb(0 0 0 / 25%));
 }
 
-.studio-favorite-indicator {
+.studio-favorite-indicator,
+.performer-favorite {
   width: 1.7rem;
   height: 1.7rem;
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid rgb(188 213 238 / 52%);
+  border: 1px solid var(--media-detail-subtle-action-border);
   border-radius: 999px;
-  background: rgb(13 27 41 / 70%);
-  color: rgb(255 255 255 / 85%);
+  background: var(--media-detail-subtle-action-background);
+  color: var(--media-detail-action-text);
   cursor: pointer;
 }
 
-.studio-favorite-indicator i {
+.studio-favorite-indicator i,
+.performer-favorite i {
   font-size: 0.95rem;
 }
 
-.studio-favorite-indicator.active {
-  color: #ffcf4a;
+.studio-favorite-indicator.active,
+.performer-favorite.is-favorite {
+  color: var(--media-gold);
 }
 
-.studio-favorite-indicator:focus-visible {
+.studio-favorite-indicator:focus-visible,
+.performer-favorite:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
-.studio-favorite-indicator:disabled {
+.studio-favorite-indicator:disabled,
+.performer-favorite:disabled {
   opacity: 0.75;
   cursor: wait;
 }
@@ -148,14 +140,15 @@ a.studio-logo-overlay:focus-visible {
   grid-template-columns: minmax(210px, 280px) 1fr;
   align-items: end;
   gap: 1.2rem;
+  color: var(--media-detail-text);
 }
 
 .poster-card {
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 52%, transparent);
-  box-shadow: 0 18px 28px rgb(6 11 18 / 50%);
-  background: rgb(16 26 38 / 72%);
+  border: 1px solid var(--media-detail-card-border);
+  box-shadow: var(--media-detail-card-shadow);
+  background: var(--media-detail-card-background);
 }
 
 .poster-image {
@@ -163,11 +156,7 @@ a.studio-logo-overlay:focus-visible {
   aspect-ratio: 3 / 4;
   object-fit: cover;
   display: block;
-  background: #22374d;
-}
-
-.poster-image.placeholder {
-  background: rgb(29 46 64 / 88%);
+  background: var(--media-detail-placeholder-background);
 }
 
 .hero-info {
@@ -187,7 +176,7 @@ a.studio-logo-overlay:focus-visible {
   font-size: clamp(1.7rem, 5.3vw, 3rem);
   line-height: 1.05;
   text-wrap: balance;
-  text-shadow: 0 8px 22px rgb(0 0 0 / 45%);
+  text-shadow: var(--media-detail-title-shadow);
 }
 
 .release-subheading {
@@ -196,9 +185,9 @@ a.studio-logo-overlay:focus-visible {
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #d8ebff;
-  background: rgb(21 43 64 / 72%);
-  border: 1px solid rgb(165 197 227 / 45%);
+  color: var(--media-detail-kicker-text);
+  background: var(--media-detail-kicker-background);
+  border: 1px solid var(--media-detail-kicker-border);
   border-radius: 999px;
   padding: 0.2rem 0.64rem;
 }
@@ -211,9 +200,9 @@ a.studio-logo-overlay:focus-visible {
 
 .meta-chip {
   border-radius: 999px;
-  border: 1px solid rgb(189 216 241 / 40%);
-  background: rgb(15 34 52 / 66%);
-  color: #e2effc;
+  border: 1px solid var(--media-detail-chip-border);
+  background: var(--media-detail-chip-background);
+  color: var(--media-detail-chip-text);
   font-size: 0.8rem;
   font-weight: 600;
   padding: 0.18rem 0.56rem;
@@ -225,7 +214,7 @@ a.studio-logo-overlay:focus-visible {
 }
 
 .tag-link:hover {
-  border-color: color-mix(in srgb, var(--focus-ring) 62%, rgb(189 216 241 / 40%));
+  border-color: color-mix(in srgb, var(--focus-ring) 62%, var(--media-detail-chip-border));
 }
 
 .tag-link:focus-visible {
@@ -250,9 +239,9 @@ a.studio-logo-overlay:focus-visible {
 :host ::ng-deep .hero-actions .p-button {
   text-decoration: none;
   border-radius: 8px;
-  border: 1px solid var(--border-strong);
-  background: rgb(17 34 52 / 78%);
-  color: var(--text-on-media);
+  border: 1px solid var(--media-detail-action-border);
+  background: var(--media-detail-action-background);
+  color: var(--media-detail-action-text);
   font-size: 0.8rem;
   font-weight: 700;
   padding: 0.4rem 0.68rem;
@@ -261,7 +250,7 @@ a.studio-logo-overlay:focus-visible {
 
 :host ::ng-deep .hero-actions .p-button:not(:disabled):hover {
   border-color: color-mix(in srgb, var(--focus-ring) 62%, var(--border-strong));
-  background: rgb(25 49 75 / 82%);
+  background: color-mix(in srgb, var(--media-detail-action-background) 82%, var(--focus-ring) 18%);
 }
 
 :host ::ng-deep .hero-actions .p-button:focus-visible {
@@ -274,12 +263,12 @@ a.studio-logo-overlay:focus-visible {
   align-items: center;
   gap: 0.35rem;
   border-color: color-mix(in srgb, var(--focus-ring) 30%, var(--border-strong));
-  background: rgb(15 37 58 / 82%);
+  background: color-mix(in srgb, var(--media-detail-action-background) 88%, var(--focus-ring) 12%);
 }
 
 :host ::ng-deep .hero-actions .p-button.external-action:not(:disabled):hover {
   border-color: color-mix(in srgb, var(--focus-ring) 72%, var(--border-strong));
-  background: rgb(21 48 74 / 88%);
+  background: color-mix(in srgb, var(--media-detail-action-background) 78%, var(--focus-ring) 22%);
 }
 
 .external-action-icon {
@@ -293,7 +282,7 @@ a.studio-logo-overlay:focus-visible {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.35rem;
-  color: var(--text-on-media);
+  color: var(--media-detail-action-text);
   font-size: 0.76rem;
   font-weight: 700;
 }
@@ -301,19 +290,20 @@ a.studio-logo-overlay:focus-visible {
 :host ::ng-deep .stash-copy-selector .p-select {
   min-width: 10.8rem;
   border-radius: 8px;
-  border-color: color-mix(in srgb, var(--border-strong) 85%, transparent);
-  background: rgb(17 34 52 / 78%);
-  color: var(--text-on-media);
+  border-color: var(--media-detail-action-border);
+  background: var(--media-detail-action-background);
+  color: var(--media-detail-action-text);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 14%);
 }
 
 :host ::ng-deep .stash-copy-selector .p-select-label {
-  color: var(--text-on-media);
+  color: var(--media-detail-action-text);
   font-size: 0.78rem;
   font-weight: 700;
 }
 
 :host ::ng-deep .stash-copy-selector .p-select-dropdown {
-  color: var(--text-on-media);
+  color: var(--media-detail-action-text);
 }
 
 :host ::ng-deep .stash-copy-selector .p-select.p-focus {
@@ -327,7 +317,7 @@ a.studio-logo-overlay:focus-visible {
 }
 
 .hero-action-helper {
-  color: color-mix(in srgb, var(--text-on-media) 84%, #d8ebff);
+  color: var(--media-detail-muted-text);
   line-height: 1.45;
   max-width: 36rem;
 }
@@ -396,34 +386,6 @@ button {
   top: 0.45rem;
   right: 0.5rem;
   z-index: 1;
-  width: 1.7rem;
-  height: 1.7rem;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid rgb(188 213 238 / 52%);
-  border-radius: 999px;
-  background: rgb(13 27 41 / 70%);
-  color: rgb(255 255 255 / 85%);
-  cursor: pointer;
-}
-
-.performer-favorite i {
-  font-size: 0.95rem;
-}
-
-.performer-favorite.is-favorite {
-  color: #ffcf4a;
-}
-
-.performer-favorite:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.performer-favorite:disabled {
-  opacity: 0.75;
-  cursor: wait;
 }
 
 .performer-image {
@@ -438,7 +400,7 @@ button {
   place-items: center;
   font-size: 1.35rem;
   font-weight: 700;
-  color: #324455;
+  color: var(--media-detail-placeholder-text);
 }
 
 .performer-meta {

@@ -17,6 +17,7 @@ export interface SceneCardItem extends SceneCardShellItem {
 }
 
 export type SceneCardVariant = 'default' | 'rail';
+export type SceneCardTone = 'media' | 'surface';
 export type SceneCardPrimaryLinkMode = 'scene' | 'external';
 export type SceneCardStudioBadgeRoute = 'none' | 'scenes' | 'library';
 
@@ -38,12 +39,15 @@ export interface SceneCardBadge {
   host: {
     '[class.scene-card-variant-rail]': "variant === 'rail'",
     '[class.scene-card-variant-default]': "variant !== 'rail'",
+    '[class.scene-card-tone-media]': "tone !== 'surface'",
+    '[class.scene-card-tone-surface]': "tone === 'surface'",
   },
 })
 export class SceneCardComponent {
   @Input({ required: true }) item!: SceneCardItem;
   @Input() requestable = false;
   @Input() variant: SceneCardVariant = 'default';
+  @Input() tone: SceneCardTone = 'media';
   @Input() primaryLinkMode: SceneCardPrimaryLinkMode = 'scene';
   @Input() sceneRouteId: string | null = null;
   @Input() sceneQueryParams: Params | null = null;

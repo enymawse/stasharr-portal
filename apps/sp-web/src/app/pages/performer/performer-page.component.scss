@@ -5,30 +5,22 @@
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--app-bg) 35%, #0c141f) 0%,
-      color-mix(in srgb, var(--app-bg) 25%, #101a27) 22%,
+      color-mix(in srgb, var(--app-bg) 84%, var(--surface-raised)) 0%,
+      color-mix(in srgb, var(--app-bg) 92%, var(--surface-2)) 22%,
       var(--app-bg) 55%
     );
   font-family: var(--app-font-family);
 }
 
 main {
-  max-width: min(1540px, 96vw);
-  margin: 0 auto;
-  padding: 1.2rem 1rem 1.8rem;
+  --app-page-max-width: min(1540px, 96vw);
+  --app-page-padding-end: 1.8rem;
 }
 
 h1,
 h2,
 p {
   margin: 0;
-}
-
-.back-link {
-  display: inline-block;
-  margin-bottom: 0.95rem;
-  color: color-mix(in srgb, var(--text-primary) 75%, #9bc0e2);
-  text-decoration: none;
 }
 
 .state {
@@ -44,9 +36,9 @@ p {
   border-radius: 16px;
   overflow: hidden;
   min-height: 560px;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 70%, transparent);
-  box-shadow: 0 18px 38px rgb(5 9 14 / 38%);
-  background: #152331;
+  border: 1px solid var(--media-detail-hero-border);
+  box-shadow: var(--media-detail-hero-shadow);
+  background: var(--media-detail-hero-background);
 }
 
 .hero-backdrop {
@@ -61,19 +53,7 @@ p {
 .hero-shade {
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(
-      110deg,
-      rgb(7 13 20 / 86%) 0%,
-      rgb(7 13 20 / 58%) 42%,
-      rgb(7 13 20 / 84%) 100%
-    ),
-    linear-gradient(
-      to bottom,
-      rgb(8 14 23 / 10%) 0%,
-      rgb(8 14 23 / 52%) 66%,
-      rgb(18 28 39 / 92%) 100%
-    );
+  background: var(--media-detail-hero-shade);
 }
 
 .hero-layout {
@@ -84,6 +64,7 @@ p {
   display: grid;
   grid-template-columns: minmax(230px, 360px) 1fr;
   gap: 1rem;
+  color: var(--media-detail-text);
 }
 
 .media-column {
@@ -95,9 +76,9 @@ p {
 .carousel-main {
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 52%, transparent);
-  box-shadow: 0 18px 28px rgb(6 11 18 / 50%);
-  background: rgb(16 26 38 / 72%);
+  border: 1px solid var(--media-detail-card-border);
+  box-shadow: var(--media-detail-card-shadow);
+  background: var(--media-detail-card-background);
 }
 
 .carousel-main img {
@@ -114,8 +95,8 @@ p {
   place-items: center;
   font-size: 2rem;
   font-weight: 700;
-  color: #324455;
-  background: rgb(29 46 64 / 88%);
+  color: var(--media-detail-placeholder-text);
+  background: var(--media-detail-placeholder-background);
 }
 
 .carousel-controls {
@@ -142,11 +123,11 @@ main > button {
 }
 
 .thumb {
-  border: 1px solid color-mix(in srgb, var(--border-strong) 60%, transparent);
+  border: 1px solid var(--media-detail-subtle-surface-border);
   border-radius: 8px;
   overflow: hidden;
   padding: 0;
-  background: rgb(12 20 30 / 58%);
+  background: var(--media-detail-subtle-surface-background);
   cursor: pointer;
 }
 
@@ -174,15 +155,15 @@ main > button {
   font-size: clamp(1.7rem, 5.3vw, 3rem);
   line-height: 1.05;
   text-wrap: balance;
-  text-shadow: 0 8px 22px rgb(0 0 0 / 45%);
+  text-shadow: var(--media-detail-title-shadow);
 }
 
 .favorite-indicator {
   padding: 0.1rem 0.28rem;
-  border: 1px solid rgb(170 201 229 / 45%);
+  border: 1px solid var(--media-detail-subtle-action-border);
   border-radius: 999px;
-  background: rgb(17 33 49 / 56%);
-  color: rgb(255 255 255 / 78%);
+  background: var(--media-detail-subtle-action-background);
+  color: var(--media-detail-action-text);
   cursor: pointer;
 }
 
@@ -191,7 +172,7 @@ main > button {
 }
 
 .favorite-indicator.active {
-  color: #ffcf4a;
+  color: var(--media-gold);
   cursor: default;
 }
 
@@ -210,23 +191,29 @@ main > button {
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #d8ebff;
-  background: rgb(21 43 64 / 72%);
-  border: 1px solid rgb(165 197 227 / 45%);
+  color: var(--media-detail-kicker-text);
+  background: var(--media-detail-kicker-background);
+  border: 1px solid var(--media-detail-kicker-border);
   border-radius: 999px;
   padding: 0.2rem 0.64rem;
+}
+
+.aliases {
+  color: var(--media-detail-muted-text);
+  line-height: 1.48;
 }
 
 .meta-flags {
   display: flex;
   flex-wrap: wrap;
+  gap: 0.4rem;
 }
 
 .meta-chip {
   border-radius: 999px;
-  border: 1px solid rgb(189 216 241 / 40%);
-  background: rgb(15 34 52 / 66%);
-  color: #e2effc;
+  border: 1px solid var(--media-detail-chip-border);
+  background: var(--media-detail-chip-background);
+  color: var(--media-detail-chip-text);
   font-size: 0.75rem;
   font-weight: 600;
   padding: 0.16rem 0.52rem;
@@ -241,8 +228,8 @@ main > button {
 .metadata-item {
   padding: 0.45rem 0.52rem;
   border-radius: 8px;
-  border: 1px solid rgb(168 195 220 / 24%);
-  background: rgb(10 21 33 / 44%);
+  border: 1px solid var(--media-detail-subtle-surface-border);
+  background: var(--media-detail-subtle-surface-background);
   display: grid;
 }
 
@@ -250,24 +237,17 @@ main > button {
   font-size: 0.67rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #aac6de;
+  color: var(--media-detail-muted-text);
   font-weight: 700;
 }
 
 .metadata-item .value {
   font-size: 0.84rem;
-  color: #edf5ff;
+  color: var(--media-detail-text);
 }
 
 .section {
   margin-top: 0.9rem;
-  display: grid;
-  gap: 0.7rem;
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  padding: 0.95rem;
-  color: var(--text-primary);
 }
 
 .controls-row {
@@ -276,66 +256,11 @@ main > button {
   gap: 0.55rem;
 }
 
-.control-field {
-  display: grid;
-  gap: 0.26rem;
-}
-
-.control-field span {
-  font-size: 0.74rem;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  font-weight: 700;
-}
-
-.control-field input,
-.control-field select {
-  width: 100%;
-  box-sizing: border-box;
-  border-radius: 7px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  padding: 0.38rem 0.44rem;
-}
-
 .toggle-label {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
   font-size: 0.84rem;
-}
-
-.sort-direction-toggle {
-  width: 2.5rem;
-  min-width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 7px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-
-.sort-direction-toggle i {
-  font-size: 1rem;
-}
-
-.sort-direction-toggle:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.sort-with-direction {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.35rem;
-  align-items: center;
-  min-width: 0;
 }
 
 .filter-grid {
@@ -346,8 +271,8 @@ main > button {
 
 .filter-panel {
   border-radius: 9px;
-  border: 1px solid var(--border-subtle);
-  background: var(--surface-2);
+  border: 1px solid var(--surface-panel-muted-border);
+  background: var(--surface-panel-muted-background);
   padding: 0.65rem;
   display: grid;
   gap: 0.55rem;
@@ -355,28 +280,6 @@ main > button {
 
 .hint {
   font-size: 0.75rem;
-}
-
-:host ::ng-deep .controls-shell .p-select,
-:host ::ng-deep .controls-shell .p-inputtext,
-:host ::ng-deep .controls-shell .p-multiselect {
-  width: 100%;
-}
-
-:host ::ng-deep .controls-shell .p-select,
-:host ::ng-deep .controls-shell .p-inputtext,
-:host ::ng-deep .controls-shell .p-multiselect {
-  border-radius: 7px;
-  border-color: var(--border-strong);
-  background: var(--surface-elevated);
-  color: var(--text-primary);
-}
-
-:host ::ng-deep .controls-shell .p-select.p-focus,
-:host ::ng-deep .controls-shell .p-inputtext:focus,
-:host ::ng-deep .controls-shell .p-multiselect.p-focus {
-  border-color: var(--focus-ring);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--focus-ring) 44%, transparent);
 }
 
 .grid {

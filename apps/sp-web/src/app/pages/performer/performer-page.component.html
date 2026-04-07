@@ -1,6 +1,6 @@
-<main>
+<main class="app-page-shell app-page-shell--xl">
   <a
-    class="back-link"
+    class="back-link app-back-link app-back-link--media"
     [routerLink]="backLinkPath()"
     [queryParams]="backLinkQueryParams()"
   >
@@ -118,12 +118,15 @@
       </div>
     </section>
 
-    <section class="section controls-shell" aria-label="Performer scene filters">
+    <section
+      class="section controls-shell app-section-panel app-control-shell"
+      aria-label="Performer scene filters"
+    >
       <h2>Scenes</h2>
       <div class="controls-row">
-        <div class="control-field">
-          <span>Sort</span>
-          <div class="sort-with-direction">
+        <div class="control-field app-control-field">
+          <span class="app-control-label">Sort</span>
+          <div class="sort-with-direction app-control-inline">
             <p-select
               inputId="performer-sort"
               [ngModel]="sceneSort()"
@@ -136,7 +139,7 @@
             />
             <button
               type="button"
-              class="sort-direction-toggle"
+              class="sort-direction-toggle app-sort-direction-toggle"
               [attr.aria-label]="sceneSortDirectionToggleLabel()"
               [attr.title]="sceneSortDirectionToggleLabel()"
               (click)="toggleSceneSortDirection()"
@@ -146,8 +149,8 @@
           </div>
         </div>
 
-        <label class="control-field checkbox-field">
-          <span>Only Favorite Studios</span>
+        <label class="control-field checkbox-field app-control-field">
+          <span class="app-control-label">Only Favorite Studios</span>
           <label class="toggle-label">
             <p-toggleswitch
               inputId="performer-favorite-studios"
@@ -161,8 +164,8 @@
 
       <div class="filter-grid">
         <div class="filter-panel">
-          <label class="control-field">
-            <span>Studios</span>
+          <label class="control-field app-control-field">
+            <span class="app-control-label">Studios</span>
             <p-multiselect
               inputId="performer-studios"
               [ngModel]="studioSelectedIds()"
@@ -193,8 +196,8 @@
         </div>
 
         <div class="filter-panel">
-          <label class="control-field">
-            <span>Tags</span>
+          <label class="control-field app-control-field">
+            <span class="app-control-label">Tags</span>
             <p-multiselect
               inputId="performer-tags"
               [ngModel]="tagSelectedIds()"
@@ -243,6 +246,7 @@
           <app-scene-card
             [item]="item"
             [requestable]="isRequestable(item)"
+            tone="surface"
             [sceneQueryParams]="{ returnTo: currentRouteUrl() }"
             studioBadgeRoute="scenes"
             (request)="openRequestModal($event)"

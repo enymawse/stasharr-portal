@@ -38,11 +38,11 @@ p {
 }
 
 .info-card {
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--surface-panel-border);
   border-radius: 18px;
   padding: 1rem;
-  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
-  box-shadow: 0 18px 38px rgba(10, 17, 29, 0.12);
+  background: var(--surface-panel-background);
+  box-shadow: var(--surface-panel-shadow);
   display: grid;
   gap: 0.85rem;
 }
