@@ -20,9 +20,21 @@ describe('app routes', () => {
       'studios',
       'performer/:performerId',
       'studio/:studioId',
-      'settings/indexing',
       'settings',
       '',
+    ]);
+  });
+
+  it('organizes settings into focused child routes', () => {
+    const appShellChildren = routes.find((route) => route.path === '')?.children ?? [];
+    const settingsRoute = appShellChildren.find((route) => route.path === 'settings');
+
+    expect(settingsRoute?.children?.map((route) => route.path)).toEqual([
+      '',
+      'integrations',
+      'indexing',
+      'account',
+      'about',
     ]);
   });
 });

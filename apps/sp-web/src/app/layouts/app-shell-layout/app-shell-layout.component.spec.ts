@@ -221,7 +221,7 @@ describe('AppShellLayoutComponent', () => {
     expect(banner?.textContent).toContain('Runtime outage');
     expect(banner?.textContent).toContain('Whisparr is currently unavailable.');
     expect(banner?.textContent).toContain('Acquisition and status updates may be stale.');
-    expect(repairLink?.getAttribute('href')).toContain('/settings');
+    expect(repairLink?.getAttribute('href')).toContain('/settings/integrations');
     expect(settingsIndicator?.textContent).toContain('Repair');
   });
 

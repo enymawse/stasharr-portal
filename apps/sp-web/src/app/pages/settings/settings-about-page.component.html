@@ -1,0 +1,68 @@
+<section class="about-page">
+  <header class="section-head">
+    <p class="eyebrow">About</p>
+    <h2>About Stasharr</h2>
+    <p class="lede">
+      Stasharr is a self-hosted console for discovering scenes, sending acquisitions to Whisparr,
+      and validating availability against your local Stash library.
+    </p>
+  </header>
+
+  <section class="about-grid">
+    <article class="info-card">
+      <p class="eyebrow">Runtime</p>
+      <h3>App metadata</h3>
+
+      @if (loading()) {
+        <div class="loading-state" role="status" aria-live="polite">
+          <p-progressspinner
+            strokeWidth="4"
+            [style]="{ width: '2rem', height: '2rem' }"
+          />
+          <p>Loading runtime metadata...</p>
+        </div>
+      } @else {
+        <div class="meta-grid">
+          <div class="meta-item">
+            <span>Application</span>
+            <strong>Stasharr</strong>
+          </div>
+          <div class="meta-item">
+            <span>Version</span>
+            <strong>{{ health()?.version ?? 'Unknown' }}</strong>
+          </div>
+          <div class="meta-item">
+            <span>Runtime service</span>
+            <strong>{{ health()?.service ?? 'Unknown' }}</strong>
+          </div>
+          <div class="meta-item">
+            <span>API status</span>
+            <strong>{{ health()?.status ?? 'Unknown' }}</strong>
+          </div>
+          <div class="meta-item">
+            <span>Database</span>
+            <strong>{{ health()?.database ?? 'Unknown' }}</strong>
+          </div>
+          <div class="meta-item">
+            <span>Access model</span>
+            <strong>Single local admin</strong>
+          </div>
+        </div>
+      }
+
+      @if (loadError()) {
+        <p-message severity="warn" styleClass="state-message">{{ loadError() }}</p-message>
+      }
+    </article>
+
+    <article class="info-card">
+      <p class="eyebrow">Project</p>
+      <h3>Links</h3>
+      <div class="link-list">
+        <a [href]="githubUrl" target="_blank" rel="noopener noreferrer">GitHub repository</a>
+        <a [href]="docsUrl" target="_blank" rel="noopener noreferrer">Self-hosted quick start</a>
+        <a [href]="releasesUrl" target="_blank" rel="noopener noreferrer">Release history</a>
+      </div>
+    </article>
+  </section>
+</section>

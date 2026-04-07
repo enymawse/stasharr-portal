@@ -1,0 +1,87 @@
+:host {
+  display: block;
+}
+
+.about-page {
+  display: grid;
+  gap: 1rem;
+}
+
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+.section-head {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 58rem;
+}
+
+.eyebrow {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.lede {
+  color: var(--text-muted);
+}
+
+.about-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.info-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  padding: 1rem;
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
+  box-shadow: 0 18px 38px rgba(10, 17, 29, 0.12);
+  display: grid;
+  gap: 0.85rem;
+}
+
+.loading-state,
+.meta-grid,
+.meta-item,
+.link-list {
+  display: grid;
+}
+
+.loading-state {
+  gap: 0.75rem;
+}
+
+.meta-grid {
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.meta-item {
+  gap: 0.25rem;
+}
+
+.meta-item span {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.link-list {
+  gap: 0.65rem;
+}
+
+.link-list a {
+  color: var(--focus-ring);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.link-list a:hover {
+  text-decoration: underline;
+}

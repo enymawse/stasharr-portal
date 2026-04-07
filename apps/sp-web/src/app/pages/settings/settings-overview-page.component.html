@@ -1,0 +1,53 @@
+<section class="overview-page">
+  @if (loading()) {
+    <div class="app-blocking-loader" role="status" aria-live="polite">
+      <p-progressspinner
+        styleClass="app-blocking-spinner"
+        strokeWidth="4"
+        [style]="{ width: '2.25rem', height: '2.25rem' }"
+      />
+      <p>Loading settings overview...</p>
+    </div>
+  } @else {
+    <section
+      class="hero-card"
+      [class.tone-good]="statusTone() === 'good'"
+      [class.tone-warn]="statusTone() === 'warn'"
+    >
+      <div class="hero-head">
+        <div class="hero-copy">
+          <p class="eyebrow">Overview</p>
+          <h2>{{ progressSummary() }}</h2>
+          <p class="hero-lead">{{ statusLead() }}</p>
+        </div>
+
+        <span
+          class="status-pill"
+          [class.tone-good]="statusTone() === 'good'"
+          [class.tone-warn]="statusTone() === 'warn'"
+        >
+          {{ statusLabel() }}
+        </span>
+      </div>
+
+      <div class="hero-meta">
+        <div class="meta-item">
+          <span>Catalog provider</span>
+          <strong>{{ catalogProviderLabel() }}</strong>
+        </div>
+        <div class="meta-item">
+          <span>Runtime</span>
+          <strong>{{ health()?.service ?? 'Unknown' }}</strong>
+        </div>
+        <div class="meta-item">
+          <span>Version</span>
+          <strong>{{ health()?.version ?? 'Unknown' }}</strong>
+        </div>
+      </div>
+
+      @if (loadError()) {
+        <p-message severity="warn" styleClass="state-message">{{ loadError() }}</p-message>
+      }
+    </section>
+  }
+</section>

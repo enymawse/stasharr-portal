@@ -1,0 +1,68 @@
+<article class="repair-card">
+  <div class="card-head">
+    <div>
+      @if (sectionLabel) {
+        <p class="eyebrow">{{ sectionLabel }}</p>
+      }
+      <h2>{{ label }}</h2>
+    </div>
+    <span [class]="'state-badge ' + stateClass()">
+      {{ readinessLabel() }}
+    </span>
+  </div>
+
+  <p class="card-summary">{{ summary }}</p>
+
+  @if (helpText) {
+    <p class="meta">{{ helpText }}</p>
+  }
+
+  <div class="health-meta">
+    <p>Last healthy test: {{ lastHealthyAt ?? 'Never' }}</p>
+    <p>Last failed test: {{ lastErrorAt ?? 'None' }}</p>
+  </div>
+
+  @if (errorMessage) {
+    <p-message severity="error" styleClass="inline-message">{{ errorMessage }}</p-message>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="onSubmit()">
+    <app-integration-form-fields
+      [form]="form"
+      [hasStoredApiKey]="hasStoredApiKey"
+      [enabledInputId]="enabledInputId"
+      [showEnabledToggle]="showEnabledToggle"
+    />
+
+    <div class="actions">
+      <button
+        pButton
+        [attr.type]="submitAction === 'primary' ? 'submit' : 'button'"
+        [disabled]="primaryDisabled"
+        (click)="onPrimaryClick()"
+      >
+        {{ primaryActionLabel }}
+      </button>
+      <button
+        pButton
+        text
+        [attr.type]="submitAction === 'secondary' ? 'submit' : 'button'"
+        [disabled]="secondaryDisabled"
+        (click)="onSecondaryClick()"
+      >
+        {{ secondaryActionLabel }}
+      </button>
+      <ng-content select="[panel-actions]"></ng-content>
+    </div>
+
+    <p class="action-hint">{{ actionHint }}</p>
+
+    @for (message of messages; track message.text + message.severity) {
+      <p-message [severity]="message.severity" styleClass="inline-message">
+        {{ message.text }}
+      </p-message>
+    }
+  </form>
+
+  <ng-content select="[panel-footer]"></ng-content>
+</article>

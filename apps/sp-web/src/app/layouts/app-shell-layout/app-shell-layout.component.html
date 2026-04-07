@@ -97,7 +97,7 @@
       <a
         routerLink="/settings"
         routerLinkActive="active"
-        [routerLinkActiveOptions]="{ exact: true }"
+        [routerLinkActiveOptions]="{ exact: false }"
         class="nav-item settings-nav-item"
         data-testid="settings-nav-link"
         [class.has-alert]="!!degradedState()"
@@ -136,11 +136,11 @@
             <p class="degraded-message">{{ degradedState.message }}</p>
           </div>
           <a
-            routerLink="/settings"
+            routerLink="/settings/integrations"
             class="degraded-action"
             data-testid="repair-integrations-link"
           >
-            Open Settings
+            Repair integrations
           </a>
         </section>
       </div>

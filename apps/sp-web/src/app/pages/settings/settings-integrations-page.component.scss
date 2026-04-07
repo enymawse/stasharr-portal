@@ -1,0 +1,162 @@
+:host {
+  display: block;
+}
+
+.integrations-page {
+  display: grid;
+  gap: 1rem;
+}
+
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+.page-head {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 58rem;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.lede {
+  color: var(--text-muted);
+}
+
+.settings-overview,
+.global-health,
+.global-danger,
+.danger-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 1rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 88%, transparent), var(--surface-1));
+}
+
+.overview-head,
+.checklist-item-head,
+.panel-head {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.overview-lead {
+  margin-top: 0.45rem;
+  font-size: 1.02rem;
+}
+
+.progress-pill {
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  padding: 0.45rem 0.75rem;
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
+.progress-pill.is-complete {
+  border-color: color-mix(in srgb, var(--success-color, #2f855a) 48%, var(--border-strong));
+}
+
+.overview-meta,
+.health-grid {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.overview-meta,
+.overview-summary,
+.danger-card p {
+  color: var(--text-muted);
+}
+
+.checklist-grid,
+.cards,
+.operations-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.checklist-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.checklist-item {
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  padding: 0.85rem;
+  background: var(--surface-elevated);
+}
+
+.cards {
+  align-items: start;
+}
+
+.operations-grid {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.global-health,
+.global-danger,
+.danger-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.state-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.is-ready {
+  border-color: color-mix(in srgb, var(--success-color, #2f855a) 48%, var(--border-strong));
+  background: color-mix(in srgb, var(--success-color, #2f855a) 14%, var(--surface-elevated));
+}
+
+.is-saved {
+  border-color: color-mix(in srgb, var(--warning-color, #b7791f) 48%, var(--border-strong));
+  background: color-mix(in srgb, var(--warning-color, #b7791f) 12%, var(--surface-elevated));
+}
+
+.is-error {
+  border-color: color-mix(in srgb, var(--error-color, #c53030) 52%, var(--border-strong));
+  background: color-mix(in srgb, var(--error-color, #c53030) 12%, var(--surface-elevated));
+}
+
+.is-pending {
+  border-color: var(--border-strong);
+}
+
+@media (max-width: 640px) {
+  .overview-head,
+  .checklist-item-head,
+  .panel-head {
+    flex-direction: column;
+  }
+
+  .progress-pill,
+  .state-badge {
+    align-self: flex-start;
+  }
+}
