@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/enymawse/stasharr-portal/compare/v0.1.0...v0.2.0) (2026-04-14)
+
+
+### Features
+
+* **runtime:** expose built app version metadata ([#14](https://github.com/enymawse/stasharr-portal/issues/14)) ([6d7a5a2](https://github.com/enymawse/stasharr-portal/commit/6d7a5a29a60050af6de667db27e39c599a5bda6b))
+
 ## 0.1.0 (2026-04-14)
 
 
