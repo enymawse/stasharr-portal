@@ -331,6 +331,12 @@ describe('LibraryPageComponent', () => {
       'Currently showing projected library data synced through',
     );
     expect(degradedAlert?.textContent).toContain('Newly imported scenes');
+    expect(
+      degradedAlert?.querySelector('a[href*="/settings/integrations"]')?.textContent,
+    ).toContain('Repair integrations');
+    expect(degradedAlert?.querySelector('a[href*="/settings/indexing"]')?.textContent).toContain(
+      'Open Indexing',
+    );
   });
 
   it('renders an intentional empty state when the local library has no indexed scenes yet', async () => {
@@ -342,6 +348,9 @@ describe('LibraryPageComponent', () => {
     expect(
       fixture.nativeElement.querySelector('[data-testid="library-empty-state"]')?.textContent,
     ).toContain('Track Imports');
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="library-empty-state"]')?.textContent,
+    ).toContain('Open Indexing');
   });
 
   it('renders a no-match empty state when filters narrow the library to zero scenes', async () => {

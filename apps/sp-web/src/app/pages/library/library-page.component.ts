@@ -40,6 +40,11 @@ import {
 } from '../../core/api/library.types';
 import { SceneCardBadge, SceneCardComponent } from '../../shared/scene-card/scene-card.component';
 import { SceneCardShellLink } from '../../shared/scene-card/scene-card-shell.component';
+import {
+  buildReadinessPageAlert,
+  firstUseEmptyStateCopy,
+  initialIndexingGuidance,
+} from '../../shared/readiness/first-run-readiness.utils';
 
 interface MultiSelectOption {
   label: string;
@@ -174,27 +179,25 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly tagMatchOptions = LibraryPageComponent.TAG_MATCH_OPTIONS;
   protected readonly localCardBadges = LibraryPageComponent.LOCAL_CARD_BADGES;
   protected readonly pageAlert = computed<LibraryPageAlert | null>(() => {
-    const setupStatus = this.setupStatusStore.status();
-    if (setupStatus && !setupStatus.required.stash) {
-      return {
-        title: 'Local library browsing needs attention',
-        message:
-          'Stash needs repair for this surface. Newly imported scenes, artwork, and local favorite overlays may be missing or stale until the integration is fixed.',
-      };
-    }
-
-    const runtimeStatus = this.runtimeHealthService.status();
-    if (!runtimeStatus?.services.stash.degraded) {
+    const alert = buildReadinessPageAlert(
+      'library',
+      this.setupStatusStore.status(),
+      this.runtimeHealthService.status(),
+    );
+    if (!alert) {
       return null;
     }
 
-    const freshnessHint = this.latestSyncAt()
-      ? `Currently showing projected library data synced through ${this.formatDateTime(this.latestSyncAt())}.`
-      : 'Currently showing projected library data with an unknown sync timestamp.';
+    const freshnessHint =
+      alert.eyebrow === 'Runtime Outage'
+        ? this.latestSyncAt()
+          ? ` Currently showing projected library data synced through ${this.formatDateTime(this.latestSyncAt())}.`
+          : ' Current library sync freshness is unknown.'
+        : '';
 
     return {
-      title: 'Local library freshness is degraded',
-      message: `${freshnessHint} Newly imported scenes, refreshed metadata, and availability overlays may lag until Stash is healthy again.`,
+      title: alert.title,
+      message: `${alert.message}${freshnessHint}`,
     };
   });
 
@@ -379,13 +382,27 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected emptyStateTitle(): string {
     return this.hasNarrowingFilters()
       ? 'Nothing matches the current library view'
-      : 'No local scenes are indexed yet';
+      : firstUseEmptyStateCopy('library').title;
   }
 
   protected emptyStateMessage(): string {
-    return this.hasNarrowingFilters()
-      ? 'Clear or adjust the current filters to bring local scenes back into view. If you just imported something, Stash or indexing may still be catching up.'
-      : 'This page only shows scenes that already exist in Stash. Import content, wait for indexing to finish, or browse discovery while your local library catches up.';
+    if (this.hasNarrowingFilters()) {
+      return 'Clear or adjust the current filters to bring local scenes back into view. If you just imported something, Stash or indexing may still be catching up.';
+    }
+
+    if (this.pageAlert()) {
+      return 'Library may be empty because Stash is degraded. Repair the integration, then run Sync All from Indexing & Sync if the local library still has not appeared.';
+    }
+
+    if (this.latestSyncAt()) {
+      return 'Indexing has run, but Stasharr did not find local scenes for this view. Check Stash for imported scenes, then run Sync All after new imports.';
+    }
+
+    return firstUseEmptyStateCopy('library').message;
+  }
+
+  protected indexingGuidance(): string {
+    return initialIndexingGuidance();
   }
 
   protected sortSummaryShort(): string {

@@ -6,11 +6,12 @@ import {
   OnDestroy,
   OnInit,
   ViewChild,
+  computed,
   inject,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   Subject,
   Subscription,
@@ -38,8 +39,15 @@ import {
   SceneTagOption,
   isSceneStatusRequestable,
 } from '../../core/api/discover.types';
+import { RuntimeHealthService } from '../../core/api/runtime-health.service';
+import { SetupStatusStore } from '../../core/api/setup-status.store';
 import { SceneCardComponent } from '../../shared/scene-card/scene-card.component';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
+import {
+  buildReadinessPageAlert,
+  firstUseEmptyStateCopy,
+  initialIndexingGuidance,
+} from '../../shared/readiness/first-run-readiness.utils';
 
 type FavoritesFilterOption = 'NONE' | SceneFavoritesFilter;
 interface MultiSelectOption {
@@ -65,6 +73,7 @@ interface SelectedStudioChip {
     ProgressSpinner,
     Select,
     MultiSelect,
+    RouterLink,
     SceneCardComponent,
     SceneRequestModalComponent,
   ],
@@ -106,6 +115,8 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   ];
 
   private readonly discoverService = inject(DiscoverService);
+  private readonly runtimeHealthService = inject(RuntimeHealthService);
+  private readonly setupStatusStore = inject(SetupStatusStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly studioSearchTerms = new Subject<string>();
@@ -176,8 +187,16 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly sortOptions = ScenesPageComponent.SORT_OPTIONS;
   protected readonly favoritesOptions = ScenesPageComponent.FAVORITES_OPTIONS;
   protected readonly tagMatchOptions = ScenesPageComponent.TAG_MATCH_OPTIONS;
+  protected readonly pageAlert = computed(() =>
+    buildReadinessPageAlert(
+      'scenes',
+      this.setupStatusStore.status(),
+      this.runtimeHealthService.status(),
+    ),
+  );
 
   ngOnInit(): void {
+    this.runtimeHealthService.ensureStarted();
     this.setupStudioSearch();
     this.setupTagSearch();
     this.setupUrlStateSync();
@@ -340,9 +359,25 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected emptyStateMessage(): string {
+    if (this.hasActiveFilters()) {
+      return 'No scenes match the current filters.';
+    }
+
+    if (this.pageAlert()?.impactedServices.includes('CATALOG')) {
+      return 'The catalog feed may be empty because the configured catalog provider needs repair.';
+    }
+
+    return firstUseEmptyStateCopy('scenes').message;
+  }
+
+  protected emptyStateTitle(): string {
     return this.hasActiveFilters()
-      ? 'No scenes match the current filters.'
-      : 'No trending scenes are available right now.';
+      ? 'No scenes match the current filters'
+      : firstUseEmptyStateCopy('scenes').title;
+  }
+
+  protected indexingGuidance(): string {
+    return initialIndexingGuidance();
   }
 
   protected onTagFilterChanged(nextValue: string | null | undefined): void {

@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
@@ -5,6 +6,10 @@ import { DiscoverService } from '../../core/api/discover.service';
 import { SceneExplorerItem, ScenesFeedResponse } from '../../core/api/discover.types';
 import { HomeService } from '../../core/api/home.service';
 import { HomeRailConfig, HomeRailContentResponse, HomeRailItem } from '../../core/api/home.types';
+import { RuntimeHealthService } from '../../core/api/runtime-health.service';
+import { RuntimeHealthResponse } from '../../core/api/runtime-health.types';
+import { SetupStatusStore } from '../../core/api/setup-status.store';
+import { SetupStatusResponse } from '../../core/api/setup.types';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import { HomePageComponent } from './home-page.component';
 
@@ -61,12 +66,71 @@ function buildRailItem(overrides: Partial<HomeRailItem> = {}): HomeRailItem {
   };
 }
 
+function buildSetupStatus(
+  overrides: Partial<Omit<SetupStatusResponse, 'required'>> & {
+    required?: Partial<SetupStatusResponse['required']>;
+  } = {},
+): SetupStatusResponse {
+  return {
+    setupComplete: overrides.setupComplete ?? true,
+    required: {
+      stash: true,
+      catalog: true,
+      whisparr: true,
+      ...(overrides.required ?? {}),
+    },
+    catalogProvider: overrides.catalogProvider ?? 'STASHDB',
+  };
+}
+
+const HEALTHY_RUNTIME_HEALTH: RuntimeHealthResponse = {
+  degraded: false,
+  failureThreshold: 3,
+  services: {
+    catalog: {
+      service: 'CATALOG',
+      status: 'HEALTHY',
+      degraded: false,
+      consecutiveFailures: 0,
+      lastHealthyAt: '2026-04-02T00:00:00.000Z',
+      lastFailureAt: null,
+      lastErrorMessage: null,
+      degradedAt: null,
+    },
+    stash: {
+      service: 'STASH',
+      status: 'HEALTHY',
+      degraded: false,
+      consecutiveFailures: 0,
+      lastHealthyAt: '2026-04-02T00:00:00.000Z',
+      lastFailureAt: null,
+      lastErrorMessage: null,
+      degradedAt: null,
+    },
+    whisparr: {
+      service: 'WHISPARR',
+      status: 'HEALTHY',
+      degraded: false,
+      consecutiveFailures: 0,
+      lastHealthyAt: '2026-04-02T00:00:00.000Z',
+      lastFailureAt: null,
+      lastErrorMessage: null,
+      degradedAt: null,
+    },
+  },
+};
+
 describe('HomePageComponent', () => {
   afterEach(() => {
     TestBed.resetTestingModule();
   });
 
-  async function renderPage() {
+  async function renderPage(options?: {
+    discoverFeed?: ScenesFeedResponse;
+    homeRailItemsById?: Record<string, HomeRailContentResponse>;
+    runtimeHealth?: RuntimeHealthResponse;
+    setupStatus?: SetupStatusResponse;
+  }) {
     const rails: HomeRailConfig[] = [
       {
         id: 'rail-stashdb',
@@ -121,15 +185,16 @@ describe('HomePageComponent', () => {
       },
     ];
 
-    const homeRailItemsById: Record<string, HomeRailContentResponse> = {
-      'rail-stash': {
-        items: [buildRailItem()],
-        message: null,
-      },
-    };
+    const homeRailItemsById: Record<string, HomeRailContentResponse> =
+      options?.homeRailItemsById ?? {
+        'rail-stash': {
+          items: [buildRailItem()],
+          message: null,
+        },
+      };
 
     const discoverService = {
-      getScenesFeed: vi.fn().mockReturnValue(of(buildDiscoverFeed())),
+      getScenesFeed: vi.fn().mockReturnValue(of(options?.discoverFeed ?? buildDiscoverFeed())),
       searchSceneTags: vi.fn().mockReturnValue(of([])),
       searchPerformerStudios: vi.fn().mockReturnValue(of([])),
       getSceneRequestOptions: vi.fn().mockReturnValue(of(null)),
@@ -145,6 +210,14 @@ describe('HomePageComponent', () => {
       updateRail: vi.fn(),
       deleteRail: vi.fn(),
     };
+    const runtimeHealthService = {
+      ensureStarted: vi.fn(),
+      status: signal(options?.runtimeHealth ?? HEALTHY_RUNTIME_HEALTH).asReadonly(),
+    };
+    const setupStatusStore = {
+      status: signal(options?.setupStatus ?? buildSetupStatus()),
+      sync: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       imports: [HomePageComponent],
@@ -157,6 +230,14 @@ describe('HomePageComponent', () => {
         {
           provide: HomeService,
           useValue: homeService,
+        },
+        {
+          provide: RuntimeHealthService,
+          useValue: runtimeHealthService,
+        },
+        {
+          provide: SetupStatusStore,
+          useValue: setupStatusStore,
         },
         {
           provide: AppNotificationsService,
@@ -174,7 +255,7 @@ describe('HomePageComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    return { fixture, discoverService };
+    return { fixture, discoverService, runtimeHealthService };
   }
 
   function railSectionByTitle(
@@ -194,7 +275,7 @@ describe('HomePageComponent', () => {
   }
 
   it('routes STASHDB rails to /scenes and STASH rails to /library', async () => {
-    const { fixture, discoverService } = await renderPage();
+    const { fixture, discoverService, runtimeHealthService } = await renderPage();
 
     expect(discoverService.getScenesFeed).toHaveBeenCalledWith(
       1,
@@ -228,6 +309,7 @@ describe('HomePageComponent', () => {
     expect(libraryLink?.getAttribute('href')).toContain('favoriteTagsOnly=1');
     expect(libraryLink?.getAttribute('href')).toContain('tags=tag-2');
     expect(libraryLink?.getAttribute('href')).toContain('studios=studio-2');
+    expect(runtimeHealthService.ensureStarted).toHaveBeenCalledTimes(1);
   });
 
   it('renders Home rails through the shared scene card and preserves request routing', async () => {
@@ -236,8 +318,12 @@ describe('HomePageComponent', () => {
     const cards = fixture.nativeElement.querySelectorAll('app-scene-card');
     const discoverySection = railSectionByTitle(fixture, 'Discovery Rail');
     const librarySection = railSectionByTitle(fixture, 'Library Rail');
-    const requestButton = discoverySection.querySelector('.request-cta') as HTMLButtonElement | null;
-    const libraryLink = librarySection.querySelector('.media-link-stretch') as HTMLAnchorElement | null;
+    const requestButton = discoverySection.querySelector(
+      '.request-cta',
+    ) as HTMLButtonElement | null;
+    const libraryLink = librarySection.querySelector(
+      '.media-link-stretch',
+    ) as HTMLAnchorElement | null;
 
     expect(cards).toHaveLength(2);
     expect(libraryLink?.getAttribute('href')).toBe('http://stash.local/scenes/local-scene-1');
@@ -276,5 +362,24 @@ describe('HomePageComponent', () => {
 
     expect(fixture.nativeElement.querySelector('#home-rail-hybrid-favorites')).toBeNull();
     expect(fixture.nativeElement.querySelector('#home-rail-library-availability')).toBeNull();
+  });
+
+  it('guides first-run users when Home rails have no data yet', async () => {
+    const { fixture } = await renderPage({
+      discoverFeed: buildDiscoverFeed([]),
+      homeRailItemsById: {
+        'rail-stash': {
+          items: [],
+          message: null,
+        },
+      },
+    });
+
+    const text = fixture.nativeElement.textContent ?? '';
+
+    expect(text).toContain('Home is waiting for useful scene data');
+    expect(text).toContain('Run the initial indexing sync');
+    expect(text).toContain('Open Indexing');
+    expect(text).toContain('Browse Scenes');
   });
 });

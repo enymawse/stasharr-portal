@@ -21,8 +21,60 @@ header p {
   margin-top: 0.5rem;
 }
 
+.eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 .state {
   margin-top: 1rem;
+}
+
+.page-alert {
+  margin-top: 0.9rem;
+  --app-alert-radius: 8px;
+}
+
+.page-alert p:last-child {
+  color: var(--text-muted);
+  max-width: 70ch;
+}
+
+.empty-shell {
+  margin-top: 0.9rem;
+  --app-state-radius: 8px;
+}
+
+.state-link {
+  font: inherit;
+  min-height: 2.25rem;
+  padding: 0.42rem 0.72rem;
+  border-radius: 6px;
+  border: 1px solid var(--button-border);
+  background: var(--button-bg);
+  color: var(--button-text);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.state-link.primary {
+  border-color: var(--tone-info-border);
+  background: var(--tone-info-background);
+  color: var(--tone-info-text);
+}
+
+.state-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .error {
