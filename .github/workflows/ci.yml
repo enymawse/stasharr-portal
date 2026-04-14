@@ -58,4 +58,4 @@ jobs:
       - name: Build production image
         env:
           DOCKER_BUILDKIT: 1
-        run: docker build -t stasharr-portal:test .
+        run: docker build --build-arg STASHARR_VERSION=0.0.0-ci -t stasharr-portal:test .

@@ -60,6 +60,8 @@ Stasharr publishes one production image to GHCR at `ghcr.io/enymawse/stasharr-po
 - Pushes to `main` publish development tags `edge` and `sha-<shortsha>`.
 - Pushes of release tags matching `vX.Y.Z` publish `vX.Y.Z`, `vX.Y`, `vX`, and `latest`.
 - `latest` tracks the newest stable tagged release, not the tip of `main`.
+- Release images bake `STASHARR_VERSION` from the tag without the leading `v`, so tag `v0.1.0` displays app version `0.1.0` in health, About, and Settings Overview.
+- `main` images bake `STASHARR_VERSION=edge-<shortsha>`. Local Docker builds that omit the build arg use `0.0.0-dev`.
 
 The published image is built from the repo-root `Dockerfile`. It installs the workspace, generates the Prisma client, builds the Nest API and Angular frontend, then copies the production runtime artifacts into a separate runtime stage.
 
