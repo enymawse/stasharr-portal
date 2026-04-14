@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Observable, finalize, forkJoin, map, switchMap } from 'rxjs';
 import { ButtonDirective } from 'primeng/button';
 import { Message } from 'primeng/message';
@@ -36,15 +36,14 @@ import {
   mapIntegrationsByType,
   patchActionState,
 } from '../../shared/integration-repair/integration-repair.utils';
+import {
+  initialIndexingGuidance,
+  setupCompleteSummary,
+} from '../../shared/readiness/first-run-readiness.utils';
 
 @Component({
   selector: 'app-setup-page',
-  imports: [
-    Message,
-    ProgressSpinner,
-    ButtonDirective,
-    IntegrationRepairPanelComponent,
-  ],
+  imports: [Message, ProgressSpinner, ButtonDirective, RouterLink, IntegrationRepairPanelComponent],
   templateUrl: './setup-page.component.html',
   styleUrl: './setup-page.component.scss',
 })
@@ -52,12 +51,13 @@ export class SetupPageComponent implements OnInit {
   private readonly setupService = inject(SetupService);
   private readonly integrationsService = inject(IntegrationsService);
   private readonly notifications = inject(AppNotificationsService);
-  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
   protected readonly status = signal<SetupStatusResponse | null>(null);
   protected readonly resettingCatalogProvider = signal(false);
+  protected readonly bootstrapHandoff = signal(false);
 
   private readonly allIntegrationTypes: IntegrationType[] = [
     'STASH',
@@ -84,17 +84,14 @@ export class SetupPageComponent implements OnInit {
     createEmptyIntegrationsRecord(),
   );
 
-  protected readonly saveState = signal<Record<IntegrationType, IntegrationActionState>>(
-    createActionStateRecord(),
-  );
+  protected readonly saveState =
+    signal<Record<IntegrationType, IntegrationActionState>>(createActionStateRecord());
 
-  protected readonly testState = signal<Record<IntegrationType, IntegrationActionState>>(
-    createActionStateRecord(),
-  );
+  protected readonly testState =
+    signal<Record<IntegrationType, IntegrationActionState>>(createActionStateRecord());
 
-  protected readonly saveAndTestState = signal<Record<IntegrationType, IntegrationActionState>>(
-    createActionStateRecord(),
-  );
+  protected readonly saveAndTestState =
+    signal<Record<IntegrationType, IntegrationActionState>>(createActionStateRecord());
 
   protected readonly isSetupComplete = computed(() => this.status()?.setupComplete ?? false);
   protected readonly checklistItems = computed<SetupChecklistItem[]>(() => [
@@ -110,6 +107,7 @@ export class SetupPageComponent implements OnInit {
   );
 
   ngOnInit(): void {
+    this.bootstrapHandoff.set(this.route.snapshot.queryParamMap.get('from') === 'bootstrap');
     this.loadSetupData();
   }
 
@@ -162,6 +160,17 @@ export class SetupPageComponent implements OnInit {
     return `${this.labelFor(catalogProvider)} is locked in as the catalog provider. Finish the remaining required services to complete setup.`;
   }
 
+  protected setupCompleteSummary(): string {
+    const catalogProvider = this.catalogProvider();
+    return setupCompleteSummary(
+      catalogProvider ? this.labelFor(catalogProvider) : 'The catalog provider',
+    );
+  }
+
+  protected indexingGuidance(): string {
+    return initialIndexingGuidance();
+  }
+
   protected catalogProviderHelp(type: IntegrationType): string | null {
     if (!this.isCatalogProvider(type)) {
       return null;
@@ -184,7 +193,9 @@ export class SetupPageComponent implements OnInit {
 
   protected sectionLabel(type: IntegrationType): string {
     if (this.isCatalogProvider(type)) {
-      return this.catalogProvider() === type ? 'Chosen catalog provider' : 'Catalog provider option';
+      return this.catalogProvider() === type
+        ? 'Chosen catalog provider'
+        : 'Catalog provider option';
     }
 
     return 'Required service';
@@ -321,10 +332,6 @@ export class SetupPageComponent implements OnInit {
             success: message,
             error: null,
           });
-
-          if (status.setupComplete) {
-            void this.router.navigateByUrl('/scenes');
-          }
         },
         error: (error: unknown) => {
           const message = describeMutationError(error, `Failed to save ${this.labelFor(type)}.`);
@@ -369,10 +376,6 @@ export class SetupPageComponent implements OnInit {
               success: message,
               error: null,
             });
-
-            if (status.setupComplete) {
-              void this.router.navigateByUrl('/scenes');
-            }
             return;
           }
 
@@ -426,10 +429,6 @@ export class SetupPageComponent implements OnInit {
               success: message,
               error: null,
             });
-
-            if (status.setupComplete) {
-              void this.router.navigateByUrl('/scenes');
-            }
             return;
           }
 
@@ -473,9 +472,7 @@ export class SetupPageComponent implements OnInit {
           this.notifications.info('Catalog setup was reset');
         },
         error: (error: unknown) => {
-          this.notifications.error(
-            describeMutationError(error, 'Failed to reset catalog setup.'),
-          );
+          this.notifications.error(describeMutationError(error, 'Failed to reset catalog setup.'));
         },
       });
   }
@@ -496,10 +493,6 @@ export class SetupPageComponent implements OnInit {
       .subscribe({
         next: (response) => {
           this.syncSetupState(response.status, response.integrations);
-
-          if (response.status.setupComplete) {
-            void this.router.navigateByUrl('/scenes');
-          }
         },
         error: () => {
           this.loadError.set('Failed to load setup data from the API.');
@@ -633,10 +626,7 @@ export class SetupPageComponent implements OnInit {
     });
   }
 
-  private syncSetupState(
-    status: SetupStatusResponse,
-    integrations: IntegrationResponse[],
-  ): void {
+  private syncSetupState(status: SetupStatusResponse, integrations: IntegrationResponse[]): void {
     this.status.set(status);
     this.applyIntegrations(integrations);
   }
@@ -650,10 +640,7 @@ export class SetupPageComponent implements OnInit {
     return this.integrations()[catalogProvider]?.status === 'ERROR';
   }
 
-  private describeSaveSuccess(
-    type: IntegrationType,
-    integration: IntegrationResponse,
-  ): string {
+  private describeSaveSuccess(type: IntegrationType, integration: IntegrationResponse): string {
     if (integration.status === 'ERROR') {
       return `${this.labelFor(type)} settings saved. Repair the connection details and run the test again.`;
     }

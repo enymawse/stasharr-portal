@@ -34,6 +34,21 @@
     </div>
   </section>
 
+  @if (pageAlert(); as alert) {
+    <section class="home-alert app-page-alert" data-testid="home-readiness-alert" role="status">
+      <div class="app-page-alert__copy">
+        <p class="eyebrow">{{ alert.eyebrow }}</p>
+        <h2>{{ alert.title }}</h2>
+        <p>{{ alert.message }}</p>
+      </div>
+
+      <div class="home-alert-actions app-action-row">
+        <a class="hero-link" [routerLink]="['/settings/integrations']">Repair integrations</a>
+        <a class="hero-link secondary" [routerLink]="['/settings/indexing']">Open indexing</a>
+      </div>
+    </section>
+  }
+
   @if (loading()) {
     <div class="home-state loading app-state-block" role="status" aria-live="polite">
       <p-progressspinner
@@ -511,15 +526,16 @@
       </section>
     } @else if (isPageEmptyState()) {
       <section class="home-state empty-state app-state-block">
-        <h2>No enabled rails are matching scenes yet</h2>
-        <p>
-          Try favoriting more performers or studios, or add a custom rail with broader tags,
-          studios, or favorites filters.
-        </p>
+        <h2>{{ emptyStateTitle() }}</h2>
+        <p>{{ emptyStateMessage() }}</p>
+        <p>{{ indexingGuidance() }}</p>
         <div class="empty-links app-action-row">
-          <button type="button" class="hero-link" (click)="openEditor()">Customize Home</button>
-          <a class="hero-link secondary" [routerLink]="['/scenes']">Browse Scenes</a>
+          <a class="hero-link" [routerLink]="['/scenes']">Browse Scenes</a>
+          <a class="hero-link secondary" [routerLink]="['/settings/indexing']">Open Indexing</a>
           <a class="hero-link secondary" [routerLink]="['/library']">Browse Library</a>
+          <button type="button" class="hero-link secondary" (click)="openEditor()">
+            Customize Home
+          </button>
         </div>
       </section>
     } @else {

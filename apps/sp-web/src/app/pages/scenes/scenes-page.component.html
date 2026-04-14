@@ -10,6 +10,23 @@
     }
   </header>
 
+  @if (pageAlert(); as alert) {
+    <section class="page-alert app-page-alert" data-testid="scenes-readiness-alert" role="status">
+      <div class="app-page-alert__copy">
+        <p class="eyebrow">{{ alert.eyebrow }}</p>
+        <h2>{{ alert.title }}</h2>
+        <p>{{ alert.message }}</p>
+      </div>
+
+      <div class="page-alert-actions app-action-row">
+        <a class="state-link primary" [routerLink]="['/settings/integrations']">
+          Repair integrations
+        </a>
+        <a class="state-link" [routerLink]="['/settings/indexing']">Open indexing</a>
+      </div>
+    </section>
+  }
+
   <section class="controls-shell" aria-label="Scenes controls">
     <div class="controls-header">
       <span class="controls-title">Catalog Discovery</span>
@@ -160,7 +177,27 @@
     <p-message severity="error" styleClass="app-page-message">{{ error() }}</p-message>
     <button type="button" class="retry-button" (click)="retryInitialLoad()">Retry</button>
   } @else if (!hasItems()) {
-    <p class="state">{{ emptyStateMessage() }}</p>
+    <section class="empty-shell app-state-block" data-testid="scenes-empty-state">
+      <h2>{{ emptyStateTitle() }}</h2>
+      <p class="app-state-copy">{{ emptyStateMessage() }}</p>
+      @if (!hasActiveFilters()) {
+        <p class="app-state-copy">{{ indexingGuidance() }}</p>
+      }
+
+      <div class="state-actions app-action-row">
+        @if (hasActiveFilters()) {
+          <button type="button" class="state-link primary" (click)="resetFilters()">
+            Clear filters
+          </button>
+        } @else {
+          <a class="state-link primary" [routerLink]="['/settings/indexing']">Open indexing</a>
+          <a class="state-link" [routerLink]="['/library']">Open Library</a>
+        }
+        @if (pageAlert()) {
+          <a class="state-link" [routerLink]="['/settings/integrations']">Repair integrations</a>
+        }
+      </div>
+    </section>
   } @else {
     <section class="grid">
       @for (item of items(); track item.id) {

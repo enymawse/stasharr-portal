@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Router, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { IntegrationsService } from '../../core/api/integrations.service';
@@ -17,18 +17,17 @@ function buildIntegration(
     type: overrides.type,
     enabled: overrides.enabled ?? true,
     status,
-    name: 'name' in overrides ? overrides.name ?? null : null,
-    baseUrl: 'baseUrl' in overrides ? overrides.baseUrl ?? null : 'http://service.local',
+    name: 'name' in overrides ? (overrides.name ?? null) : null,
+    baseUrl: 'baseUrl' in overrides ? (overrides.baseUrl ?? null) : 'http://service.local',
     hasApiKey: overrides.hasApiKey ?? true,
     lastHealthyAt:
       'lastHealthyAt' in overrides
-        ? overrides.lastHealthyAt ?? null
+        ? (overrides.lastHealthyAt ?? null)
         : status === 'CONFIGURED'
           ? '2026-04-01T00:00:00.000Z'
           : null,
-    lastErrorAt: 'lastErrorAt' in overrides ? overrides.lastErrorAt ?? null : null,
-    lastErrorMessage:
-      'lastErrorMessage' in overrides ? overrides.lastErrorMessage ?? null : null,
+    lastErrorAt: 'lastErrorAt' in overrides ? (overrides.lastErrorAt ?? null) : null,
+    lastErrorMessage: 'lastErrorMessage' in overrides ? (overrides.lastErrorMessage ?? null) : null,
   };
 }
 
@@ -41,7 +40,12 @@ describe('SetupPageComponent', () => {
     TestBed.resetTestingModule();
   });
 
-  async function renderPage(status: SetupStatusResponse, integrations: IntegrationResponse[]) {
+  async function renderPage(
+    status: SetupStatusResponse,
+    integrations: IntegrationResponse[],
+    options: { queryParams?: Record<string, string> } = {},
+  ) {
+    const queryParamMap = convertToParamMap(options.queryParams ?? {});
     const setupService = {
       getStatus: vi.fn().mockReturnValue(of(status)),
     };
@@ -72,6 +76,14 @@ describe('SetupPageComponent', () => {
         {
           provide: AppNotificationsService,
           useValue: notifications,
+        },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              queryParamMap,
+            },
+          },
         },
       ],
     }).compileComponents();
@@ -173,6 +185,63 @@ describe('SetupPageComponent', () => {
     );
     expect(textContent(stashCard)).toContain('Save & Test');
     expect(textContent(stashCard)).toContain('Save only');
+  });
+
+  it('shows a bootstrap handoff when the admin account just sent the user to setup', async () => {
+    const { fixture } = await renderPage(
+      {
+        setupComplete: false,
+        required: { stash: false, catalog: false, whisparr: false },
+        catalogProvider: null,
+      },
+      [
+        buildIntegration({ type: 'STASH', status: 'NOT_CONFIGURED', baseUrl: null }),
+        buildIntegration({ type: 'WHISPARR', status: 'NOT_CONFIGURED', baseUrl: null }),
+        buildIntegration({ type: 'STASHDB', status: 'NOT_CONFIGURED', baseUrl: null }),
+        buildIntegration({ type: 'FANSDB', status: 'NOT_CONFIGURED', baseUrl: null }),
+      ],
+      {
+        queryParams: { from: 'bootstrap' },
+      },
+    );
+
+    const handoff = fixture.nativeElement.querySelector(
+      '[data-testid="setup-bootstrap-handoff"]',
+    ) as HTMLElement | null;
+
+    expect(textContent(handoff)).toContain('Admin account ready');
+    expect(textContent(handoff)).toContain('Connect the required integrations next');
+    expect(textContent(handoff)).toContain('catalog provider');
+  });
+
+  it('renders a setup-complete milestone with app and indexing CTAs', async () => {
+    const { fixture } = await renderPage(
+      {
+        setupComplete: true,
+        required: { stash: true, catalog: true, whisparr: true },
+        catalogProvider: 'STASHDB',
+      },
+      [
+        buildIntegration({ type: 'STASH' }),
+        buildIntegration({ type: 'WHISPARR' }),
+        buildIntegration({ type: 'STASHDB' }),
+      ],
+    );
+
+    const panel = fixture.nativeElement.querySelector(
+      '[data-testid="setup-complete-panel"]',
+    ) as HTMLElement | null;
+    const links = Array.from(panel?.querySelectorAll('a') ?? []) as HTMLAnchorElement[];
+
+    expect(textContent(panel)).toContain('Setup complete');
+    expect(textContent(panel)).toContain('Stasharr is ready to open');
+    expect(textContent(panel)).toContain('Library, Acquisition, and status badges');
+    expect(textContent(panel)).toContain('Sync All');
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([
+      '/home',
+      '/settings/indexing',
+      '/scenes',
+    ]);
   });
 
   it('renders Saved, Test Failed, and Ready states clearly in the checklist and cards', async () => {
@@ -356,7 +425,9 @@ describe('SetupPageComponent', () => {
       apiKey: 'token-123',
     });
     expect(notifications.success).toHaveBeenCalledWith('Whisparr is ready.');
-    expect(textContent(cardByTitle(fixture, 'Whisparr'))).toContain('Whisparr is ready.');
-    expect(navigateByUrl).toHaveBeenCalledWith('/scenes');
+    expect(
+      textContent(fixture.nativeElement.querySelector('[data-testid="setup-complete-panel"]')),
+    ).toContain('Stasharr is ready to open');
+    expect(navigateByUrl).not.toHaveBeenCalled();
   });
 });

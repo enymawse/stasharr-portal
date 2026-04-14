@@ -5,6 +5,7 @@ import {
   OnInit,
   QueryList,
   ViewChildren,
+  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -49,8 +50,15 @@ import {
   HomeRailViewSummary,
   SaveHomeRailPayload,
 } from '../../core/api/home.types';
+import { RuntimeHealthService } from '../../core/api/runtime-health.service';
+import { SetupStatusStore } from '../../core/api/setup-status.store';
 import { SceneCardComponent } from '../../shared/scene-card/scene-card.component';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
+import {
+  buildReadinessPageAlert,
+  firstUseEmptyStateCopy,
+  initialIndexingGuidance,
+} from '../../shared/readiness/first-run-readiness.utils';
 
 type HomeRailView = HomeRailConfig & {
   items: HomeRailItem[];
@@ -153,6 +161,8 @@ export class HomePageComponent implements OnInit, OnDestroy {
 
   private readonly discoverService = inject(DiscoverService);
   private readonly homeService = inject(HomeService);
+  private readonly runtimeHealthService = inject(RuntimeHealthService);
+  private readonly setupStatusStore = inject(SetupStatusStore);
   private readonly router = inject(Router);
   private readonly tagSearchTerms = new Subject<string>();
   private readonly studioSearchTerms = new Subject<string>();
@@ -200,6 +210,13 @@ export class HomePageComponent implements OnInit, OnDestroy {
   protected readonly railErrorsById = signal<Record<string, string>>({});
   protected readonly requestModalOpen = signal(false);
   protected readonly requestContext = signal<SceneRequestContext | null>(null);
+  protected readonly pageAlert = computed(() =>
+    buildReadinessPageAlert(
+      'home',
+      this.setupStatusStore.status(),
+      this.runtimeHealthService.status(),
+    ),
+  );
 
   protected readonly sortOptions = HomePageComponent.SORT_OPTIONS;
   protected readonly stashSortOptions = HomePageComponent.STASH_SORT_OPTIONS;
@@ -209,6 +226,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
   protected readonly tagMatchOptions = HomePageComponent.TAG_MATCH_OPTIONS;
 
   ngOnInit(): void {
+    this.runtimeHealthService.ensureStarted();
     this.setupTagSearch();
     this.setupStudioSearch();
     this.loadHome();
@@ -302,6 +320,22 @@ export class HomePageComponent implements OnInit, OnDestroy {
     }
 
     return enabledRails.every((rail) => rail.items.length === 0 && rail.error === null);
+  }
+
+  protected emptyStateTitle(): string {
+    return firstUseEmptyStateCopy('home').title;
+  }
+
+  protected emptyStateMessage(): string {
+    if (this.pageAlert()) {
+      return 'Home rails may be empty because required integrations are degraded. Repair integrations, then refresh Home to reload rail data.';
+    }
+
+    return firstUseEmptyStateCopy('home').message;
+  }
+
+  protected indexingGuidance(): string {
+    return initialIndexingGuidance();
   }
 
   protected openEditor(): void {
@@ -553,9 +587,7 @@ export class HomePageComponent implements OnInit, OnDestroy {
       | 'limit'
     >,
   >(field: K, value: HomeRailFormDraft[K]): void {
-    this.railForm.update((current) =>
-      current ? { ...current, [field]: value } : current,
-    );
+    this.railForm.update((current) => (current ? { ...current, [field]: value } : current));
   }
 
   protected updateRailSource(nextSource: HomeRailSource): void {

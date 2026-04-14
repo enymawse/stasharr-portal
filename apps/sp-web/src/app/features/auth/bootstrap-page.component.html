@@ -9,6 +9,7 @@
 
     <div class="auth-note">
       <p>This account signs into the app, unlocks setup, and can change its password later.</p>
+      <p>After this, Stasharr opens required integration setup for catalog, Stash, and Whisparr.</p>
       <p>Use a strong password now even if this is a private home network install.</p>
     </div>
 
@@ -20,12 +21,7 @@
 
       <label class="field">
         <span>Password</span>
-        <input
-          pInputText
-          type="password"
-          formControlName="password"
-          autocomplete="new-password"
-        />
+        <input pInputText type="password" formControlName="password" autocomplete="new-password" />
       </label>
 
       <label class="field">
@@ -48,8 +44,12 @@
         <p-message severity="error" styleClass="state-message">{{ errorMessage() }}</p-message>
       }
 
+      @if (handoffMessage()) {
+        <p-message severity="success" styleClass="state-message">{{ handoffMessage() }}</p-message>
+      }
+
       <button pButton type="submit" [disabled]="submitting()">
-        {{ submitting() ? 'Creating admin...' : 'Create admin account' }}
+        {{ submitting() ? 'Creating admin and opening setup...' : 'Create admin account' }}
       </button>
     </form>
   </section>

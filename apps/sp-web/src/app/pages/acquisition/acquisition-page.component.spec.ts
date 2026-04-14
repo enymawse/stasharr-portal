@@ -338,8 +338,11 @@ describe('AcquisitionPageComponent', () => {
     expect(degradedState?.textContent).toContain(
       'Queue state, failures, and request progression may be stale',
     );
-    expect(emptyState?.textContent).toContain('Nothing is moving through acquisition right now');
+    expect(degradedState?.querySelector('a[href*="/settings/integrations"]')).toBeTruthy();
+    expect(emptyState?.textContent).toContain('No acquisition activity is indexed yet');
+    expect(emptyState?.textContent).toContain('run Sync All');
     expect(emptyState?.textContent).toContain('Open Scenes');
+    expect(emptyState?.textContent).toContain('Open Indexing');
     expect(emptyState?.textContent).toContain('Open Library');
   });
 

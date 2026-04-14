@@ -2,12 +2,18 @@
   <header class="page-head app-page-header">
     <div class="page-copy app-page-header__copy">
       <h1>Acquisition</h1>
-      <p class="app-page-lede">Track requested scenes through Whisparr and into your Stash library.</p>
+      <p class="app-page-lede">
+        Track requested scenes through Whisparr and into your Stash library.
+      </p>
     </div>
   </header>
 
   @if (pageAlert(); as alert) {
-    <section class="page-alert app-page-alert" data-testid="acquisition-degraded-state" role="status">
+    <section
+      class="page-alert app-page-alert"
+      data-testid="acquisition-degraded-state"
+      role="status"
+    >
       <div class="page-alert-copy app-page-alert__copy">
         <p class="eyebrow app-page-eyebrow">{{ alert.eyebrow }}</p>
         <h2>{{ alert.title }}</h2>
@@ -15,7 +21,10 @@
       </div>
 
       <div class="page-alert-actions app-action-row">
-        <a class="primary-link small" [routerLink]="['/settings']">Open Settings</a>
+        <a class="primary-link small" [routerLink]="['/settings/integrations']">
+          Repair integrations
+        </a>
+        <a class="secondary-link small" [routerLink]="['/settings/indexing']">Open Indexing</a>
         <a class="secondary-link small" [routerLink]="['/scenes']">Open Scenes</a>
       </div>
     </section>
@@ -54,10 +63,16 @@
     </section>
 
     @if (!hasItems()) {
-      <section class="state-shell empty-shell app-state-block" data-testid="acquisition-empty-state">
+      <section
+        class="state-shell empty-shell app-state-block"
+        data-testid="acquisition-empty-state"
+      >
         <p class="eyebrow app-page-eyebrow">Pipeline Quiet</p>
         <h2>{{ emptyStateTitle() }}</h2>
         <p class="state-copy app-state-copy">{{ emptyStateMessage() }}</p>
+        @if (selectedLifecycle() === 'ANY') {
+          <p class="state-copy app-state-copy">{{ indexingGuidance() }}</p>
+        }
 
         <div class="state-actions app-action-row">
           @if (selectedLifecycle() !== 'ANY') {
@@ -66,7 +81,13 @@
             </button>
           }
           <a class="primary-link" [routerLink]="['/scenes']">Open Scenes</a>
+          <a class="secondary-link" [routerLink]="['/settings/indexing']">Open Indexing</a>
           <a class="secondary-link" [routerLink]="['/library']">Open Library</a>
+          @if (pageAlert()) {
+            <a class="secondary-link" [routerLink]="['/settings/integrations']">
+              Repair integrations
+            </a>
+          }
         </div>
       </section>
     } @else {

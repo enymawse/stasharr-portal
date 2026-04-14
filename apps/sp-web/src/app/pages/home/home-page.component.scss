@@ -4,7 +4,11 @@
   color: var(--text-primary);
   font-family: var(--app-font-family);
   background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--focus-ring) 22%, transparent), transparent 32%),
+    radial-gradient(
+      circle at top right,
+      color-mix(in srgb, var(--focus-ring) 22%, transparent),
+      transparent 32%
+    ),
     linear-gradient(
       180deg,
       color-mix(in srgb, var(--app-bg) 84%, var(--surface-raised)) 0%,
@@ -140,6 +144,20 @@ p {
   margin-top: 1rem;
   --app-state-radius: 18px;
   --app-state-padding: 1rem;
+}
+
+.home-alert {
+  margin-top: 1rem;
+  --app-alert-radius: 8px;
+}
+
+.home-alert p:last-child {
+  color: var(--text-muted);
+  max-width: 70ch;
+}
+
+.home-alert-actions {
+  align-self: center;
 }
 
 .home-state.loading {

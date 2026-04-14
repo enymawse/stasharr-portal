@@ -21,10 +21,13 @@ import {
   AcquisitionSceneItem,
 } from '../../core/api/acquisition.types';
 import { RuntimeHealthService } from '../../core/api/runtime-health.service';
-import { summarizeRuntimeDegradedState } from '../../core/api/runtime-health.types';
 import { SetupStatusStore } from '../../core/api/setup-status.store';
-import { summarizeDegradedSetupState } from '../../core/api/setup.types';
 import { SceneStatusBadgeComponent } from '../../shared/scene-status-badge/scene-status-badge.component';
+import {
+  buildReadinessPageAlert,
+  firstUseEmptyStateCopy,
+  initialIndexingGuidance,
+} from '../../shared/readiness/first-run-readiness.utils';
 
 type AcquisitionSectionTone = 'attention' | 'pending' | 'active' | 'passive' | 'overview';
 
@@ -183,28 +186,10 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
     ).filter((section) => section.items.length > 0);
   });
   protected readonly pageAlert = computed<AcquisitionPageAlert | null>(() => {
-    const setupState = summarizeDegradedSetupState(this.setupStatusStore.status());
-    if (setupState) {
-      const alert = this.buildDegradedAlert(
-        setupState.services.map((service) => service.key),
-        'setup',
-      );
-      if (alert) {
-        return alert;
-      }
-    }
-
-    const runtimeState = summarizeRuntimeDegradedState(
+    return buildReadinessPageAlert(
+      'acquisition',
+      this.setupStatusStore.status(),
       this.runtimeHealth(),
-      this.setupStatusStore.status()?.catalogProvider ?? null,
-    );
-    if (!runtimeState) {
-      return null;
-    }
-
-    return this.buildDegradedAlert(
-      runtimeState.services.map((service) => service.key),
-      'runtime',
     );
   });
 
@@ -379,11 +364,15 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
         return 'No queued requests are waiting to start';
       case 'ANY':
       default:
-        return 'Nothing is moving through acquisition right now';
+        return firstUseEmptyStateCopy('acquisition').title;
     }
   }
 
   protected emptyStateMessage(): string {
+    if (this.selectedLifecycle() === 'ANY' && this.pageAlert()) {
+      return 'Acquisition may look empty because Whisparr or Stash is degraded. Repair integrations, then run Sync All from Indexing & Sync if tracked requests still do not appear.';
+    }
+
     switch (this.selectedLifecycle()) {
       case 'FAILED':
         return 'There is nothing to recover in Whisparr at the moment. Switch back to the full pipeline or request something new from Scenes.';
@@ -395,8 +384,12 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
         return 'Whisparr is not holding any queued requests that have not started yet.';
       case 'ANY':
       default:
-        return 'Requests begin in Scenes. Once Whisparr downloads and Stash imports them, they leave this page and continue in Library.';
+        return firstUseEmptyStateCopy('acquisition').message;
     }
+  }
+
+  protected indexingGuidance(): string {
+    return initialIndexingGuidance();
   }
 
   protected currentRouteUrl(): string {
@@ -478,43 +471,6 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
 
   private humanizeStatus(value: string): string {
     return value.trim().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').toLowerCase();
-  }
-
-  private buildDegradedAlert(
-    services: string[],
-    source: 'setup' | 'runtime',
-  ): AcquisitionPageAlert | null {
-    const whisparrImpacted = services.includes('WHISPARR');
-    const stashImpacted = services.includes('STASH');
-
-    if (!whisparrImpacted && !stashImpacted) {
-      return null;
-    }
-
-    if (whisparrImpacted && stashImpacted) {
-      return {
-        eyebrow: source === 'setup' ? 'Repair Required' : 'Runtime Outage',
-        title: 'Acquisition tracking is degraded',
-        message:
-          'Whisparr and Stash are both affecting this page. Request progress, failure states, and import visibility may be incomplete or stale until both recover.',
-      };
-    }
-
-    if (whisparrImpacted) {
-      return {
-        eyebrow: source === 'setup' ? 'Repair Required' : 'Runtime Outage',
-        title: 'Whisparr needs attention',
-        message:
-          'Acquisition progress on this page depends on Whisparr. Queue state, failures, and request progression may be stale until it is healthy again.',
-      };
-    }
-
-    return {
-      eyebrow: source === 'setup' ? 'Repair Required' : 'Runtime Outage',
-      title: 'Stash import visibility is degraded',
-      message:
-        'Downloaded scenes may take longer to appear as imported while Stash is unhealthy. Check Settings if import handoffs look stuck.',
-    };
   }
 
   private loadNextPage(): void {

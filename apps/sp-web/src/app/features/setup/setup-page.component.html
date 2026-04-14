@@ -1,7 +1,10 @@
 <main>
   <header>
     <h1>Stasharr Setup</h1>
-    <p>Finish the required integrations in order, keep the chosen catalog provider locked, and repair failures without guessing what is still blocking setup.</p>
+    <p>
+      Finish the required integrations in order, keep the chosen catalog provider locked, and repair
+      failures without guessing what is still blocking setup.
+    </p>
   </header>
 
   @if (loading()) {
@@ -16,6 +19,23 @@
   } @else if (loadError()) {
     <p-message severity="error" styleClass="app-page-message">{{ loadError() }}</p-message>
   } @else {
+    @if (bootstrapHandoff()) {
+      <section
+        class="handoff-panel app-page-alert"
+        data-testid="setup-bootstrap-handoff"
+        role="status"
+      >
+        <div class="handoff-copy app-page-alert__copy">
+          <p class="eyebrow">Admin account ready</p>
+          <h2>Connect the required integrations next</h2>
+          <p>
+            Setup locks in one catalog provider, then verifies Stash and Whisparr so the app can
+            open with working discovery, local library, and acquisition status.
+          </p>
+        </div>
+      </section>
+    }
+
     <section class="setup-overview">
       <div class="overview-head">
         <div>
@@ -49,10 +69,18 @@
                 [class.is-pending]="item.state === 'NOT_SAVED'"
               >
                 @switch (item.state) {
-                  @case ('NOT_SAVED') { Not Saved }
-                  @case ('SAVED') { Saved }
-                  @case ('TEST_FAILED') { Test Failed }
-                  @case ('READY') { Ready }
+                  @case ('NOT_SAVED') {
+                    Not Saved
+                  }
+                  @case ('SAVED') {
+                    Saved
+                  }
+                  @case ('TEST_FAILED') {
+                    Test Failed
+                  }
+                  @case ('READY') {
+                    Ready
+                  }
                 }
               </span>
             </div>
@@ -62,74 +90,93 @@
       </div>
     </section>
 
-    <section class="cards">
-      @for (type of visibleCatalogProviderTypes(); track type) {
-        <app-integration-repair-panel
-          class="card"
-          [label]="labelFor(type)"
-          [sectionLabel]="sectionLabel(type)"
-          [state]="readinessState(type)"
-          [summary]="readinessSummary(type)"
-          [helpText]="catalogProviderHelp(type)"
-          [form]="formFor(type)"
-          [hasStoredApiKey]="hasStoredApiKey(type)"
-          [enabledInputId]="'setup-enabled-' + type"
-          [showEnabledToggle]="showEnabledToggle(type)"
-          [lastHealthyAt]="lastHealthyAt(type)"
-          [lastErrorAt]="lastErrorAt(type)"
-          [errorMessage]="integrations()[type]?.lastErrorMessage ?? null"
-          [primaryActionLabel]="isSaveAndTesting(type) ? 'Saving & testing...' : 'Save & Test'"
-          [primaryDisabled]="isWorking(type)"
-          [secondaryActionLabel]="isSaving(type) ? 'Saving...' : 'Save only'"
-          [secondaryDisabled]="isWorking(type)"
-          [actionHint]="actionHint(type)"
-          [messages]="messagesFor(type)"
-          submitAction="secondary"
-          (primaryAction)="saveAndTestIntegration(type)"
-          (secondaryAction)="saveIntegration(type)"
-        >
-          @if (catalogProvider() === type) {
-            <button
-              panel-actions
-              pButton
-              type="button"
-              text
-              [disabled]="resettingCatalogProvider() || isWorking(type)"
-              (click)="resetCatalogProviderChoice()"
-            >
-              {{ resettingCatalogProvider() ? 'Resetting...' : 'Reset catalog setup' }}
-            </button>
-          }
-        </app-integration-repair-panel>
-      }
-    </section>
+    @if (isSetupComplete()) {
+      <section
+        class="setup-complete-panel app-state-block"
+        data-testid="setup-complete-panel"
+        role="status"
+      >
+        <p class="eyebrow">Setup complete</p>
+        <h2>Stasharr is ready to open</h2>
+        <p class="state-copy app-state-copy">{{ setupCompleteSummary() }}</p>
+        <p class="state-copy app-state-copy">{{ indexingGuidance() }}</p>
 
-    <section class="cards">
-      @for (type of requiredServiceTypes; track type) {
-        <app-integration-repair-panel
-          class="card"
-          [label]="labelFor(type)"
-          [sectionLabel]="sectionLabel(type)"
-          [state]="readinessState(type)"
-          [summary]="readinessSummary(type)"
-          [form]="formFor(type)"
-          [hasStoredApiKey]="hasStoredApiKey(type)"
-          [enabledInputId]="'setup-enabled-' + type"
-          [showEnabledToggle]="showEnabledToggle(type)"
-          [lastHealthyAt]="lastHealthyAt(type)"
-          [lastErrorAt]="lastErrorAt(type)"
-          [errorMessage]="integrations()[type]?.lastErrorMessage ?? null"
-          [primaryActionLabel]="isSaveAndTesting(type) ? 'Saving & testing...' : 'Save & Test'"
-          [primaryDisabled]="isWorking(type)"
-          [secondaryActionLabel]="isSaving(type) ? 'Saving...' : 'Save only'"
-          [secondaryDisabled]="isWorking(type)"
-          [actionHint]="actionHint(type)"
-          [messages]="messagesFor(type)"
-          submitAction="secondary"
-          (primaryAction)="saveAndTestIntegration(type)"
-          (secondaryAction)="saveIntegration(type)"
-        />
-      }
-    </section>
+        <div class="complete-actions app-action-row">
+          <a class="primary-link" [routerLink]="['/home']">Go to Home</a>
+          <a class="secondary-link" [routerLink]="['/settings/indexing']">Open indexing settings</a>
+          <a class="secondary-link" [routerLink]="['/scenes']">Browse Scenes</a>
+        </div>
+      </section>
+    } @else {
+      <section class="cards">
+        @for (type of visibleCatalogProviderTypes(); track type) {
+          <app-integration-repair-panel
+            class="card"
+            [label]="labelFor(type)"
+            [sectionLabel]="sectionLabel(type)"
+            [state]="readinessState(type)"
+            [summary]="readinessSummary(type)"
+            [helpText]="catalogProviderHelp(type)"
+            [form]="formFor(type)"
+            [hasStoredApiKey]="hasStoredApiKey(type)"
+            [enabledInputId]="'setup-enabled-' + type"
+            [showEnabledToggle]="showEnabledToggle(type)"
+            [lastHealthyAt]="lastHealthyAt(type)"
+            [lastErrorAt]="lastErrorAt(type)"
+            [errorMessage]="integrations()[type]?.lastErrorMessage ?? null"
+            [primaryActionLabel]="isSaveAndTesting(type) ? 'Saving & testing...' : 'Save & Test'"
+            [primaryDisabled]="isWorking(type)"
+            [secondaryActionLabel]="isSaving(type) ? 'Saving...' : 'Save only'"
+            [secondaryDisabled]="isWorking(type)"
+            [actionHint]="actionHint(type)"
+            [messages]="messagesFor(type)"
+            submitAction="secondary"
+            (primaryAction)="saveAndTestIntegration(type)"
+            (secondaryAction)="saveIntegration(type)"
+          >
+            @if (catalogProvider() === type) {
+              <button
+                panel-actions
+                pButton
+                type="button"
+                text
+                [disabled]="resettingCatalogProvider() || isWorking(type)"
+                (click)="resetCatalogProviderChoice()"
+              >
+                {{ resettingCatalogProvider() ? 'Resetting...' : 'Reset catalog setup' }}
+              </button>
+            }
+          </app-integration-repair-panel>
+        }
+      </section>
+
+      <section class="cards">
+        @for (type of requiredServiceTypes; track type) {
+          <app-integration-repair-panel
+            class="card"
+            [label]="labelFor(type)"
+            [sectionLabel]="sectionLabel(type)"
+            [state]="readinessState(type)"
+            [summary]="readinessSummary(type)"
+            [form]="formFor(type)"
+            [hasStoredApiKey]="hasStoredApiKey(type)"
+            [enabledInputId]="'setup-enabled-' + type"
+            [showEnabledToggle]="showEnabledToggle(type)"
+            [lastHealthyAt]="lastHealthyAt(type)"
+            [lastErrorAt]="lastErrorAt(type)"
+            [errorMessage]="integrations()[type]?.lastErrorMessage ?? null"
+            [primaryActionLabel]="isSaveAndTesting(type) ? 'Saving & testing...' : 'Save & Test'"
+            [primaryDisabled]="isWorking(type)"
+            [secondaryActionLabel]="isSaving(type) ? 'Saving...' : 'Save only'"
+            [secondaryDisabled]="isWorking(type)"
+            [actionHint]="actionHint(type)"
+            [messages]="messagesFor(type)"
+            submitAction="secondary"
+            (primaryAction)="saveAndTestIntegration(type)"
+            (secondaryAction)="saveIntegration(type)"
+          />
+        }
+      </section>
+    }
   }
 </main>

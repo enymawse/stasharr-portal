@@ -35,8 +35,67 @@ p {
   border: 1px solid var(--border-subtle);
   border-radius: 16px;
   padding: 1rem;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 88%, transparent), var(--surface-1));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 88%, transparent),
+    var(--surface-1)
+  );
+}
+
+.handoff-panel,
+.setup-complete-panel {
+  margin-top: 1rem;
+}
+
+.handoff-panel {
+  --app-alert-radius: 8px;
+}
+
+.handoff-copy p:last-child {
+  color: var(--text-muted);
+  max-width: 68ch;
+}
+
+.setup-complete-panel {
+  --app-state-radius: 8px;
+  --app-state-border: 1px solid var(--tone-success-border);
+  --app-state-bg: var(--tone-success-background);
+}
+
+.state-copy {
+  color: color-mix(in srgb, var(--text-muted) 92%, var(--text-primary));
+}
+
+.complete-actions {
+  margin-top: 0.2rem;
+}
+
+.primary-link,
+.secondary-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.78rem;
+  border-radius: 6px;
+  border: 1px solid var(--button-border);
+  background: var(--button-bg);
+  color: var(--button-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.primary-link {
+  border-color: var(--tone-success-border);
+  background: color-mix(in srgb, var(--success-bg) 82%, var(--surface-elevated));
+  color: var(--tone-success-text);
+}
+
+.primary-link:focus-visible,
+.secondary-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .overview-head,

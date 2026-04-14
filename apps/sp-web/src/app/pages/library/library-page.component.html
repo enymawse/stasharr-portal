@@ -15,7 +15,10 @@
       </div>
 
       <div class="page-alert-actions app-action-row">
-        <a class="secondary-link small" [routerLink]="['/settings']">Open Settings</a>
+        <a class="secondary-link small" [routerLink]="['/settings/integrations']">
+          Repair integrations
+        </a>
+        <a class="secondary-link small" [routerLink]="['/settings/indexing']">Open Indexing</a>
         <a class="secondary-link small" [routerLink]="['/acquisition']">Track Imports</a>
       </div>
     </section>
@@ -244,6 +247,9 @@
     <section class="state-shell empty-shell app-state-block" data-testid="library-empty-state">
       <h2>{{ emptyStateTitle() }}</h2>
       <p class="state-copy app-state-copy">{{ emptyStateMessage() }}</p>
+      @if (!hasNarrowingFilters()) {
+        <p class="state-copy app-state-copy">{{ indexingGuidance() }}</p>
+      }
 
       <div class="state-actions app-action-row">
         @if (hasNarrowingFilters()) {
@@ -254,9 +260,12 @@
           <a class="secondary-link" [routerLink]="['/acquisition']">Track Imports</a>
         } @else {
           <a class="primary-link" [routerLink]="['/acquisition']">Track Imports</a>
+          <a class="secondary-link" [routerLink]="['/settings/indexing']">Open Indexing</a>
           <a class="secondary-link" [routerLink]="['/scenes']">Browse Scenes</a>
           @if (pageAlert()) {
-            <a class="secondary-link" [routerLink]="['/settings']">Open Settings</a>
+            <a class="secondary-link" [routerLink]="['/settings/integrations']">
+              Repair integrations
+            </a>
           }
         }
       </div>

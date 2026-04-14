@@ -19,6 +19,7 @@ export class BootstrapPageComponent {
 
   protected readonly submitting = signal(false);
   protected readonly errorMessage = signal<string | null>(null);
+  protected readonly handoffMessage = signal<string | null>(null);
 
   protected readonly form = new FormGroup({
     username: new FormControl('', {
@@ -37,6 +38,7 @@ export class BootstrapPageComponent {
 
   protected submit(): void {
     this.errorMessage.set(null);
+    this.handoffMessage.set(null);
 
     if (this.form.invalid || this.passwordMismatch()) {
       this.form.markAllAsTouched();
@@ -49,7 +51,12 @@ export class BootstrapPageComponent {
     this.authService.bootstrap({ username, password }).subscribe({
       next: () => {
         this.submitting.set(false);
-        void this.router.navigateByUrl('/');
+        this.handoffMessage.set('Admin account created. Opening required integration setup next.');
+        void this.router.navigate(['/setup'], {
+          queryParams: {
+            from: 'bootstrap',
+          },
+        });
       },
       error: (error: unknown) => {
         this.submitting.set(false);
