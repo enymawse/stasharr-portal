@@ -22,9 +22,11 @@ FROM node:22-alpine AS runtime
 WORKDIR /app
 RUN apk add --no-cache openssl
 RUN mkdir -p /var/lib/stasharr && chmod 700 /var/lib/stasharr
+ARG STASHARR_VERSION=0.0.0-dev
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
+ENV STASHARR_VERSION=$STASHARR_VERSION
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/node_modules ./node_modules
