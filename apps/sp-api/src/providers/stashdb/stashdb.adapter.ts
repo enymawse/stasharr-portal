@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { RuntimeHealthServiceKey } from '@prisma/client';
 import { RuntimeHealthService } from '../../runtime-health/runtime-health.service';
+import { fetchWithTimeout } from '../fetch-with-timeout';
 
 export interface StashdbAdapterBaseConfig {
   baseUrl: string;
@@ -2037,7 +2038,7 @@ export class StashdbAdapter {
 
     let response: Response;
     try {
-      response = await fetch(endpoint, {
+      response = await fetchWithTimeout(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify({

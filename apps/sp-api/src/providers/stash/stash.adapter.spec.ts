@@ -106,6 +106,7 @@ describe('StashAdapter', () => {
           Accept: 'application/json',
           ApiKey: 'secret',
         },
+        signal: expect.any(AbortSignal),
       }),
     );
 
@@ -922,7 +923,10 @@ describe('StashAdapter', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'http://stash.local/images/411.jpg',
-      { headers: { ApiKey: 'secret' } },
+      expect.objectContaining({
+        headers: { ApiKey: 'secret' },
+        signal: expect.any(AbortSignal),
+      }),
     );
   });
 

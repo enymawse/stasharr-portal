@@ -1,6 +1,7 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { RuntimeHealthServiceKey } from '@prisma/client';
 import { RuntimeHealthService } from '../../runtime-health/runtime-health.service';
+import { fetchWithTimeout } from '../fetch-with-timeout';
 
 export interface WhisparrAdapterBaseConfig {
   baseUrl: string;
@@ -526,7 +527,7 @@ export class WhisparrAdapter {
 
     let response: Response;
     try {
-      response = await fetch(endpoint, {
+      response = await fetchWithTimeout(endpoint, {
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,

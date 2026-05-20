@@ -1431,4 +1431,61 @@ describe('IndexingService', () => {
     expect(runWithLeaseMock).not.toHaveBeenCalled();
     expect(getSceneMetadataByIdsMock).not.toHaveBeenCalled();
   });
+
+  it('clears metadata hydration in-flight IDs after a failed metadata batch', async () => {
+    const { prisma, sceneIndexStore } = createPrismaMock({
+      sceneIndexRows: [
+        buildSceneIndexRow({
+          stashId: 'scene-1',
+        }),
+      ],
+    });
+    getSceneMetadataByIdsMock.mockRejectedValueOnce(new Error('network stall'));
+    const service = new IndexingService(
+      prisma,
+      integrationsService,
+      catalogProviderService,
+      whisparrAdapter,
+      stashAdapter,
+      stashdbAdapter,
+      syncStateService,
+    );
+    const internals = service as unknown as {
+      metadataHydrationInFlight: Set<string>;
+    };
+
+    await service.hydrateMetadataForStashIds(['scene-1'], 'test');
+
+    expect(internals.metadataHydrationInFlight.size).toBe(0);
+    expect(sceneIndexStore.get('scene-1')).toEqual(
+      expect.objectContaining({
+        metadataHydrationState: MetadataHydrationState.FAILED_RETRYABLE,
+        metadataRetryAfterAt: expect.any(Date),
+      }),
+    );
+
+    getSceneMetadataByIdsMock.mockResolvedValueOnce([
+      {
+        id: 'scene-1',
+        title: 'Recovered scene',
+        details: null,
+        imageUrl: null,
+        studioId: null,
+        studioName: null,
+        studioImageUrl: null,
+        releaseDate: null,
+        duration: null,
+      },
+    ]);
+
+    await service.hydrateMetadataForStashIds(['scene-1'], 'test-retry');
+
+    expect(getSceneMetadataByIdsMock).toHaveBeenCalledTimes(2);
+    expect(sceneIndexStore.get('scene-1')).toEqual(
+      expect.objectContaining({
+        metadataHydrationState: MetadataHydrationState.HYDRATED,
+        title: 'Recovered scene',
+      }),
+    );
+  });
 });
