@@ -7,6 +7,7 @@ import {
   normalizeCatalogSceneRefs,
 } from '../catalog/catalog-provider.util';
 import { RuntimeHealthService } from '../../runtime-health/runtime-health.service';
+import { fetchWithTimeout } from '../fetch-with-timeout';
 
 export interface StashAdapterBaseConfig {
   baseUrl: string;
@@ -702,7 +703,7 @@ export class StashAdapter {
 
     let response: Response;
     try {
-      response = await fetch(resolvedUrl, { headers });
+      response = await fetchWithTimeout(resolvedUrl, { headers });
     } catch (error) {
       await this.reportRuntimeFailure(error);
       throw new BadGatewayException('Failed to reach Stash provider endpoint.');
@@ -1231,7 +1232,7 @@ export class StashAdapter {
 
     let response: Response;
     try {
-      response = await fetch(endpoint, {
+      response = await fetchWithTimeout(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify({ query, variables }),

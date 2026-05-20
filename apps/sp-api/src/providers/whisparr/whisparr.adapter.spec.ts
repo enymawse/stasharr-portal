@@ -71,13 +71,14 @@ describe('WhisparrAdapter', () => {
 
       expect(fetchMock).toHaveBeenCalledWith(
         'http://whisparr.local/base/api/v3/movie?stashId=scene-1',
-        {
+        expect.objectContaining({
           method: 'GET',
           headers: {
             Accept: 'application/json',
             'X-Api-Key': 'secret',
           },
-        },
+          signal: expect.any(AbortSignal),
+        }),
       );
       expect(runtimeHealthService.recordSuccess).toHaveBeenCalledWith(
         'WHISPARR',
@@ -183,13 +184,14 @@ describe('WhisparrAdapter', () => {
 
       expect(fetchMock).toHaveBeenCalledWith(
         'http://whisparr.local/base/api/v3/movie/42',
-        {
+        expect.objectContaining({
           method: 'GET',
           headers: {
             Accept: 'application/json',
             'X-Api-Key': 'secret',
           },
-        },
+          signal: expect.any(AbortSignal),
+        }),
       );
     });
 
@@ -459,24 +461,28 @@ describe('WhisparrAdapter', () => {
         ),
       ).resolves.toEqual({ movieId: 777 });
 
-      expect(fetchMock).toHaveBeenCalledWith('http://whisparr.local/api/v3/movie', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'X-Api-Key': 'secret',
-        },
-        body: JSON.stringify({
-          title: 'Scene title',
-          studio: 'Scene studio',
-          foreignId: 'scene-1',
-          monitored: true,
-          rootFolderPath: '/media/a',
-          addOptions: { searchForMovie: true },
-          qualityProfileId: 10,
-          tags: [50],
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://whisparr.local/api/v3/movie',
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-Api-Key': 'secret',
+          },
+          body: JSON.stringify({
+            title: 'Scene title',
+            studio: 'Scene studio',
+            foreignId: 'scene-1',
+            monitored: true,
+            rootFolderPath: '/media/a',
+            addOptions: { searchForMovie: true },
+            qualityProfileId: 10,
+            tags: [50],
+          }),
+          signal: expect.any(AbortSignal),
         }),
-      });
+      );
     });
 
     it('throws for malformed create movie response payload', async () => {
