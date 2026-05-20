@@ -97,4 +97,33 @@ describe('IndexingScheduler', () => {
       expect.stringContaining('heap=20/40MB'),
     );
   });
+
+  it('logs failed outcome when a scheduler job rejects', async () => {
+    process.env.STASHARR_INDEXING_MEMORY_LOG = '1';
+    const debugSpy = jest
+      .spyOn(Logger.prototype, 'debug')
+      .mockImplementation(() => undefined);
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    jest.spyOn(process, 'memoryUsage').mockReturnValue({
+      rss: 101 * 1024 ** 2,
+      heapTotal: 40 * 1024 ** 2,
+      heapUsed: 20 * 1024 ** 2,
+      external: 3 * 1024 ** 2,
+      arrayBuffers: 2 * 1024 ** 2,
+    });
+    const indexingService = createIndexingServiceMock();
+    indexingService.syncMetadataBackfill.mockRejectedValueOnce(
+      new Error('metadata failed'),
+    );
+    const scheduler = new IndexingScheduler(
+      indexingService as unknown as IndexingService,
+    );
+
+    scheduler.handleMetadataBackfill();
+    await flushPromises();
+
+    expect(debugSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[metadata-backfill] outcome=failed'),
+    );
+  });
 });

@@ -52,9 +52,11 @@ export class IndexingScheduler implements OnApplicationBootstrap {
 
     this.runningJobs.add(jobName);
     const startedAt = Date.now();
+    let outcome = 'completed';
 
     void task()
       .catch((error: unknown) => {
+        outcome = 'failed';
         this.logger.error(
           `Background indexing job failed: ${jobName}`,
           error instanceof Error ? error.stack : undefined,
@@ -62,7 +64,7 @@ export class IndexingScheduler implements OnApplicationBootstrap {
       })
       .finally(() => {
         this.runningJobs.delete(jobName);
-        this.logMemory(jobName, 'completed', Date.now() - startedAt);
+        this.logMemory(jobName, outcome, Date.now() - startedAt);
       });
   }
 
