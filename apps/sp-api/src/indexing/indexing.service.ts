@@ -129,6 +129,11 @@ type SceneIndexUpsertData = Prisma.SceneIndexUncheckedCreateInput & {
   metadataHydrationState: MetadataHydrationState;
 };
 
+type MetadataHydrationCandidate = {
+  metadataHydrationState: MetadataHydrationState;
+  metadataRetryAfterAt?: Date | string | null;
+};
+
 @Injectable()
 export class IndexingService {
   private static readonly INDEX_STATUS_MAX_AGE_MS = 30 * 60_000;
@@ -1576,6 +1581,7 @@ export class IndexingService {
         for (const row of nextRows) {
           existingByStashId.set(row.stashId, row as SceneIndex);
         }
+        this.invalidateScheduledMetadataBackfillCheckIfNeeded(nextRows);
         return;
       } catch (error) {
         if (
@@ -2397,6 +2403,18 @@ export class IndexingService {
     return shouldRun;
   }
 
+  private invalidateScheduledMetadataBackfillCheckIfNeeded(
+    rows: MetadataHydrationCandidate[],
+  ): void {
+    if (this.nextMetadataBackfillCheckAt === null) {
+      return;
+    }
+
+    if (rows.some((row) => this.shouldHydrateMetadataNow(row))) {
+      this.nextMetadataBackfillCheckAt = null;
+    }
+  }
+
   private buildMissingMetadataBacklogWhere(): Prisma.SceneIndexWhereInput {
     return {
       metadataHydrationState: MetadataHydrationState.FAILED_RETRYABLE,
@@ -2474,7 +2492,9 @@ export class IndexingService {
     };
   }
 
-  private shouldHydrateMetadataNow(row: SceneIndex | null): boolean {
+  private shouldHydrateMetadataNow(
+    row: MetadataHydrationCandidate | null,
+  ): boolean {
     if (!row) {
       return true;
     }
@@ -2489,11 +2509,17 @@ export class IndexingService {
       return false;
     }
 
-    if (!row.metadataRetryAfterAt) {
+    const retryAfterAt = row.metadataRetryAfterAt;
+    if (!retryAfterAt) {
       return true;
     }
 
-    return row.metadataRetryAfterAt.getTime() <= Date.now();
+    const retryAfterTime =
+      retryAfterAt instanceof Date
+        ? retryAfterAt.getTime()
+        : new Date(retryAfterAt).getTime();
+
+    return Number.isFinite(retryAfterTime) && retryAfterTime <= Date.now();
   }
 
   private pickValue<T>(incoming: T | undefined, existing: T): T {

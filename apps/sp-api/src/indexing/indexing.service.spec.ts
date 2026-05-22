@@ -99,15 +99,21 @@ function matchesWhere(
   }
 
   if (Array.isArray(where.AND)) {
-    return where.AND.every((entry) =>
+    const matchesAll = where.AND.every((entry) =>
       matchesWhere(row, entry as Record<string, unknown>),
     );
+    if (!matchesAll) {
+      return false;
+    }
   }
 
   if (Array.isArray(where.OR)) {
-    return where.OR.some((entry) =>
+    const matchesAny = where.OR.some((entry) =>
       matchesWhere(row, entry as Record<string, unknown>),
     );
+    if (!matchesAny) {
+      return false;
+    }
   }
 
   return Object.entries(where).every(([key, value]) => {
@@ -1463,6 +1469,71 @@ describe('IndexingService', () => {
 
     expect(runWithLeaseMock).not.toHaveBeenCalled();
     expect(sceneIndex.count).toHaveBeenCalledTimes(3);
+  });
+
+  it('recomputes scheduled metadata backfill after sync queues pending metadata work', async () => {
+    const { prisma, sceneIndexStore } = createPrismaMock({
+      sceneIndexRows: [
+        buildSceneIndexRow({
+          stashId: 'scene-1',
+          metadataHydrationState: MetadataHydrationState.HYDRATED,
+          metadataLastSyncedAt: new Date(),
+        }),
+      ],
+      syncStateRow: {
+        lastSuccessAt: new Date(Date.now() - 5 * 60_000),
+      },
+    });
+    getMovieSnapshotMock.mockResolvedValue([
+      {
+        movieId: 22,
+        stashId: 'scene-new',
+        hasFile: false,
+      },
+    ]);
+    const service = new IndexingService(
+      prisma,
+      integrationsService,
+      catalogProviderService,
+      whisparrAdapter,
+      stashAdapter,
+      stashdbAdapter,
+      syncStateService,
+    );
+
+    await service.syncMetadataBackfill('interval');
+
+    expect(runWithLeaseMock).not.toHaveBeenCalled();
+
+    await service.syncWhisparrMovies('test');
+
+    expect(sceneIndexStore.get('scene-new')).toEqual(
+      expect.objectContaining({
+        metadataHydrationState: MetadataHydrationState.PENDING,
+      }),
+    );
+
+    runWithLeaseMock.mockClear();
+    await service.syncMetadataBackfill('interval');
+
+    expect(runWithLeaseMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobName: INDEXING_JOB_NAMES.METADATA_BACKFILL,
+      }),
+      expect.any(Function),
+    );
+    expect(getSceneMetadataByIdsMock).toHaveBeenCalledWith(
+      ['scene-new'],
+      expect.objectContaining({
+        baseUrl: 'http://stashdb.local',
+      }),
+    );
+    expect(sceneIndexStore.get('scene-new')).toEqual(
+      expect.objectContaining({
+        metadataHydrationState: MetadataHydrationState.HYDRATED,
+        title: 'Title scene-new',
+      }),
+    );
   });
 
   it('clears metadata hydration in-flight IDs after a failed metadata batch', async () => {
