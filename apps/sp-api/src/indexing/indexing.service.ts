@@ -129,6 +129,11 @@ type SceneIndexUpsertData = Prisma.SceneIndexUncheckedCreateInput & {
   metadataHydrationState: MetadataHydrationState;
 };
 
+type MetadataHydrationCandidate = {
+  metadataHydrationState: MetadataHydrationState;
+  metadataRetryAfterAt?: Date | string | null;
+};
+
 @Injectable()
 export class IndexingService {
   private static readonly INDEX_STATUS_MAX_AGE_MS = 30 * 60_000;
@@ -144,6 +149,7 @@ export class IndexingService {
   private static readonly METADATA_QUERY_BATCH_SIZE = 8;
   private static readonly METADATA_ACCELERATED_INTERVAL_MS = 10_000;
   private static readonly METADATA_STEADY_INTERVAL_MS = 30 * 60_000;
+  private static readonly METADATA_SCHEDULED_CHECK_CACHE_MS = 60_000;
   private static readonly METADATA_RETRY_BACKOFF_MS = 5 * 60_000;
   private static readonly UPSERT_DEADLOCK_RETRY_ATTEMPTS = 3;
   private static readonly BOOTSTRAP_LEASE_MS = 20 * 60_000;
@@ -156,6 +162,7 @@ export class IndexingService {
   private readonly logger = new Logger(IndexingService.name);
   private sceneIndexWriteBarrier: Promise<void> = Promise.resolve();
   private readonly metadataHydrationInFlight = new Set<string>();
+  private nextMetadataBackfillCheckAt: number | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -1574,6 +1581,7 @@ export class IndexingService {
         for (const row of nextRows) {
           existingByStashId.set(row.stashId, row as SceneIndex);
         }
+        this.invalidateScheduledMetadataBackfillCheckIfNeeded(nextRows);
         return;
       } catch (error) {
         if (
@@ -2333,6 +2341,14 @@ export class IndexingService {
   }
 
   private async shouldRunScheduledMetadataBackfill(): Promise<boolean> {
+    const now = Date.now();
+    if (
+      this.nextMetadataBackfillCheckAt !== null &&
+      now < this.nextMetadataBackfillCheckAt
+    ) {
+      return false;
+    }
+
     const [
       pendingMetadataCount,
       retryableMetadataCount,
@@ -2371,10 +2387,32 @@ export class IndexingService {
     const lastSuccessAt = syncState?.lastSuccessAt ?? null;
 
     if (!lastSuccessAt) {
+      this.nextMetadataBackfillCheckAt = null;
       return true;
     }
 
-    return Date.now() - lastSuccessAt.getTime() >= targetIntervalMs;
+    const nextRunAt = lastSuccessAt.getTime() + targetIntervalMs;
+    const shouldRun = now >= nextRunAt;
+    this.nextMetadataBackfillCheckAt = shouldRun
+      ? null
+      : Math.min(
+          nextRunAt,
+          now + IndexingService.METADATA_SCHEDULED_CHECK_CACHE_MS,
+        );
+
+    return shouldRun;
+  }
+
+  private invalidateScheduledMetadataBackfillCheckIfNeeded(
+    rows: MetadataHydrationCandidate[],
+  ): void {
+    if (this.nextMetadataBackfillCheckAt === null) {
+      return;
+    }
+
+    if (rows.some((row) => this.shouldHydrateMetadataNow(row))) {
+      this.nextMetadataBackfillCheckAt = null;
+    }
   }
 
   private buildMissingMetadataBacklogWhere(): Prisma.SceneIndexWhereInput {
@@ -2454,7 +2492,9 @@ export class IndexingService {
     };
   }
 
-  private shouldHydrateMetadataNow(row: SceneIndex | null): boolean {
+  private shouldHydrateMetadataNow(
+    row: MetadataHydrationCandidate | null,
+  ): boolean {
     if (!row) {
       return true;
     }
@@ -2469,11 +2509,17 @@ export class IndexingService {
       return false;
     }
 
-    if (!row.metadataRetryAfterAt) {
+    const retryAfterAt = row.metadataRetryAfterAt;
+    if (!retryAfterAt) {
       return true;
     }
 
-    return row.metadataRetryAfterAt.getTime() <= Date.now();
+    const retryAfterTime =
+      retryAfterAt instanceof Date
+        ? retryAfterAt.getTime()
+        : new Date(retryAfterAt).getTime();
+
+    return Number.isFinite(retryAfterTime) && retryAfterTime <= Date.now();
   }
 
   private pickValue<T>(incoming: T | undefined, existing: T): T {

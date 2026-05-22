@@ -59,4 +59,34 @@ describe('fetchWithTimeout', () => {
     await jest.advanceTimersByTimeAsync(25);
     await expectation;
   });
+
+  it('preserves cancellation from a caller abort signal', async () => {
+    const callerController = new AbortController();
+    fetchMock.mockImplementation((_input, init) => {
+      const signal = init?.signal as AbortSignal;
+
+      return new Promise<Response>((_resolve, reject) => {
+        signal.addEventListener('abort', () => {
+          const error = new Error('Caller aborted.');
+          error.name = 'AbortError';
+          reject(error);
+        });
+      });
+    });
+
+    const request = fetchWithTimeout(
+      'http://provider.local/graphql',
+      {
+        signal: callerController.signal,
+      },
+      30_000,
+    );
+    const expectation = expect(request).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+
+    callerController.abort();
+
+    await expectation;
+  });
 });

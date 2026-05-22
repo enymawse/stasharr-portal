@@ -5,9 +5,12 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
 import { AppModule } from './app.module';
+import { resolveNestLogLevels } from './logging/log-levels';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: resolveNestLogLevels(),
+  });
   const logger = new Logger('Bootstrap');
 
   app.useGlobalPipes(
