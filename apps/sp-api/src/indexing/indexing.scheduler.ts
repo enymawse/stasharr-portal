@@ -80,7 +80,7 @@ export class IndexingScheduler implements OnApplicationBootstrap {
     const memory = process.memoryUsage();
     const toMb = (bytes: number) => Math.round(bytes / 1024 ** 2);
 
-    this.logger.debug(
+    this.logger.log(
       `[${jobName}] outcome=${outcome}${
         durationMs === undefined ? '' : ` durationMs=${durationMs}`
       } rss=${toMb(memory.rss)}MB heap=${toMb(memory.heapUsed)}/${toMb(

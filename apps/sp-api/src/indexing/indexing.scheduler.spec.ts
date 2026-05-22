@@ -71,8 +71,8 @@ describe('IndexingScheduler', () => {
 
   it('logs memory usage for scheduler jobs when enabled', async () => {
     process.env.STASHARR_INDEXING_MEMORY_LOG = '1';
-    const debugSpy = jest
-      .spyOn(Logger.prototype, 'debug')
+    const logSpy = jest
+      .spyOn(Logger.prototype, 'log')
       .mockImplementation(() => undefined);
     jest.spyOn(process, 'memoryUsage').mockReturnValue({
       rss: 101 * 1024 ** 2,
@@ -89,19 +89,19 @@ describe('IndexingScheduler', () => {
     scheduler.handleMetadataBackfill();
     await flushPromises();
 
-    expect(debugSpy).toHaveBeenCalledWith(
+    expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('[metadata-backfill] outcome=completed'),
     );
-    expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('rss=101MB'));
-    expect(debugSpy).toHaveBeenCalledWith(
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('rss=101MB'));
+    expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('heap=20/40MB'),
     );
   });
 
   it('logs failed outcome when a scheduler job rejects', async () => {
     process.env.STASHARR_INDEXING_MEMORY_LOG = '1';
-    const debugSpy = jest
-      .spyOn(Logger.prototype, 'debug')
+    const logSpy = jest
+      .spyOn(Logger.prototype, 'log')
       .mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     jest.spyOn(process, 'memoryUsage').mockReturnValue({
@@ -122,7 +122,7 @@ describe('IndexingScheduler', () => {
     scheduler.handleMetadataBackfill();
     await flushPromises();
 
-    expect(debugSpy).toHaveBeenCalledWith(
+    expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('[metadata-backfill] outcome=failed'),
     );
   });

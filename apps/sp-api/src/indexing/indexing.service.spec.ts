@@ -1432,6 +1432,39 @@ describe('IndexingService', () => {
     expect(getSceneMetadataByIdsMock).not.toHaveBeenCalled();
   });
 
+  it('short-circuits repeated metadata backfill checks during the idle cache window', async () => {
+    const { prisma } = createPrismaMock({
+      sceneIndexRows: [
+        buildSceneIndexRow({
+          stashId: 'scene-1',
+          metadataHydrationState: MetadataHydrationState.HYDRATED,
+          metadataLastSyncedAt: new Date(),
+        }),
+      ],
+      syncStateRow: {
+        lastSuccessAt: new Date(Date.now() - 5 * 60_000),
+      },
+    });
+    const sceneIndex = (prisma as unknown as {
+      sceneIndex: { count: jest.Mock };
+    }).sceneIndex;
+    const service = new IndexingService(
+      prisma,
+      integrationsService,
+      catalogProviderService,
+      whisparrAdapter,
+      stashAdapter,
+      stashdbAdapter,
+      syncStateService,
+    );
+
+    await service.syncMetadataBackfill('interval');
+    await service.syncMetadataBackfill('interval');
+
+    expect(runWithLeaseMock).not.toHaveBeenCalled();
+    expect(sceneIndex.count).toHaveBeenCalledTimes(3);
+  });
+
   it('clears metadata hydration in-flight IDs after a failed metadata batch', async () => {
     const { prisma, sceneIndexStore } = createPrismaMock({
       sceneIndexRows: [
