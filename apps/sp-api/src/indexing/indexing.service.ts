@@ -11,9 +11,7 @@ import {
 } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  type CatalogProviderKey,
-} from '../providers/catalog/catalog-provider.util';
+import { type CatalogProviderKey } from '../providers/catalog/catalog-provider.util';
 import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import {
   StashAdapter,
@@ -77,6 +75,12 @@ export interface SceneIndexSummarySnapshot {
   lastIndexWriteAt: Date | null;
 }
 
+export interface IndexingDiagnosticsSnapshot extends SceneIndexSummarySnapshot {
+  metadataHydratedCount: number;
+  metadataBacklogCount: number;
+  metadataHydrationInFlightCount: number;
+}
+
 interface SceneIndexPatch {
   stashId: string;
   requestStatus?: RequestStatus | null;
@@ -104,10 +108,13 @@ interface SceneIndexPatch {
   lastSyncedAt?: Date | null;
 }
 
+type SyncRunDiagnosticValue = number | string | boolean | null;
+
 interface SyncRunSummary {
   processedCount: number;
   updatedCount: number;
   cursor?: string | null;
+  diagnostics?: Record<string, SyncRunDiagnosticValue>;
 }
 
 interface SceneIndexSummaryDelta {
@@ -228,6 +235,13 @@ export class IndexingService {
             (queueResult?.updatedCount ?? 0) +
             (libraryResult?.updatedCount ?? 0) +
             (metadataResult?.updatedCount ?? 0),
+          diagnostics: {
+            requestRows: requestRows.length,
+            movieProcessed: movieResult?.processedCount ?? 0,
+            queueProcessed: queueResult?.processedCount ?? 0,
+            libraryProcessed: libraryResult?.processedCount ?? 0,
+            metadataProcessed: metadataResult?.processedCount ?? 0,
+          },
         };
       },
     );
@@ -524,6 +538,23 @@ export class IndexingService {
       metadataPendingCount: summary?.metadataPendingCount ?? 0,
       metadataRetryableCount: summary?.metadataRetryableCount ?? 0,
       lastIndexWriteAt: summary?.lastIndexWriteAt ?? null,
+    };
+  }
+
+  async getIndexingDiagnosticsSnapshot(): Promise<IndexingDiagnosticsSnapshot> {
+    const summary = await this.getSceneIndexSummary();
+    const metadataBacklogCount =
+      summary.metadataPendingCount + summary.metadataRetryableCount;
+    const metadataHydratedCount = Math.max(
+      0,
+      summary.indexedScenes - metadataBacklogCount,
+    );
+
+    return {
+      ...summary,
+      metadataHydratedCount,
+      metadataBacklogCount,
+      metadataHydrationInFlightCount: this.metadataHydrationInFlight.size,
     };
   }
 
@@ -983,6 +1014,12 @@ export class IndexingService {
     return {
       processedCount: movies.length + staleRows.length,
       updatedCount: patches.length,
+      diagnostics: {
+        whisparrMovies: movies.length,
+        whisparrMovieIds: snapshotMovieIds.size,
+        staleMovieRows: staleRows.length,
+        patchCount: patches.length,
+      },
     };
   }
 
@@ -1144,6 +1181,15 @@ export class IndexingService {
     return {
       processedCount: queueItems.length + clearedQueueRows.length,
       updatedCount: patches.length,
+      diagnostics: {
+        queueItems: queueItems.length,
+        queueMovieIds: movieIds.length,
+        mappedQueueScenes: queueItemsByStashId.size,
+        missingQueueMovieLookups: missingMovieIds.length,
+        lookedUpQueueMovies: lookedUpMovies.size,
+        clearedQueueRows: clearedQueueRows.length,
+        patchCount: patches.length,
+      },
     };
   }
 
@@ -1164,6 +1210,7 @@ export class IndexingService {
     const syncStartedAt = new Date();
     const availableActiveCatalogSceneIds = new Set<string>();
     let page = 1;
+    let pages = 0;
     let localSceneCount = 0;
     let projectionWrites = 0;
 
@@ -1176,6 +1223,7 @@ export class IndexingService {
         },
         activeCatalogProviderKey,
       );
+      pages += 1;
       localSceneCount += snapshotPage.items.length;
       projectionWrites += await this.upsertLibrarySceneProjectionPage(
         snapshotPage.items,
@@ -1224,6 +1272,14 @@ export class IndexingService {
     return {
       processedCount: localSceneCount,
       updatedCount: projectionWrites + deletedRows.count + availabilityWrites,
+      diagnostics: {
+        libraryPages: pages,
+        localSceneCount,
+        indexedAvailableIds: availableActiveCatalogSceneIds.size,
+        projectionWrites,
+        deletedLibraryRows: deletedRows.count,
+        availabilityWrites,
+      },
     };
   }
 
@@ -1338,6 +1394,11 @@ export class IndexingService {
         processedCount: 0,
         updatedCount: 0,
         cursor: null,
+        diagnostics: {
+          metadataTargets: 0,
+          forceBootstrapPass,
+          cursorPresent: cursorState?.cursor ? true : false,
+        },
       };
     }
 
@@ -1350,6 +1411,11 @@ export class IndexingService {
       processedCount: targetRows.length,
       updatedCount: targetRows.length,
       cursor: targetRows[targetRows.length - 1]?.stashId ?? null,
+      diagnostics: {
+        metadataTargets: targetRows.length,
+        forceBootstrapPass,
+        cursorPresent: cursorState?.cursor ? true : false,
+      },
     };
   }
 
