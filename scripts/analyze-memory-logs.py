@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable
@@ -20,10 +20,14 @@ MEMORY_PATTERN = re.compile(
 )
 DOCKER_ISO_PATTERN = re.compile(r"^(?P<timestamp>\d{4}-\d{2}-\d{2}T\S+)")
 ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
+KEY_VALUE_PATTERN = re.compile(r"(?P<key>[A-Za-z][A-Za-z0-9]*)=(?P<value>\S+)")
+SIGNED_MB_PATTERN = re.compile(r"^(?P<value>[+-]?\d+)MB$")
 SIGNAL_PATTERN = re.compile(
     r"Background indexing job failed|"
     r"Skipping overlapping indexing job|"
     r"Metadata hydration batch failed|"
+    r"\[memory-gc]|"
+    r"\[heap-snapshot]|"
     r"outcome=failed|"
     r"fetch failed|"
     r"provider returned|"
@@ -46,6 +50,7 @@ class Sample:
     external_mb: int
     array_buffers_mb: int
     raw: str
+    extras: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -63,6 +68,15 @@ class JobStats:
     total_rss_delta_after_run: int = 0
     positive_rss_delta_after_run: int = 0
     rss_delta_samples: int = 0
+    measured_heap_delta_total: int = 0
+    measured_heap_delta_positive: int = 0
+    measured_rss_delta_total: int = 0
+    measured_rss_delta_positive: int = 0
+    measured_delta_samples: int = 0
+    result_processed_total: int = 0
+    result_updated_total: int = 0
+    result_samples: int = 0
+    last_extras: dict[str, str] = field(default_factory=dict)
 
 
 def usage() -> None:
@@ -72,7 +86,7 @@ def usage() -> None:
   docker logs --timestamps <container> 2>&1 | python3 scripts/analyze-memory-logs.py -
 
 Expected telemetry lines look like:
-  [metadata-backfill] outcome=completed durationMs=42 rss=341MB heap=80/120MB external=3MB arrayBuffers=1MB"""
+  [metadata-backfill] outcome=completed durationMs=42 rss=341MB heap=80/120MB external=3MB arrayBuffers=1MB rssDelta=+2MB heapDelta=+1MB resultProcessed=24 indexTotal=100 metadataPending=8"""
     )
 
 
@@ -109,6 +123,23 @@ def parse_memory_sample(line: str, line_number: int) -> Sample | None:
         return None
 
     groups = match.groupdict()
+    parsed_fields = {
+        field_match.group("key"): field_match.group("value")
+        for field_match in KEY_VALUE_PATTERN.finditer(clean_line)
+    }
+    extras = {
+        key: value
+        for key, value in parsed_fields.items()
+        if key
+        not in {
+            "outcome",
+            "durationMs",
+            "rss",
+            "heap",
+            "external",
+            "arrayBuffers",
+        }
+    }
     return Sample(
         line_number=line_number,
         timestamp=parse_timestamp(clean_line),
@@ -125,6 +156,7 @@ def parse_memory_sample(line: str, line_number: int) -> Sample | None:
         external_mb=int(groups["external"]),
         array_buffers_mb=int(groups["array_buffers"]),
         raw=clean_line,
+        extras=extras,
     )
 
 
@@ -145,6 +177,24 @@ def format_number(value: int | float | None, digits: int = 1) -> str:
     return f"{value:.{digits}f}"
 
 
+def parse_signed_mb(value: str | None) -> int | None:
+    if value is None:
+        return None
+    match = SIGNED_MB_PATTERN.match(value)
+    if not match:
+        return None
+    return int(match.group("value"))
+
+
+def parse_int(value: str | None) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
 def format_sample_time(sample: Sample) -> str:
     if sample.timestamp is not None:
         return sample.timestamp.isoformat()
@@ -157,7 +207,13 @@ def summarize_series(samples: list[Sample]) -> dict[str, object]:
     min_rss = min(sample.rss_mb for sample in samples)
     max_rss = max(sample.rss_mb for sample in samples)
     max_heap = max(sample.heap_used_mb for sample in samples)
+    max_heap_rss_ratio = max(
+        sample.heap_used_mb / sample.rss_mb
+        for sample in samples
+        if sample.rss_mb > 0
+    )
     rss_delta = last.rss_mb - first.rss_mb
+    heap_delta = last.heap_used_mb - first.heap_used_mb
 
     elapsed_hours: float | None = None
     if first.timestamp is not None and last.timestamp is not None:
@@ -168,6 +224,9 @@ def summarize_series(samples: list[Sample]) -> dict[str, object]:
     rss_rate_per_hour = (
         rss_delta / elapsed_hours if elapsed_hours is not None else None
     )
+    heap_rate_per_hour = (
+        heap_delta / elapsed_hours if elapsed_hours is not None else None
+    )
 
     return {
         "first": first,
@@ -175,9 +234,12 @@ def summarize_series(samples: list[Sample]) -> dict[str, object]:
         "min_rss": min_rss,
         "max_rss": max_rss,
         "max_heap": max_heap,
+        "max_heap_rss_ratio": max_heap_rss_ratio,
         "rss_delta": rss_delta,
+        "heap_delta": heap_delta,
         "elapsed_hours": elapsed_hours,
         "rss_rate_per_hour": rss_rate_per_hour,
+        "heap_rate_per_hour": heap_rate_per_hour,
     }
 
 
@@ -207,9 +269,33 @@ def build_job_summaries(samples: list[Sample]) -> list[tuple[str, JobStats]]:
             stats.positive_rss_delta_after_run += max(delta, 0)
             stats.rss_delta_samples += 1
 
+        measured_heap_delta = parse_signed_mb(sample.extras.get("heapDelta"))
+        measured_rss_delta = parse_signed_mb(sample.extras.get("rssDelta"))
+        if measured_heap_delta is not None or measured_rss_delta is not None:
+            stats.measured_delta_samples += 1
+            if measured_heap_delta is not None:
+                stats.measured_heap_delta_total += measured_heap_delta
+                stats.measured_heap_delta_positive += max(measured_heap_delta, 0)
+            if measured_rss_delta is not None:
+                stats.measured_rss_delta_total += measured_rss_delta
+                stats.measured_rss_delta_positive += max(measured_rss_delta, 0)
+
+        result_processed = parse_int(sample.extras.get("resultProcessed"))
+        result_updated = parse_int(sample.extras.get("resultUpdated"))
+        if result_processed is not None or result_updated is not None:
+            stats.result_samples += 1
+            stats.result_processed_total += result_processed or 0
+            stats.result_updated_total += result_updated or 0
+
+        stats.last_extras = sample.extras
+
     return sorted(
         by_job.items(),
-        key=lambda item: (-item[1].positive_rss_delta_after_run, -item[1].samples),
+        key=lambda item: (
+            -item[1].measured_heap_delta_positive,
+            -item[1].positive_rss_delta_after_run,
+            -item[1].samples,
+        ),
     )
 
 
@@ -226,9 +312,10 @@ def print_job_summaries(job_summaries: list[tuple[str, JobStats]]) -> None:
     print("\nPer-job memory correlation")
     print(
         "job | samples | failed | skipped | rss min/max | first->last | "
-        "avg duration | max duration | positive rss delta"
+        "avg duration | max duration | measured heap delta | measured rss delta | "
+        "processed/updated | positive rss correlation"
     )
-    print("-" * 120)
+    print("-" * 160)
 
     for job, stats in job_summaries:
         avg_duration = (
@@ -238,6 +325,27 @@ def print_job_summaries(job_summaries: list[tuple[str, JobStats]]) -> None:
         )
         first_rss = stats.first_rss or 0
         last_rss = stats.last_rss or 0
+        measured_heap_delta = (
+            "n/a"
+            if stats.measured_delta_samples == 0
+            else (
+                f"{format_signed_mb(stats.measured_heap_delta_total)} "
+                f"(+only {format_mb(stats.measured_heap_delta_positive)})"
+            )
+        )
+        measured_rss_delta = (
+            "n/a"
+            if stats.measured_delta_samples == 0
+            else (
+                f"{format_signed_mb(stats.measured_rss_delta_total)} "
+                f"(+only {format_mb(stats.measured_rss_delta_positive)})"
+            )
+        )
+        processed_updated = (
+            "n/a"
+            if stats.result_samples == 0
+            else f"{stats.result_processed_total}/{stats.result_updated_total}"
+        )
         print(
             " | ".join(
                 [
@@ -254,10 +362,88 @@ def print_job_summaries(job_summaries: list[tuple[str, JobStats]]) -> None:
                     if avg_duration is None
                     else f"{format_number(avg_duration, 0)}ms",
                     f"{stats.max_duration_ms}ms" if stats.max_duration_ms else "n/a",
+                    measured_heap_delta,
+                    measured_rss_delta,
+                    processed_updated,
                     format_signed_mb(stats.positive_rss_delta_after_run),
                 ]
             )
         )
+
+
+def print_latest_diagnostics(samples: list[Sample]) -> None:
+    diagnostic_keys = [
+        "indexTotal",
+        "acquisitionTracked",
+        "metadataPending",
+        "metadataRetryable",
+        "metadataHydrated",
+        "metadataBacklog",
+        "inFlightMetadata",
+    ]
+    latest = next(
+        (
+            sample
+            for sample in reversed(samples)
+            if any(key in sample.extras for key in diagnostic_keys)
+        ),
+        None,
+    )
+
+    print("\nLatest indexing diagnostics")
+    if latest is None:
+        print("not present in these logs")
+        return
+
+    print(
+        " | ".join(
+            [format_sample_time(latest)]
+            + [
+                f"{key}={latest.extras[key]}"
+                for key in diagnostic_keys
+                if key in latest.extras
+            ]
+        )
+    )
+
+
+def print_job_diagnostics(job_summaries: list[tuple[str, JobStats]]) -> None:
+    interesting_keys = [
+        "resultProcessed",
+        "resultUpdated",
+        "diagQueueItems",
+        "diagQueueMovieIds",
+        "diagMappedQueueScenes",
+        "diagMissingQueueMovieLookups",
+        "diagLookedUpQueueMovies",
+        "diagClearedQueueRows",
+        "diagWhisparrMovies",
+        "diagWhisparrMovieIds",
+        "diagStaleMovieRows",
+        "diagLibraryPages",
+        "diagLocalSceneCount",
+        "diagIndexedAvailableIds",
+        "diagProjectionWrites",
+        "diagDeletedLibraryRows",
+        "diagAvailabilityWrites",
+        "diagMetadataTargets",
+    ]
+
+    print("\nLatest per-job diagnostics")
+    any_diagnostics = False
+    for job, stats in job_summaries:
+        fields = [
+            f"{key}={stats.last_extras[key]}"
+            for key in interesting_keys
+            if key in stats.last_extras
+        ]
+        if not fields:
+            continue
+        any_diagnostics = True
+        print(f"{job}: " + " | ".join(fields))
+
+    if not any_diagnostics:
+        print("not present in these logs")
 
 
 def print_signals(signals: list[tuple[int, str]]) -> None:
@@ -319,10 +505,18 @@ def main() -> None:
         f"({format_signed_mb(int(summary['rss_delta']))})"
     )
     print(
+        f"heap used: {format_mb(first.heap_used_mb)} -> {format_mb(last.heap_used_mb)} "
+        f"({format_signed_mb(int(summary['heap_delta']))})"
+    )
+    print(
         f"rss min/max: {format_mb(int(summary['min_rss']))} / "
         f"{format_mb(int(summary['max_rss']))}"
     )
     print(f"max heap used: {format_mb(int(summary['max_heap']))}")
+    print(
+        "max heap/rss ratio: "
+        f"{format_number(float(summary['max_heap_rss_ratio']), 3)}"
+    )
 
     rss_rate = summary["rss_rate_per_hour"]
     print(
@@ -333,10 +527,22 @@ def main() -> None:
             else f"{format_signed_mb(float(rss_rate))}/hour"
         )
     )
+    heap_rate = summary["heap_rate_per_hour"]
+    print(
+        "heap rate: "
+        + (
+            "n/a"
+            if heap_rate is None
+            else f"{format_signed_mb(float(heap_rate))}/hour"
+        )
+    )
     print(f"failed telemetry samples: {len(failed_samples)}")
     print(f"skipped overlap samples: {len(skipped_samples)}")
 
-    print_job_summaries(build_job_summaries(samples))
+    job_summaries = build_job_summaries(samples)
+    print_job_summaries(job_summaries)
+    print_latest_diagnostics(samples)
+    print_job_diagnostics(job_summaries)
     print_signals(collect_signals(lines))
 
 
