@@ -67,6 +67,8 @@ services:
       # Optional advanced override. Leave unset to let Stasharr generate and persist
       # a unique session secret for this install in the app data volume.
       # SESSION_SECRET: your-own-long-random-secret
+      # Optional: uncomment if catalog provider checks time out on IPv4-only Docker networks.
+      # NODE_OPTIONS: --no-network-family-autoselection
       # Optional: set to true when serving Stasharr over HTTPS.
       SESSION_COOKIE_SECURE: "false"
     ports:
@@ -92,6 +94,9 @@ docker compose up -d
 Open `http://localhost:3000`.
 
 On the first visit, Stasharr opens a bootstrap screen until you create the single local admin account. After that, unauthenticated visits land on the login screen and normal app and API usage require that session.
+
+If StashDB or FansDB Save & Test repeatedly fails with `ETIMEDOUT` on an IPv4-only Docker network, add
+`NODE_OPTIONS: --no-network-family-autoselection` to the app service environment and restart the container.
 
 Tag guidance:
 
