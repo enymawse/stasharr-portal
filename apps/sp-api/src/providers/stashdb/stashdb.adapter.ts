@@ -2047,12 +2047,11 @@ export class StashdbAdapter {
         }),
       });
     } catch (error) {
+      const message = this.providerRequestFailureMessage(error);
       if (trackRuntimeHealth) {
-        await this.reportRuntimeFailure(error);
+        await this.reportRuntimeFailure(message);
       }
-      throw new BadGatewayException(
-        'Failed to reach StashDB provider endpoint.',
-      );
+      throw new BadGatewayException(message);
     }
 
     if (!response.ok) {
@@ -2102,6 +2101,109 @@ export class StashdbAdapter {
     }
 
     return 'unknown error';
+  }
+
+  private providerRequestFailureMessage(error: unknown): string {
+    const details = this.networkErrorDetails(error);
+
+    if (!details) {
+      return 'Failed to reach StashDB provider endpoint.';
+    }
+
+    return `Failed to reach StashDB provider endpoint: ${details}`;
+  }
+
+  private networkErrorDetails(error: unknown): string | null {
+    const details: string[] = [];
+    this.collectNetworkErrorDetails(error, details, new Set<unknown>());
+
+    return details.length > 0 ? details.join('; ') : null;
+  }
+
+  private collectNetworkErrorDetails(
+    error: unknown,
+    details: string[],
+    seen: Set<unknown>,
+  ): void {
+    if (!error || seen.has(error)) {
+      return;
+    }
+
+    seen.add(error);
+
+    if (typeof error === 'string') {
+      const trimmed = error.trim();
+      if (trimmed.length > 0) {
+        this.addUniqueDetail(details, trimmed);
+      }
+      return;
+    }
+
+    if (error instanceof AggregateError) {
+      for (const nestedError of error.errors) {
+        this.collectNetworkErrorDetails(nestedError, details, seen);
+      }
+    }
+
+    if (error instanceof Error) {
+      const parts = [
+        this.errorCode(error),
+        error.message.trim().length > 0 ? error.message.trim() : null,
+      ].filter((part): part is string => !!part);
+
+      if (parts.length > 0) {
+        this.addUniqueDetail(details, parts.join(' '));
+      }
+
+      this.collectNetworkErrorDetails(error.cause, details, seen);
+      return;
+    }
+
+    if (typeof error === 'object') {
+      const maybeError = error as {
+        cause?: unknown;
+        code?: unknown;
+        message?: unknown;
+        errors?: unknown;
+      };
+      const code =
+        typeof maybeError.code === 'string' && maybeError.code.trim().length > 0
+          ? maybeError.code.trim()
+          : null;
+      const message =
+        typeof maybeError.message === 'string' &&
+        maybeError.message.trim().length > 0
+          ? maybeError.message.trim()
+          : null;
+
+      if (code || message) {
+        this.addUniqueDetail(
+          details,
+          [code, message].filter((part): part is string => !!part).join(' '),
+        );
+      }
+
+      if (Array.isArray(maybeError.errors)) {
+        for (const nestedError of maybeError.errors) {
+          this.collectNetworkErrorDetails(nestedError, details, seen);
+        }
+      }
+
+      this.collectNetworkErrorDetails(maybeError.cause, details, seen);
+    }
+  }
+
+  private errorCode(error: Error): string | null {
+    const code = (error as { code?: unknown }).code;
+    return typeof code === 'string' && code.trim().length > 0
+      ? code.trim()
+      : null;
+  }
+
+  private addUniqueDetail(details: string[], detail: string): void {
+    if (!details.includes(detail)) {
+      details.push(detail);
+    }
   }
 
   private resolveGraphqlEndpoint(baseUrl: string): string {

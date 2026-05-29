@@ -38,10 +38,34 @@ describe('StashdbAdapter', () => {
       adapter.testConnection({
         baseUrl: 'http://stashdb.local/graphql',
       }),
-    ).rejects.toBeInstanceOf(BadGatewayException);
+    ).rejects.toThrow(
+      'Failed to reach StashDB provider endpoint: network failure',
+    );
 
     expect(runtimeHealthService.recordFailure).not.toHaveBeenCalled();
     expect(runtimeHealthService.recordSuccess).not.toHaveBeenCalled();
+  });
+
+  it('preserves nested Node fetch timeout causes in connectivity errors', async () => {
+    const timeout = Object.assign(
+      new Error('connect ETIMEDOUT 2606:4700::6810:85e5:443'),
+      {
+        code: 'ETIMEDOUT',
+      },
+    );
+    const aggregateError = new AggregateError([timeout], 'fetch failed');
+    const fetchError = new TypeError('fetch failed', {
+      cause: aggregateError,
+    });
+    fetchMock.mockRejectedValue(fetchError);
+
+    await expect(
+      adapter.testConnection({
+        baseUrl: 'http://stashdb.local/graphql',
+      }),
+    ).rejects.toThrow(
+      'Failed to reach StashDB provider endpoint: fetch failed; ETIMEDOUT connect ETIMEDOUT 2606:4700::6810:85e5:443',
+    );
   });
 
   it('requests studio images and normalizes studio badge URL from the widest image', async () => {
@@ -379,7 +403,7 @@ describe('StashdbAdapter', () => {
 
     expect(runtimeHealthService.recordFailure).toHaveBeenCalledWith(
       'CATALOG',
-      expect.any(Error),
+      'Failed to reach StashDB provider endpoint: network failure',
     );
   });
 

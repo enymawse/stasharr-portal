@@ -38,6 +38,8 @@ services:
       # Optional advanced override. Leave unset to let Stasharr generate and persist
       # a unique session secret for this install in the app data volume.
       # SESSION_SECRET: your-own-long-random-secret
+      # Optional: uncomment if catalog provider checks time out on IPv4-only Docker networks.
+      # NODE_OPTIONS: --no-network-family-autoselection
       # Optional: set to true when serving Stasharr over HTTPS.
       SESSION_COOKIE_SECURE: "false"
     ports:
