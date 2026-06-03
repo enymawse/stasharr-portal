@@ -159,6 +159,8 @@ export class IndexingService {
   private static readonly METADATA_SCHEDULED_CHECK_CACHE_MS = 60_000;
   private static readonly METADATA_RETRY_BACKOFF_MS = 5 * 60_000;
   private static readonly UPSERT_DEADLOCK_RETRY_ATTEMPTS = 3;
+  private static readonly INDEX_WRITE_TRANSACTION_MAX_WAIT_MS = 10_000;
+  private static readonly INDEX_WRITE_TRANSACTION_TIMEOUT_MS = 60_000;
   private static readonly BOOTSTRAP_LEASE_MS = 20 * 60_000;
   private static readonly QUEUE_LEASE_MS = 25_000;
   private static readonly MOVIES_LEASE_MS = 4 * 60_000;
@@ -1615,34 +1617,32 @@ export class IndexingService {
             queueItemsByStashId?.get(patch.stashId),
           ),
         );
-        const transactionOperations: Prisma.PrismaPromise<unknown>[] =
-          nextRows.map((data) =>
-            this.prisma.sceneIndex.upsert({
-              where: {
-                stashId: data.stashId,
-              },
-              create: data,
-              update: data,
-            }),
-          );
         const summaryDelta = this.buildSceneIndexSummaryDelta(
           chunk,
           nextRows,
           existingByStashId,
         );
 
-        if (this.hasSummaryDelta(summaryDelta)) {
-          transactionOperations.push(
-            this.prisma.sceneIndexSummary.update({
+        await this.prisma.$transaction(async (tx) => {
+          for (const data of nextRows) {
+            await tx.sceneIndex.upsert({
+              where: {
+                stashId: data.stashId,
+              },
+              create: data,
+              update: data,
+            });
+          }
+
+          if (this.hasSummaryDelta(summaryDelta)) {
+            await tx.sceneIndexSummary.update({
               where: {
                 key: SCENE_INDEX_SUMMARY_KEY,
               },
               data: this.buildSceneIndexSummaryDeltaUpdate(summaryDelta),
-            }),
-          );
-        }
-
-        await this.prisma.$transaction(transactionOperations);
+            });
+          }
+        }, this.indexWriteTransactionOptions());
 
         for (const row of nextRows) {
           existingByStashId.set(row.stashId, row as SceneIndex);
@@ -2243,9 +2243,9 @@ export class IndexingService {
       return 0;
     }
 
-    await this.prisma.$transaction(
-      items.map((item) =>
-        this.prisma.librarySceneIndex.upsert({
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        await tx.librarySceneIndex.upsert({
           where: {
             stashSceneId: item.id,
           },
@@ -2296,9 +2296,9 @@ export class IndexingService {
             hasFavoriteTag: item.hasFavoriteTag,
             lastSyncedAt: syncedAt,
           },
-        }),
-      ),
-    );
+        });
+      }
+    }, this.indexWriteTransactionOptions());
 
     return items.length;
   }
@@ -2586,6 +2586,13 @@ export class IndexingService {
         : new Date(retryAfterAt).getTime();
 
     return Number.isFinite(retryAfterTime) && retryAfterTime <= Date.now();
+  }
+
+  private indexWriteTransactionOptions(): { maxWait: number; timeout: number } {
+    return {
+      maxWait: IndexingService.INDEX_WRITE_TRANSACTION_MAX_WAIT_MS,
+      timeout: IndexingService.INDEX_WRITE_TRANSACTION_TIMEOUT_MS,
+    };
   }
 
   private pickValue<T>(incoming: T | undefined, existing: T): T {
