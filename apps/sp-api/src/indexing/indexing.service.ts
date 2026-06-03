@@ -1615,34 +1615,32 @@ export class IndexingService {
             queueItemsByStashId?.get(patch.stashId),
           ),
         );
-        const transactionOperations: Prisma.PrismaPromise<unknown>[] =
-          nextRows.map((data) =>
-            this.prisma.sceneIndex.upsert({
-              where: {
-                stashId: data.stashId,
-              },
-              create: data,
-              update: data,
-            }),
-          );
         const summaryDelta = this.buildSceneIndexSummaryDelta(
           chunk,
           nextRows,
           existingByStashId,
         );
 
-        if (this.hasSummaryDelta(summaryDelta)) {
-          transactionOperations.push(
-            this.prisma.sceneIndexSummary.update({
+        await this.prisma.$transaction(async (tx) => {
+          for (const data of nextRows) {
+            await tx.sceneIndex.upsert({
+              where: {
+                stashId: data.stashId,
+              },
+              create: data,
+              update: data,
+            });
+          }
+
+          if (this.hasSummaryDelta(summaryDelta)) {
+            await tx.sceneIndexSummary.update({
               where: {
                 key: SCENE_INDEX_SUMMARY_KEY,
               },
               data: this.buildSceneIndexSummaryDeltaUpdate(summaryDelta),
-            }),
-          );
-        }
-
-        await this.prisma.$transaction(transactionOperations);
+            });
+          }
+        });
 
         for (const row of nextRows) {
           existingByStashId.set(row.stashId, row as SceneIndex);
@@ -2243,9 +2241,9 @@ export class IndexingService {
       return 0;
     }
 
-    await this.prisma.$transaction(
-      items.map((item) =>
-        this.prisma.librarySceneIndex.upsert({
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        await tx.librarySceneIndex.upsert({
           where: {
             stashSceneId: item.id,
           },
@@ -2296,9 +2294,9 @@ export class IndexingService {
             hasFavoriteTag: item.hasFavoriteTag,
             lastSyncedAt: syncedAt,
           },
-        }),
-      ),
-    );
+        });
+      }
+    });
 
     return items.length;
   }

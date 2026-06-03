@@ -17,6 +17,28 @@ import { SyncStateService } from './sync-state.service';
 type SceneIndexRow = Record<string, unknown>;
 type LibrarySceneIndexRow = Record<string, unknown>;
 type TransactionOperation = Promise<unknown> | (() => Promise<unknown>);
+type TransactionCallback = (tx: {
+  sceneIndex: {
+    upsert: (args: {
+      where: { stashId: string };
+      create: SceneIndexRow;
+      update: SceneIndexRow;
+    }) => Promise<unknown>;
+  };
+  librarySceneIndex: {
+    upsert: (args: {
+      where: { stashSceneId: string };
+      create: LibrarySceneIndexRow;
+      update: LibrarySceneIndexRow;
+    }) => Promise<unknown>;
+  };
+  sceneIndexSummary: {
+    update: (args: {
+      where: { key: string };
+      data: Record<string, unknown>;
+    }) => Promise<unknown>;
+  };
+}) => Promise<unknown>;
 
 function buildSceneIndexRow(
   overrides: Record<string, unknown> = {},
@@ -487,12 +509,30 @@ function createPrismaMock(config: {
       sceneIndexSummary,
       request,
       syncState,
-      $transaction: jest.fn(async (operations: TransactionOperation[]) =>
-        Promise.all(
-          operations.map((operation) =>
-            typeof operation === 'function' ? operation() : operation,
-          ),
-        ),
+      $transaction: jest.fn(
+        async (
+          operationsOrCallback: TransactionOperation[] | TransactionCallback,
+        ) => {
+          if (typeof operationsOrCallback === 'function') {
+            return operationsOrCallback({
+              sceneIndex: {
+                upsert: async (args) => sceneIndex.upsert(args)(),
+              },
+              librarySceneIndex: {
+                upsert: async (args) => librarySceneIndex.upsert(args)(),
+              },
+              sceneIndexSummary: {
+                update: async (args) => sceneIndexSummary.update(args)(),
+              },
+            });
+          }
+
+          return Promise.all(
+            operationsOrCallback.map((operation) =>
+              typeof operation === 'function' ? operation() : operation,
+            ),
+          );
+        },
       ),
     } as unknown as PrismaService,
     sceneIndexStore,
@@ -1451,9 +1491,11 @@ describe('IndexingService', () => {
         lastSuccessAt: new Date(Date.now() - 5 * 60_000),
       },
     });
-    const sceneIndex = (prisma as unknown as {
-      sceneIndex: { count: jest.Mock };
-    }).sceneIndex;
+    const sceneIndex = (
+      prisma as unknown as {
+        sceneIndex: { count: jest.Mock };
+      }
+    ).sceneIndex;
     const service = new IndexingService(
       prisma,
       integrationsService,
