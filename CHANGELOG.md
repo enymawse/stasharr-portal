@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.0](https://github.com/enymawse/stasharr-portal/compare/v0.1.0...v0.2.0) (2026-06-03)
+
+
+### Features
+
+* **runtime:** expose built app version metadata ([#14](https://github.com/enymawse/stasharr-portal/issues/14)) ([6d7a5a2](https://github.com/enymawse/stasharr-portal/commit/6d7a5a29a60050af6de667db27e39c599a5bda6b))
+
+
+### Bug Fixes
+
+* mem leak ([#19](https://github.com/enymawse/stasharr-portal/issues/19)) ([915d26f](https://github.com/enymawse/stasharr-portal/commit/915d26f0f334324bd65ab34e13473eef4ee58132))
+* **sp-api:** avoid retained prisma batch query strings ([#27](https://github.com/enymawse/stasharr-portal/issues/27)) ([6767583](https://github.com/enymawse/stasharr-portal/commit/6767583b1d60981323d08488821815d3e1d46b2d))
+* **sp-api:** harden indexing memory behavior ([#18](https://github.com/enymawse/stasharr-portal/issues/18)) ([6f0417a](https://github.com/enymawse/stasharr-portal/commit/6f0417a970649b01d67479e2a7308109dfd7799c))
+* **stashdb:** surface provider network timeout details ([#25](https://github.com/enymawse/stasharr-portal/issues/25)) ([4eeb6ee](https://github.com/enymawse/stasharr-portal/commit/4eeb6ee145bb0f1badef49ec5ec955bc38defeed)), closes [#24](https://github.com/enymawse/stasharr-portal/issues/24)
+
 ## 0.1.0 (2026-04-14)
 
 
