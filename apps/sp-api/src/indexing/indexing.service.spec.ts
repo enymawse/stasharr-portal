@@ -17,6 +17,10 @@ import { SyncStateService } from './sync-state.service';
 type SceneIndexRow = Record<string, unknown>;
 type LibrarySceneIndexRow = Record<string, unknown>;
 type TransactionOperation = Promise<unknown> | (() => Promise<unknown>);
+type TransactionOptions = {
+  maxWait?: number;
+  timeout?: number;
+};
 type TransactionCallback = (tx: {
   sceneIndex: {
     upsert: (args: {
@@ -39,6 +43,27 @@ type TransactionCallback = (tx: {
     }) => Promise<unknown>;
   };
 }) => Promise<unknown>;
+
+function expectInteractiveTransactionsToUseIndexWriteOptions(
+  prisma: PrismaService,
+): void {
+  const transaction = (
+    prisma as unknown as {
+      $transaction: jest.Mock;
+    }
+  ).$transaction;
+  const interactiveCalls = transaction.mock.calls.filter(
+    ([operation]) => typeof operation === 'function',
+  );
+
+  expect(interactiveCalls.length).toBeGreaterThan(0);
+  for (const [, options] of interactiveCalls) {
+    expect(options).toEqual({
+      maxWait: 10_000,
+      timeout: 60_000,
+    });
+  }
+}
 
 function buildSceneIndexRow(
   overrides: Record<string, unknown> = {},
@@ -512,6 +537,7 @@ function createPrismaMock(config: {
       $transaction: jest.fn(
         async (
           operationsOrCallback: TransactionOperation[] | TransactionCallback,
+          _options?: TransactionOptions,
         ) => {
           if (typeof operationsOrCallback === 'function') {
             return operationsOrCallback({
@@ -801,6 +827,7 @@ describe('IndexingService', () => {
         computedLifecycle: 'IMPORT_PENDING',
       }),
     );
+    expectInteractiveTransactionsToUseIndexWriteOptions(prisma);
   });
 
   it('syncs the local-library projection and reconciles linked stash availability', async () => {
@@ -965,6 +992,7 @@ describe('IndexingService', () => {
         computedLifecycle: 'NOT_REQUESTED',
       }),
     );
+    expectInteractiveTransactionsToUseIndexWriteOptions(prisma);
   });
 
   it('does not treat an inactive-provider raw id as locally available during library projection', async () => {

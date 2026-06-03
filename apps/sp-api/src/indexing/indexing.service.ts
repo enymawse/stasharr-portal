@@ -159,6 +159,8 @@ export class IndexingService {
   private static readonly METADATA_SCHEDULED_CHECK_CACHE_MS = 60_000;
   private static readonly METADATA_RETRY_BACKOFF_MS = 5 * 60_000;
   private static readonly UPSERT_DEADLOCK_RETRY_ATTEMPTS = 3;
+  private static readonly INDEX_WRITE_TRANSACTION_MAX_WAIT_MS = 10_000;
+  private static readonly INDEX_WRITE_TRANSACTION_TIMEOUT_MS = 60_000;
   private static readonly BOOTSTRAP_LEASE_MS = 20 * 60_000;
   private static readonly QUEUE_LEASE_MS = 25_000;
   private static readonly MOVIES_LEASE_MS = 4 * 60_000;
@@ -1640,7 +1642,7 @@ export class IndexingService {
               data: this.buildSceneIndexSummaryDeltaUpdate(summaryDelta),
             });
           }
-        });
+        }, this.indexWriteTransactionOptions());
 
         for (const row of nextRows) {
           existingByStashId.set(row.stashId, row as SceneIndex);
@@ -2296,7 +2298,7 @@ export class IndexingService {
           },
         });
       }
-    });
+    }, this.indexWriteTransactionOptions());
 
     return items.length;
   }
@@ -2584,6 +2586,13 @@ export class IndexingService {
         : new Date(retryAfterAt).getTime();
 
     return Number.isFinite(retryAfterTime) && retryAfterTime <= Date.now();
+  }
+
+  private indexWriteTransactionOptions(): { maxWait: number; timeout: number } {
+    return {
+      maxWait: IndexingService.INDEX_WRITE_TRANSACTION_MAX_WAIT_MS,
+      timeout: IndexingService.INDEX_WRITE_TRANSACTION_TIMEOUT_MS,
+    };
   }
 
   private pickValue<T>(incoming: T | undefined, existing: T): T {
