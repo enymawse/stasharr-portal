@@ -45,6 +45,7 @@ import {
   firstUseEmptyStateCopy,
   initialIndexingGuidance,
 } from '../../shared/readiness/first-run-readiness.utils';
+import { FeedState, injectFeedStateMemory } from '../../core/navigation/feed-state-memory';
 
 interface MultiSelectOption {
   label: string;
@@ -60,6 +61,10 @@ interface LibraryPageAlert {
   title: string;
   message: string;
 }
+
+type LibraryPageFeedState = FeedState<LibrarySceneItem> & {
+  latestSyncAt: string | null;
+};
 
 @Component({
   selector: 'app-library-page',
@@ -108,6 +113,13 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly setupStatusStore = inject(SetupStatusStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly feedMemory = injectFeedStateMemory<LibraryPageFeedState>(() => ({
+    items: this.items(),
+    page: this.page(),
+    total: this.total(),
+    hasMore: this.hasMore(),
+    latestSyncAt: this.latestSyncAt(),
+  }));
   private readonly queryTerms = new Subject<string>();
   private readonly studioSearchTerms = new Subject<string>();
   private readonly tagSearchTerms = new Subject<string>();
@@ -700,6 +712,21 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
       });
   }
 
+  private restoreSavedFeed(): boolean {
+    const saved = this.feedMemory.restore();
+    if (!saved) {
+      return false;
+    }
+
+    this.feedVersion += 1;
+    this.items.set([...saved.items]);
+    this.page.set(saved.page);
+    this.total.set(saved.total);
+    this.hasMore.set(saved.hasMore);
+    this.latestSyncAt.set(saved.latestSyncAt);
+    return true;
+  }
+
   private resetFeedAndReload(): void {
     this.feedVersion += 1;
     this.pendingReload = false;
@@ -748,7 +775,11 @@ export class LibraryPageComponent implements OnInit, AfterViewInit, OnDestroy {
       const urlState = this.readUrlState(queryParamMap);
       const changed = this.applyUrlState(urlState);
       if (!this.hasHydratedFromUrl || changed) {
+        const isInitialHydration = !this.hasHydratedFromUrl;
         this.hasHydratedFromUrl = true;
+        if (isInitialHydration && this.restoreSavedFeed()) {
+          return;
+        }
         this.resetFeedAndReload();
         return;
       }

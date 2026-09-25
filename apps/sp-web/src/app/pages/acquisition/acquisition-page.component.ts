@@ -28,6 +28,7 @@ import {
   firstUseEmptyStateCopy,
   initialIndexingGuidance,
 } from '../../shared/readiness/first-run-readiness.utils';
+import { FeedState, injectFeedStateMemory } from '../../core/navigation/feed-state-memory';
 
 type AcquisitionSectionTone = 'attention' | 'pending' | 'active' | 'passive' | 'overview';
 
@@ -54,6 +55,10 @@ interface AcquisitionPageAlert {
   message: string;
 }
 
+type AcquisitionPageFeedState = FeedState<AcquisitionSceneItem> & {
+  countsByLifecycle: AcquisitionCountsByLifecycle;
+};
+
 @Component({
   selector: 'app-acquisition-page',
   imports: [RouterLink, Message, ProgressSpinner, SceneStatusBadgeComponent],
@@ -79,6 +84,13 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
   private readonly runtimeHealthService = inject(RuntimeHealthService);
   private readonly setupStatusStore = inject(SetupStatusStore);
   private readonly route = inject(ActivatedRoute);
+  private readonly feedMemory = injectFeedStateMemory<AcquisitionPageFeedState>(() => ({
+    items: this.items(),
+    page: this.page(),
+    total: this.total(),
+    hasMore: this.hasMore(),
+    countsByLifecycle: this.countsByLifecycle(),
+  }));
   private readonly router = inject(Router);
   private queryParamSubscription: Subscription | null = null;
   private observer: IntersectionObserver | null = null;
@@ -550,7 +562,11 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
       const changed = this.applyUrlState(lifecycle);
 
       if (!this.hasHydratedFromUrl || changed) {
+        const isInitialHydration = !this.hasHydratedFromUrl;
         this.hasHydratedFromUrl = true;
+        if (isInitialHydration && this.restoreSavedFeed()) {
+          return;
+        }
         this.resetFeedAndReload();
         return;
       }
@@ -597,6 +613,21 @@ export class AcquisitionPageComponent implements OnInit, AfterViewInit, OnDestro
       queryParamsHandling: 'merge',
       replaceUrl,
     });
+  }
+
+  private restoreSavedFeed(): boolean {
+    const saved = this.feedMemory.restore();
+    if (!saved) {
+      return false;
+    }
+
+    this.feedVersion += 1;
+    this.items.set([...saved.items]);
+    this.page.set(saved.page);
+    this.total.set(saved.total);
+    this.hasMore.set(saved.hasMore);
+    this.countsByLifecycle.set(saved.countsByLifecycle);
+    return true;
   }
 
   private resetFeedAndReload(): void {

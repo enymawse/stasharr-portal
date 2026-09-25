@@ -48,6 +48,7 @@ import {
   firstUseEmptyStateCopy,
   initialIndexingGuidance,
 } from '../../shared/readiness/first-run-readiness.utils';
+import { FeedState, injectFeedStateMemory } from '../../core/navigation/feed-state-memory';
 
 type FavoritesFilterOption = 'NONE' | SceneFavoritesFilter;
 interface MultiSelectOption {
@@ -119,6 +120,12 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly setupStatusStore = inject(SetupStatusStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly feedMemory = injectFeedStateMemory<FeedState<SceneExplorerItem>>(() => ({
+    items: this.items(),
+    page: this.page(),
+    total: this.total(),
+    hasMore: this.hasMore(),
+  }));
   private readonly studioSearchTerms = new Subject<string>();
   private readonly tagSearchTerms = new Subject<string>();
   private studioSearchSubscription: Subscription | null = null;
@@ -595,6 +602,20 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
       });
   }
 
+  private restoreSavedFeed(): boolean {
+    const saved = this.feedMemory.restore();
+    if (!saved) {
+      return false;
+    }
+
+    this.feedVersion += 1;
+    this.items.set([...saved.items]);
+    this.page.set(saved.page);
+    this.total.set(saved.total);
+    this.hasMore.set(saved.hasMore);
+    return true;
+  }
+
   private resetFeedAndReload(): void {
     this.feedVersion += 1;
     this.pendingReload = false;
@@ -650,7 +671,11 @@ export class ScenesPageComponent implements OnInit, AfterViewInit, OnDestroy {
         this.syncUrlWithCurrentFilters(true);
       }
       if (!this.hasHydratedFromUrl || changed) {
+        const isInitialHydration = !this.hasHydratedFromUrl;
         this.hasHydratedFromUrl = true;
+        if (isInitialHydration && this.restoreSavedFeed()) {
+          return;
+        }
         this.resetFeedAndReload();
         return;
       }

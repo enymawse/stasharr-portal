@@ -42,6 +42,11 @@ import {
 } from '../../core/api/discover.types';
 import { SceneCardComponent } from '../../shared/scene-card/scene-card.component';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
+import {
+  FeedState,
+  RESTORE_FEED_NAVIGATION_STATE,
+  injectFeedStateMemory,
+} from '../../core/navigation/feed-state-memory';
 
 interface SelectedStudioChip {
   id: string;
@@ -95,6 +100,12 @@ export class PerformerPageComponent implements OnInit, AfterViewInit, OnDestroy 
   private readonly notifications = inject(AppNotificationsService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly scenesFeedMemory = injectFeedStateMemory<FeedState<DiscoverItem>>(() => ({
+    items: this.scenes(),
+    page: this.scenesPage(),
+    total: this.scenesTotal(),
+    hasMore: this.scenesHasMore(),
+  }));
 
   private readonly studioSearchTerms = new Subject<string>();
   private readonly tagSearchTerms = new Subject<string>();
@@ -169,6 +180,7 @@ export class PerformerPageComponent implements OnInit, AfterViewInit, OnDestroy 
   protected readonly backLinkPath = signal('/performers');
   protected readonly backLinkQueryParams = signal<Params>({});
   protected readonly backLinkLabel = signal('Back to Performers');
+  protected readonly backLinkState = RESTORE_FEED_NAVIGATION_STATE;
 
   ngOnInit(): void {
     this.setupStudioSearch();
@@ -198,7 +210,11 @@ export class PerformerPageComponent implements OnInit, AfterViewInit, OnDestroy 
 
       const changedByUrl = this.applyUrlFilterState(this.readUrlFilterState(queryParamMap));
       if (!this.hasHydratedFilterState || performerChanged || changedByUrl) {
+        const isInitialHydration = !this.hasHydratedFilterState;
         this.hasHydratedFilterState = true;
+        if (isInitialHydration && this.restoreSavedScenes()) {
+          return;
+        }
         this.resetScenesAndReload();
         return;
       }
@@ -680,6 +696,20 @@ export class PerformerPageComponent implements OnInit, AfterViewInit, OnDestroy 
           }
         },
       });
+  }
+
+  private restoreSavedScenes(): boolean {
+    const saved = this.scenesFeedMemory.restore();
+    if (!saved) {
+      return false;
+    }
+
+    this.scenesFeedVersion += 1;
+    this.scenes.set([...saved.items]);
+    this.scenesPage.set(saved.page);
+    this.scenesTotal.set(saved.total);
+    this.scenesHasMore.set(saved.hasMore);
+    return true;
   }
 
   private resetScenesAndReload(): void {
