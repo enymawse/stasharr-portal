@@ -8,12 +8,16 @@ import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
 import { integrationLabel } from '../../core/api/integrations.types';
-import { RESTORE_FEED_NAVIGATION_STATE } from '../../core/navigation/feed-state-memory';
+import {
+  FeedStateCache,
+  RESTORE_FEED_NAVIGATION_STATE,
+} from '../../core/navigation/feed-state-memory';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import {
   SceneDetails,
   ScenePerformer,
   SceneRequestContext,
+  SceneStatus,
   isSceneStatusRequestable,
 } from '../../core/api/discover.types';
 import { SceneRequestModalComponent } from '../../shared/scene-request-modal/scene-request-modal.component';
@@ -46,6 +50,7 @@ export class ScenePageComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly discoverService = inject(DiscoverService);
   private readonly notifications = inject(AppNotificationsService);
+  private readonly feedStateCache = inject(FeedStateCache);
   private previousFocusedElement: HTMLElement | null = null;
   private routeSubscription: Subscription | null = null;
 
@@ -379,6 +384,7 @@ export class ScenePageComponent implements OnInit, OnDestroy {
   }
 
   protected onRequestSubmitted(stashId: string): void {
+    this.feedStateCache.updateItems((item) => markSceneRequested(item, stashId));
     this.loadScene(stashId);
   }
 
@@ -587,4 +593,41 @@ export class ScenePageComponent implements OnInit, OnDestroy {
       return next;
     });
   }
+}
+
+interface RequestableSceneItem {
+  id: string;
+  status: Pick<SceneStatus, 'state'>;
+  requestable?: boolean;
+}
+
+/**
+ * Marks a remembered list item as requested so a restored list does not offer to
+ * request it again. Only touches items still in a requestable state, so richer
+ * statuses (e.g. on the Acquisition page) are left alone.
+ */
+function markSceneRequested(item: unknown, stashId: string): unknown {
+  if (!isRequestableSceneItem(item) || item.id !== stashId) {
+    return item;
+  }
+
+  return {
+    ...item,
+    status: { state: 'REQUESTED' },
+    ...('requestable' in item ? { requestable: false } : {}),
+  };
+}
+
+function isRequestableSceneItem(item: unknown): item is RequestableSceneItem {
+  if (typeof item !== 'object' || item === null) {
+    return false;
+  }
+
+  const candidate = item as Partial<RequestableSceneItem>;
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.status === 'object' &&
+    candidate.status !== null &&
+    isSceneStatusRequestable(candidate.status)
+  );
 }

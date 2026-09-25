@@ -72,6 +72,22 @@ describe('FeedStateCache', () => {
     expect(cache.get('/scenes')).toBeNull();
   });
 
+  it('updates saved items across all feeds without extending their expiry', () => {
+    vi.useFakeTimers();
+    const cache = createCache();
+    cache.save('/scenes', { state: buildState({ items: ['a', 'b'] }), scrollPosition: [0, 10] });
+    cache.save('/studios', { state: buildState({ items: ['b', 'c'] }), scrollPosition: [0, 20] });
+    vi.advanceTimersByTime(FeedStateCache.TTL_MS - 1000);
+
+    cache.updateItems((item) => (item === 'b' ? 'B' : item));
+
+    expect(cache.get('/scenes')?.state.items).toEqual(['a', 'B']);
+    expect(cache.get('/studios')?.state.items).toEqual(['B', 'c']);
+    expect(cache.get('/studios')?.scrollPosition).toEqual([0, 20]);
+    vi.advanceTimersByTime(2000);
+    expect(cache.get('/scenes')).toBeNull();
+  });
+
   it('evicts the least recently saved entry when full', () => {
     const cache = createCache();
     for (let i = 0; i <= FeedStateCache.MAX_ENTRIES; i += 1) {

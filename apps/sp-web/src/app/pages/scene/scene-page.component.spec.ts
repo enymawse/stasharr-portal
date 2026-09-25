@@ -4,6 +4,7 @@ import { of } from 'rxjs';
 import { DiscoverService } from '../../core/api/discover.service';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import { SceneDetails } from '../../core/api/discover.types';
+import { FeedStateCache } from '../../core/navigation/feed-state-memory';
 import { ScenePageComponent } from './scene-page.component';
 
 function buildScene(overrides: Partial<SceneDetails> = {}): SceneDetails {
@@ -99,6 +100,54 @@ describe('ScenePageComponent', () => {
       fixture.nativeElement.querySelector('a[href="http://whisparr.local/movie/scene-1"]')
         ?.textContent,
     ).toContain('View in Whisparr');
+  });
+
+  it('marks the requested scene as requested in remembered list pages', async () => {
+    const { fixture } = await renderScene(buildScene());
+    const cache = TestBed.inject(FeedStateCache);
+    cache.save('/scenes', {
+      state: {
+        items: [
+          { id: 'scene-1', status: { state: 'NOT_REQUESTED' }, requestable: true },
+          { id: 'scene-2', status: { state: 'NOT_REQUESTED' }, requestable: true },
+        ],
+        page: 1,
+        total: 2,
+        hasMore: false,
+      },
+      scrollPosition: [0, 500],
+    });
+    cache.save('/studio/studio-1', {
+      state: {
+        items: [{ id: 'scene-1', status: { state: 'NOT_REQUESTED' } }],
+        page: 1,
+        total: 1,
+        hasMore: false,
+      },
+      scrollPosition: [0, 900],
+    });
+    cache.save('/acquisition', {
+      state: {
+        items: [{ id: 'scene-1', status: { state: 'DOWNLOADING' } }],
+        page: 1,
+        total: 1,
+        hasMore: false,
+      },
+      scrollPosition: [0, 0],
+    });
+
+    (fixture.componentInstance as any).onRequestSubmitted('scene-1');
+
+    expect(cache.get('/scenes')?.state.items).toEqual([
+      { id: 'scene-1', status: { state: 'REQUESTED' }, requestable: false },
+      { id: 'scene-2', status: { state: 'NOT_REQUESTED' }, requestable: true },
+    ]);
+    expect(cache.get('/studio/studio-1')?.state.items).toEqual([
+      { id: 'scene-1', status: { state: 'REQUESTED' } },
+    ]);
+    expect(cache.get('/acquisition')?.state.items).toEqual([
+      { id: 'scene-1', status: { state: 'DOWNLOADING' } },
+    ]);
   });
 
   it('keeps the normal request CTA for NOT_REQUESTED scenes', async () => {

@@ -72,6 +72,20 @@ export class FeedStateCache {
     return stored.entry;
   }
 
+  /**
+   * Rewrites items in every saved feed, e.g. to reflect a change made on another page.
+   * Keeps each entry's expiry and eviction order; items returned unchanged stay as-is.
+   */
+  updateItems(update: (item: unknown) => unknown): void {
+    for (const [key, stored] of this.entries) {
+      const { entry } = stored;
+      this.entries.set(key, {
+        ...stored,
+        entry: { ...entry, state: { ...entry.state, items: entry.state.items.map(update) } },
+      });
+    }
+  }
+
   private normalizeUrl(url: string): string {
     try {
       return this.router.serializeUrl(this.router.parseUrl(url));
