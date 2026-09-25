@@ -28,6 +28,11 @@ import { MultiSelect } from 'primeng/multiselect';
 import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
+import {
+  FeedState,
+  RESTORE_FEED_NAVIGATION_STATE,
+  injectFeedStateMemory,
+} from '../../core/navigation/feed-state-memory';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import {
   DiscoverItem,
@@ -107,6 +112,12 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly discoverService = inject(DiscoverService);
   private readonly notifications = inject(AppNotificationsService);
+  private readonly scenesFeedMemory = injectFeedStateMemory<FeedState<DiscoverItem>>(() => ({
+    items: this.scenes(),
+    page: this.scenesPage(),
+    total: this.scenesTotal(),
+    hasMore: this.scenesHasMore(),
+  }));
   private readonly tagSearchTerms = new Subject<string>();
   private routeSubscription: Subscription | null = null;
   private tagSearchSubscription: Subscription | null = null;
@@ -176,6 +187,7 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly backLinkPath = signal('/studios');
   protected readonly backLinkQueryParams = signal<Params>({});
   protected readonly backLinkLabel = signal('Back to Studios');
+  protected readonly backLinkState = RESTORE_FEED_NAVIGATION_STATE;
 
   protected readonly sceneSortOptions = StudioPageComponent.SCENE_SORT_OPTIONS;
   protected readonly favoritesOptions = StudioPageComponent.FAVORITES_OPTIONS;
@@ -208,7 +220,11 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
 
       const changedByUrl = this.applyUrlFilterState(this.readUrlFilterState(queryParamMap));
       if (!this.hasHydratedFilterState || studioChanged || changedByUrl) {
+        const isInitialHydration = !this.hasHydratedFilterState;
         this.hasHydratedFilterState = true;
+        if (isInitialHydration && this.restoreSavedScenes()) {
+          return;
+        }
         this.resetScenesAndReload();
         return;
       }
@@ -627,6 +643,20 @@ export class StudioPageComponent implements OnInit, AfterViewInit, OnDestroy {
           }
         },
       });
+  }
+
+  private restoreSavedScenes(): boolean {
+    const saved = this.scenesFeedMemory.restore();
+    if (!saved) {
+      return false;
+    }
+
+    this.scenesFeedVersion += 1;
+    this.scenes.set([...saved.items]);
+    this.scenesPage.set(saved.page);
+    this.scenesTotal.set(saved.total);
+    this.scenesHasMore.set(saved.hasMore);
+    return true;
   }
 
   private resetScenesAndReload(): void {

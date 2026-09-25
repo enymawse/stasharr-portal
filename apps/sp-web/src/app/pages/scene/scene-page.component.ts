@@ -8,6 +8,7 @@ import { ProgressSpinner } from 'primeng/progressspinner';
 import { Select } from 'primeng/select';
 import { DiscoverService } from '../../core/api/discover.service';
 import { integrationLabel } from '../../core/api/integrations.types';
+import { RESTORE_FEED_NAVIGATION_STATE } from '../../core/navigation/feed-state-memory';
 import { AppNotificationsService } from '../../core/notifications/app-notifications.service';
 import {
   SceneDetails,
@@ -63,6 +64,7 @@ export class ScenePageComponent implements OnInit, OnDestroy {
   protected readonly backLinkPath = signal('/scenes');
   protected readonly backLinkQueryParams = signal<Params>({});
   protected readonly backLinkLabel = signal('Back to Scenes');
+  protected readonly backLinkState = RESTORE_FEED_NAVIGATION_STATE;
 
   ngOnInit(): void {
     this.routeSubscription = combineLatest([
