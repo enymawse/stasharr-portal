@@ -995,6 +995,111 @@ describe('IndexingService', () => {
     expectInteractiveTransactionsToUseIndexWriteOptions(prisma);
   });
 
+  it.each(['STASHDB', 'FANSDB'] as const)(
+    'keeps secondary %s catalog references available across full projections',
+    async (providerKey) => {
+      configuredStashdbIntegration.baseUrl =
+        providerKey === 'FANSDB'
+          ? 'https://fansdb.cc/graphql'
+          : 'https://stashdb.org/graphql';
+      const inactiveProvider = providerKey === 'FANSDB' ? 'STASHDB' : 'FANSDB';
+      const { prisma, sceneIndexStore, librarySceneIndexStore } =
+        createPrismaMock({
+          sceneIndexRows: [
+            buildSceneIndexRow({
+              stashId: 'alias-1',
+              stashAvailable: true,
+              computedLifecycle: 'AVAILABLE',
+              lifecycleSortOrder: 90,
+            }),
+            buildSceneIndexRow({
+              stashId: 'alias-2',
+              requestStatus: RequestStatus.REQUESTED,
+              computedLifecycle: 'REQUESTED',
+              lifecycleSortOrder: 3,
+            }),
+            buildSceneIndexRow({
+              stashId: 'foreign-only',
+              stashAvailable: true,
+              computedLifecycle: 'AVAILABLE',
+              lifecycleSortOrder: 90,
+            }),
+          ],
+        });
+      const refs = [
+        `${providerKey}|primary-1`,
+        `${providerKey}|alias-1`,
+        `${providerKey}|alias-2`,
+        `${providerKey}|alias-1`,
+        `${inactiveProvider}|foreign-only`,
+        'malformed-reference',
+        `${providerKey}| `,
+      ];
+      getLocalLibraryScenePageMock.mockResolvedValue({
+        total: 1,
+        page: 1,
+        perPage: 100,
+        hasMore: false,
+        items: [
+          {
+            id: 'local-1',
+            activeCatalogSceneId: 'primary-1',
+            linkedCatalogRefs: refs,
+            title: 'Local Scene',
+            description: null,
+            imageUrl: null,
+            studioId: null,
+            studio: null,
+            studioImageUrl: null,
+            performerIds: [],
+            performerNames: [],
+            tagIds: [],
+            tagNames: [],
+            releaseDate: null,
+            duration: null,
+            viewUrl: 'http://stash.local/scenes/local-1',
+            createdAt: null,
+            updatedAt: null,
+            hasFavoritePerformer: false,
+            favoriteStudio: false,
+            hasFavoriteTag: false,
+          },
+        ],
+      });
+      const service = new IndexingService(
+        prisma,
+        integrationsService,
+        catalogProviderService,
+        whisparrAdapter,
+        stashAdapter,
+        stashdbAdapter,
+        syncStateService,
+      );
+
+      for (const reason of ['first-refresh', 'second-refresh']) {
+        await service.syncLibraryProjection(reason);
+        for (const stashId of ['primary-1', 'alias-1', 'alias-2']) {
+          expect(sceneIndexStore.get(stashId)).toEqual(
+            expect.objectContaining({
+              stashAvailable: true,
+              computedLifecycle: 'AVAILABLE',
+            }),
+          );
+        }
+        expect(sceneIndexStore.get('foreign-only')).toEqual(
+          expect.objectContaining({ stashAvailable: false }),
+        );
+        expect(sceneIndexStore.has('')).toBe(false);
+        expect(librarySceneIndexStore.get('local-1')).toEqual(
+          expect.objectContaining({
+            linkedStashId: 'primary-1',
+            linkedCatalogRefs: refs,
+          }),
+        );
+      }
+    },
+  );
+
   it('does not treat an inactive-provider raw id as locally available during library projection', async () => {
     configuredStashdbIntegration.baseUrl = 'https://fansdb.cc/graphql';
 

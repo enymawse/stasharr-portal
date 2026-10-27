@@ -11,7 +11,10 @@ import {
 } from '@prisma/client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { type CatalogProviderKey } from '../providers/catalog/catalog-provider.util';
+import {
+  parseCatalogSceneRef,
+  type CatalogProviderKey,
+} from '../providers/catalog/catalog-provider.util';
 import { CatalogProviderService } from '../providers/catalog/catalog-provider.service';
 import {
   StashAdapter,
@@ -1235,6 +1238,12 @@ export class IndexingService {
       for (const item of snapshotPage.items) {
         if (item.activeCatalogSceneId) {
           availableActiveCatalogSceneIds.add(item.activeCatalogSceneId);
+        }
+        for (const ref of item.linkedCatalogRefs ?? []) {
+          const parsedRef = parseCatalogSceneRef(ref);
+          if (parsedRef?.providerKey === activeCatalogProviderKey) {
+            availableActiveCatalogSceneIds.add(parsedRef.externalId);
+          }
         }
       }
 
